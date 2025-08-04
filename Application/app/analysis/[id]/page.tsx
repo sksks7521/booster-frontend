@@ -1,0 +1,555 @@
+"use client"
+
+import { useState, useEffect } from "react"
+import { useParams, useRouter } from "next/navigation"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import Header from "@/components/layout/header"
+import {
+  ArrowLeft,
+  Heart,
+  Share2,
+  MapPin,
+  Calendar,
+  Car,
+  CableCarIcon as Elevator,
+  TrendingUp,
+  TrendingDown,
+  CheckCircle,
+  Download,
+  Calculator,
+  Phone,
+} from "lucide-react"
+
+interface PropertyDetail {
+  id: string
+  title: string
+  address: string
+  price: number
+  area: number
+  buildYear: number
+  lat: number
+  lng: number
+  auctionDate?: string
+  status: "scheduled" | "ongoing" | "completed" | "cancelled"
+  floor?: string
+  hasElevator?: boolean
+  hasParking?: boolean
+  estimatedValue?: number
+  description?: string
+  images?: string[]
+  legalInfo?: {
+    caseNumber: string
+    court: string
+    auctionType: string
+    minimumBid: number
+    deposit: number
+  }
+  buildingInfo?: {
+    totalFloors: number
+    buildingType: string
+    structure: string
+    landArea: number
+    buildingArea: number
+    parkingSpaces: number
+  }
+  marketAnalysis?: {
+    averagePrice: number
+    priceChange: number
+    marketTrend: "up" | "down" | "stable"
+    competitiveProperties: number
+  }
+  investmentAnalysis?: {
+    expectedRoi: number
+    riskLevel: "low" | "medium" | "high"
+    profitability: "excellent" | "good" | "fair" | "poor"
+    recommendations: string[]
+  }
+}
+
+export default function PropertyDetailPage() {
+  const params = useParams()
+  const router = useRouter()
+  const [property, setProperty] = useState<PropertyDetail | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [isFavorite, setIsFavorite] = useState(false)
+  const [activeTab, setActiveTab] = useState("overview")
+
+  // 사용자 정보
+  const user = {
+    email: "user@example.com",
+    subscription: {
+      plan: "Pro",
+      expiresAt: "2024-12-31",
+    },
+  }
+
+  // 모의 상세 데이터
+  const mockPropertyDetail: PropertyDetail = {
+    id: params.id as string,
+    title: "서울 강남구 역삼동 빌라",
+    address: "서울특별시 강남구 역삼동 123-45",
+    price: 45000,
+    area: 25,
+    buildYear: 2010,
+    lat: 37.5,
+    lng: 127.03,
+    auctionDate: "2024-02-15",
+    status: "scheduled",
+    floor: "3층",
+    hasElevator: true,
+    hasParking: true,
+    estimatedValue: 52000,
+    description:
+      "강남 핵심지역에 위치한 투자가치가 높은 빌라입니다. 교통이 편리하고 주변 상권이 발달되어 있어 임대 수요가 안정적입니다.",
+    images: [
+      "/placeholder.svg?height=400&width=600",
+      "/placeholder.svg?height=400&width=600",
+      "/placeholder.svg?height=400&width=600",
+      "/placeholder.svg?height=400&width=600",
+    ],
+    legalInfo: {
+      caseNumber: "2024타경12345",
+      court: "서울중앙지방법원",
+      auctionType: "강제경매",
+      minimumBid: 45000,
+      deposit: 4500,
+    },
+    buildingInfo: {
+      totalFloors: 4,
+      buildingType: "다세대주택",
+      structure: "철근콘크리트",
+      landArea: 120,
+      buildingArea: 100,
+      parkingSpaces: 1,
+    },
+    marketAnalysis: {
+      averagePrice: 48000,
+      priceChange: -6.25,
+      marketTrend: "down",
+      competitiveProperties: 8,
+    },
+    investmentAnalysis: {
+      expectedRoi: 8.5,
+      riskLevel: "medium",
+      profitability: "good",
+      recommendations: [
+        "시장가 대비 할인된 가격으로 투자 매력도 높음",
+        "강남권 위치로 안정적인 임대 수요 예상",
+        "리모델링 후 임대료 상승 가능성 있음",
+        "주변 재개발 계획 확인 필요",
+      ],
+    },
+  }
+
+  useEffect(() => {
+    // 실제로는 API에서 데이터를 가져옴
+    setTimeout(() => {
+      setProperty(mockPropertyDetail)
+      setLoading(false)
+    }, 1000)
+  }, [params.id])
+
+  const handleBack = () => {
+    router.back()
+  }
+
+  const handleFavorite = () => {
+    setIsFavorite(!isFavorite)
+  }
+
+  const handleShare = () => {
+    navigator.share?.({
+      title: property?.title,
+      text: property?.description,
+      url: window.location.href,
+    })
+  }
+
+  const getStatusBadge = (status: string) => {
+    const statusConfig = {
+      scheduled: { label: "경매예정", variant: "secondary" as const },
+      ongoing: { label: "경매진행중", variant: "default" as const },
+      completed: { label: "경매완료", variant: "outline" as const },
+      cancelled: { label: "경매취소", variant: "destructive" as const },
+    }
+    return statusConfig[status as keyof typeof statusConfig] || statusConfig.scheduled
+  }
+
+  const getRiskBadge = (risk: string) => {
+    const riskConfig = {
+      low: { label: "낮음", variant: "secondary" as const, color: "text-green-600" },
+      medium: { label: "보통", variant: "outline" as const, color: "text-yellow-600" },
+      high: { label: "높음", variant: "destructive" as const, color: "text-red-600" },
+    }
+    return riskConfig[risk as keyof typeof riskConfig] || riskConfig.medium
+  }
+
+  const getProfitabilityBadge = (profitability: string) => {
+    const profitConfig = {
+      excellent: { label: "우수", variant: "default" as const, color: "text-blue-600" },
+      good: { label: "양호", variant: "secondary" as const, color: "text-green-600" },
+      fair: { label: "보통", variant: "outline" as const, color: "text-yellow-600" },
+      poor: { label: "주의", variant: "destructive" as const, color: "text-red-600" },
+    }
+    return profitConfig[profitability as keyof typeof profitConfig] || profitConfig.fair
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <Header user={user} />
+        <div className="container mx-auto px-4 py-8">
+          <div className="animate-pulse">
+            <div className="h-8 bg-gray-200 rounded w-1/4 mb-6"></div>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+              <div className="lg:col-span-2">
+                <div className="h-96 bg-gray-200 rounded-lg mb-6"></div>
+                <div className="h-64 bg-gray-200 rounded-lg"></div>
+              </div>
+              <div className="space-y-4">
+                <div className="h-32 bg-gray-200 rounded-lg"></div>
+                <div className="h-48 bg-gray-200 rounded-lg"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (!property) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <Header user={user} />
+        <div className="container mx-auto px-4 py-8">
+          <div className="text-center">
+            <h1 className="text-2xl font-bold text-gray-900 mb-4">물건을 찾을 수 없습니다</h1>
+            <Button onClick={handleBack}>
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              돌아가기
+            </Button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  const statusBadge = getStatusBadge(property.status)
+  const riskBadge = getRiskBadge(property.investmentAnalysis?.riskLevel || "medium")
+  const profitabilityBadge = getProfitabilityBadge(property.investmentAnalysis?.profitability || "fair")
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <Header user={user} />
+
+      <div className="container mx-auto px-4 py-8">
+        {/* 상단 네비게이션 */}
+        <div className="flex items-center justify-between mb-6">
+          <Button variant="ghost" onClick={handleBack} className="flex items-center">
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            목록으로 돌아가기
+          </Button>
+          <div className="flex items-center space-x-2">
+            <Button variant={isFavorite ? "default" : "outline"} size="sm" onClick={handleFavorite}>
+              <Heart className={`w-4 h-4 mr-2 ${isFavorite ? "fill-current" : ""}`} />
+              관심등록
+            </Button>
+            <Button variant="outline" size="sm" onClick={handleShare}>
+              <Share2 className="w-4 h-4 mr-2" />
+              공유
+            </Button>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* 메인 콘텐츠 */}
+          <div className="lg:col-span-2">
+            {/* 물건 기본 정보 */}
+            <Card className="mb-6">
+              <CardHeader>
+                <div className="flex items-start justify-between">
+                  <div>
+                    <CardTitle className="text-2xl font-bold mb-2">{property.title}</CardTitle>
+                    <div className="flex items-center text-gray-600 mb-2">
+                      <MapPin className="w-4 h-4 mr-1" />
+                      {property.address}
+                    </div>
+                    <div className="flex items-center space-x-4 text-sm text-gray-500">
+                      <span>{property.area}㎡</span>
+                      <span>{property.buildYear}년 건축</span>
+                      <span>{property.floor}</span>
+                    </div>
+                  </div>
+                  <Badge variant={statusBadge.variant}>{statusBadge.label}</Badge>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-blue-600">{property.price.toLocaleString()}만원</div>
+                    <div className="text-sm text-gray-500">경매 시작가</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-green-600">
+                      {property.estimatedValue?.toLocaleString()}만원
+                    </div>
+                    <div className="text-sm text-gray-500">감정가</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-purple-600">
+                      {property.investmentAnalysis?.expectedRoi}%
+                    </div>
+                    <div className="text-sm text-gray-500">예상 수익률</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="flex items-center justify-center space-x-2">
+                      {property.hasParking && <Car className="w-5 h-5 text-green-500" />}
+                      {property.hasElevator && <Elevator className="w-5 h-5 text-blue-500" />}
+                    </div>
+                    <div className="text-sm text-gray-500">편의시설</div>
+                  </div>
+                </div>
+
+                {property.description && (
+                  <div className="border-t pt-4">
+                    <h3 className="font-semibold mb-2">물건 설명</h3>
+                    <p className="text-gray-700">{property.description}</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* 이미지 갤러리 */}
+            <Card className="mb-6">
+              <CardHeader>
+                <CardTitle>물건 사진</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 gap-4">
+                  {property.images?.map((image, index) => (
+                    <div key={index} className="aspect-video bg-gray-100 rounded-lg overflow-hidden">
+                      <img
+                        src={image || "/placeholder.svg"}
+                        alt={`${property.title} 사진 ${index + 1}`}
+                        className="w-full h-full object-cover hover:scale-105 transition-transform cursor-pointer"
+                      />
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* 상세 정보 탭 */}
+            <Card>
+              <CardContent className="p-0">
+                <Tabs value={activeTab} onValueChange={setActiveTab}>
+                  <TabsList className="grid w-full grid-cols-4">
+                    <TabsTrigger value="overview">개요</TabsTrigger>
+                    <TabsTrigger value="legal">법적정보</TabsTrigger>
+                    <TabsTrigger value="building">건물정보</TabsTrigger>
+                    <TabsTrigger value="location">위치정보</TabsTrigger>
+                  </TabsList>
+
+                  <TabsContent value="overview" className="p-6">
+                    <div className="space-y-4">
+                      <div>
+                        <h3 className="font-semibold mb-2">경매 일정</h3>
+                        <div className="flex items-center text-gray-700">
+                          <Calendar className="w-4 h-4 mr-2" />
+                          {property.auctionDate} 10:00
+                        </div>
+                      </div>
+                      <div>
+                        <h3 className="font-semibold mb-2">물건 특징</h3>
+                        <div className="grid grid-cols-2 gap-4 text-sm">
+                          <div>면적: {property.area}㎡</div>
+                          <div>건축년도: {property.buildYear}년</div>
+                          <div>층수: {property.floor}</div>
+                          <div>엘리베이터: {property.hasElevator ? "있음" : "없음"}</div>
+                          <div>주차장: {property.hasParking ? "있음" : "없음"}</div>
+                        </div>
+                      </div>
+                    </div>
+                  </TabsContent>
+
+                  <TabsContent value="legal" className="p-6">
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-2 gap-4 text-sm">
+                        <div>
+                          <span className="font-medium">사건번호:</span>
+                          <span className="ml-2">{property.legalInfo?.caseNumber}</span>
+                        </div>
+                        <div>
+                          <span className="font-medium">법원:</span>
+                          <span className="ml-2">{property.legalInfo?.court}</span>
+                        </div>
+                        <div>
+                          <span className="font-medium">경매구분:</span>
+                          <span className="ml-2">{property.legalInfo?.auctionType}</span>
+                        </div>
+                        <div>
+                          <span className="font-medium">최저입찰가:</span>
+                          <span className="ml-2">{property.legalInfo?.minimumBid.toLocaleString()}만원</span>
+                        </div>
+                        <div>
+                          <span className="font-medium">보증금:</span>
+                          <span className="ml-2">{property.legalInfo?.deposit.toLocaleString()}만원</span>
+                        </div>
+                      </div>
+                    </div>
+                  </TabsContent>
+
+                  <TabsContent value="building" className="p-6">
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-2 gap-4 text-sm">
+                        <div>
+                          <span className="font-medium">건물유형:</span>
+                          <span className="ml-2">{property.buildingInfo?.buildingType}</span>
+                        </div>
+                        <div>
+                          <span className="font-medium">구조:</span>
+                          <span className="ml-2">{property.buildingInfo?.structure}</span>
+                        </div>
+                        <div>
+                          <span className="font-medium">총 층수:</span>
+                          <span className="ml-2">{property.buildingInfo?.totalFloors}층</span>
+                        </div>
+                        <div>
+                          <span className="font-medium">대지면적:</span>
+                          <span className="ml-2">{property.buildingInfo?.landArea}㎡</span>
+                        </div>
+                        <div>
+                          <span className="font-medium">건물면적:</span>
+                          <span className="ml-2">{property.buildingInfo?.buildingArea}㎡</span>
+                        </div>
+                        <div>
+                          <span className="font-medium">주차대수:</span>
+                          <span className="ml-2">{property.buildingInfo?.parkingSpaces}대</span>
+                        </div>
+                      </div>
+                    </div>
+                  </TabsContent>
+
+                  <TabsContent value="location" className="p-6">
+                    <div className="space-y-4">
+                      <div className="aspect-video bg-gray-100 rounded-lg flex items-center justify-center">
+                        <div className="text-center text-gray-500">
+                          <MapPin className="w-12 h-12 mx-auto mb-2" />
+                          <p>지도 영역</p>
+                          <p className="text-sm">실제 구현 시 지도 API 연동</p>
+                        </div>
+                      </div>
+                      <div>
+                        <h3 className="font-semibold mb-2">주변 시설</h3>
+                        <div className="grid grid-cols-2 gap-2 text-sm text-gray-700">
+                          <div>• 지하철 2호선 역삼역 도보 5분</div>
+                          <div>• 버스정류장 도보 2분</div>
+                          <div>• 대형마트 도보 10분</div>
+                          <div>• 초등학교 도보 8분</div>
+                        </div>
+                      </div>
+                    </div>
+                  </TabsContent>
+                </Tabs>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* 사이드바 */}
+          <div className="space-y-6">
+            {/* 투자 분석 */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <TrendingUp className="w-5 h-5 mr-2" />
+                  투자 분석
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium">수익성</span>
+                  <Badge variant={profitabilityBadge.variant}>{profitabilityBadge.label}</Badge>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium">리스크</span>
+                  <Badge variant={riskBadge.variant}>{riskBadge.label}</Badge>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium">예상 ROI</span>
+                  <span className="font-bold text-green-600">{property.investmentAnalysis?.expectedRoi}%</span>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* 시장 분석 */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <TrendingDown className="w-5 h-5 mr-2" />
+                  시장 분석
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium">주변 평균가</span>
+                  <span className="font-bold">{property.marketAnalysis?.averagePrice.toLocaleString()}만원</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium">가격 변동</span>
+                  <span
+                    className={`font-bold ${property.marketAnalysis?.priceChange && property.marketAnalysis.priceChange > 0 ? "text-red-600" : "text-blue-600"}`}
+                  >
+                    {property.marketAnalysis?.priceChange}%
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium">경쟁 물건</span>
+                  <span className="font-bold">{property.marketAnalysis?.competitiveProperties}개</span>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* 추천사항 */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <CheckCircle className="w-5 h-5 mr-2" />
+                  투자 추천사항
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ul className="space-y-2 text-sm">
+                  {property.investmentAnalysis?.recommendations.map((rec, index) => (
+                    <li key={index} className="flex items-start">
+                      <span className="w-2 h-2 bg-blue-500 rounded-full mt-2 mr-2 flex-shrink-0"></span>
+                      {rec}
+                    </li>
+                  ))}
+                </ul>
+              </CardContent>
+            </Card>
+
+            {/* 액션 버튼 */}
+            <div className="space-y-3">
+              <Button className="w-full" size="lg">
+                <Calculator className="w-4 h-4 mr-2" />
+                수익률 계산하기
+              </Button>
+              <Button variant="outline" className="w-full bg-transparent">
+                <Download className="w-4 h-4 mr-2" />
+                상세 자료 다운로드
+              </Button>
+              <Button variant="outline" className="w-full bg-transparent">
+                <Phone className="w-4 h-4 mr-2" />
+                전문가 상담 신청
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
