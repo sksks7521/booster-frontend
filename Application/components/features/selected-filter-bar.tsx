@@ -1,154 +1,162 @@
 "use client"
 
 import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import { useFilterStore } from "@/store/filterStore"
 import { X } from "lucide-react"
 
-interface FilterTag {
-  key: string
-  label: string
-  value: any
-}
+type SelectedFilterBarProps = {}
 
-interface SelectedFilterBarProps {
-  filters: any
-  onRemoveFilter: (key: string) => void
-  onClearAll: () => void
-}
+export default function SelectedFilterBar({}: SelectedFilterBarProps) {
+  // 스토어에서 직접 상태와 액션을 가져옵니다.
+  const filters = useFilterStore((state) => state)
+  const setFilter = useFilterStore((state) => state.setFilter)
+  const setRangeFilter = useFilterStore((state) => state.setRangeFilter)
+  const resetFilters = useFilterStore((state) => state.resetFilters)
 
-export default function SelectedFilterBar({ filters, onRemoveFilter, onClearAll }: SelectedFilterBarProps) {
-  const getFilterTags = (): FilterTag[] => {
-    const tags: FilterTag[] = []
+  // 'x' 버튼 클릭 시 호출되는 함수를 수정합니다.
+  const handleRemove = (key: string) => {
+    if (key === "hasElevator" || key === "hasParking") {
+      setFilter(key as any, false)
+    } else if (key === "priceRange") {
+      setRangeFilter("priceRange", [0, 500000])
+    } else if (key === "areaRange") {
+      setRangeFilter("areaRange", [0, 200])
+    } else if (key === "buildYear") {
+      setRangeFilter("buildYear", [1980, 2024])
+    } else {
+      setFilter(key as any, "")
+    }
+  }
+
+  const formatPrice = (value: number) => {
+    if (value >= 10000) {
+      return `${(value / 10000).toFixed(1)}억`
+    }
+    return `${value.toLocaleString()}만`
+  }
+
+  const formatArea = (value: number) => {
+    return `${value}㎡`
+  }
+
+  const getSelectedFilters = () => {
+    const selected = []
 
     if (filters.region) {
-      const regionLabels: { [key: string]: string } = {
-        seoul: "서울특별시",
-        gyeonggi: "경기도",
-        incheon: "인천광역시",
-        busan: "부산광역시",
-        daegu: "대구광역시",
-      }
-      tags.push({
+      selected.push({
         key: "region",
-        label: regionLabels[filters.region] || filters.region,
+        label: `지역: ${filters.region}`,
         value: filters.region,
       })
     }
 
     if (filters.buildingType) {
-      const typeLabels: { [key: string]: string } = {
-        villa: "빌라",
-        apartment: "아파트",
-        officetel: "오피스텔",
-        commercial: "상가",
-      }
-      tags.push({
+      selected.push({
         key: "buildingType",
-        label: typeLabels[filters.buildingType] || filters.buildingType,
+        label: `건물유형: ${filters.buildingType}`,
         value: filters.buildingType,
       })
     }
 
-    if (filters.priceRange && (filters.priceRange[0] > 0 || filters.priceRange[1] < 500000)) {
-      tags.push({
+    if (filters.priceRange[0] > 0 || filters.priceRange[1] < 500000) {
+      selected.push({
         key: "priceRange",
-        label: `${filters.priceRange[0].toLocaleString()}-${filters.priceRange[1].toLocaleString()}만원`,
+        label: `가격: ${formatPrice(filters.priceRange[0])} ~ ${formatPrice(filters.priceRange[1])}`,
         value: filters.priceRange,
       })
     }
 
-    if (filters.areaRange && (filters.areaRange[0] > 0 || filters.areaRange[1] < 200)) {
-      tags.push({
+    if (filters.areaRange[0] > 0 || filters.areaRange[1] < 200) {
+      selected.push({
         key: "areaRange",
-        label: `${filters.areaRange[0]}-${filters.areaRange[1]}평`,
+        label: `면적: ${formatArea(filters.areaRange[0])} ~ ${formatArea(filters.areaRange[1])}`,
         value: filters.areaRange,
       })
     }
 
-    if (filters.buildYear && (filters.buildYear[0] > 1980 || filters.buildYear[1] < 2024)) {
-      tags.push({
+    if (filters.buildYear[0] > 1980 || filters.buildYear[1] < 2024) {
+      selected.push({
         key: "buildYear",
-        label: `${filters.buildYear[0]}-${filters.buildYear[1]}년`,
+        label: `건축년도: ${filters.buildYear[0]}년 ~ ${filters.buildYear[1]}년`,
         value: filters.buildYear,
       })
     }
 
     if (filters.floor) {
-      const floorLabels: { [key: string]: string } = {
-        basement: "지하",
-        "1-3": "1-3층",
-        "4-6": "4-6층",
-        "7-10": "7-10층",
-        "11+": "11층 이상",
-      }
-      tags.push({
+      selected.push({
         key: "floor",
-        label: floorLabels[filters.floor] || filters.floor,
+        label: `층수: ${filters.floor}`,
         value: filters.floor,
       })
     }
 
     if (filters.hasElevator) {
-      tags.push({
+      selected.push({
         key: "hasElevator",
         label: "엘리베이터",
-        value: filters.hasElevator,
+        value: true,
       })
     }
 
     if (filters.hasParking) {
-      tags.push({
+      selected.push({
         key: "hasParking",
         label: "주차장",
-        value: filters.hasParking,
+        value: true,
       })
     }
 
     if (filters.auctionStatus) {
-      const statusLabels: { [key: string]: string } = {
-        scheduled: "경매 예정",
-        ongoing: "경매 진행중",
-        completed: "경매 완료",
-        cancelled: "경매 취소",
+      const statusLabels = {
+        scheduled: "경매예정",
+        ongoing: "경매진행중",
+        completed: "경매완료",
+        cancelled: "경매취소",
       }
-      tags.push({
+      selected.push({
         key: "auctionStatus",
-        label: statusLabels[filters.auctionStatus] || filters.auctionStatus,
+        label: `상태: ${statusLabels[filters.auctionStatus as keyof typeof statusLabels] || filters.auctionStatus}`,
         value: filters.auctionStatus,
       })
     }
 
-    return tags
+    return selected
   }
 
-  const filterTags = getFilterTags()
+  const selectedFilters = getSelectedFilters()
 
-  if (filterTags.length === 0) {
+  if (selectedFilters.length === 0) {
     return null
   }
 
   return (
-    <div className="bg-gray-50 border-b border-gray-200 px-4 py-3">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-2">
-          <span className="text-sm font-medium text-gray-700">적용된 필터:</span>
-          <div className="flex flex-wrap gap-2">
-            {filterTags.map((tag) => (
-              <div
-                key={tag.key}
-                className="inline-flex items-center bg-blue-100 text-blue-800 text-xs font-medium px-2.5 py-0.5 rounded-full"
-              >
-                {tag.label}
-                <button onClick={() => onRemoveFilter(tag.key)} className="ml-1 hover:bg-blue-200 rounded-full p-0.5">
-                  <X className="w-3 h-3" />
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-        <Button variant="ghost" size="sm" onClick={onClearAll} className="text-gray-500 hover:text-gray-700">
-          전체 해제
-        </Button>
-      </div>
+    <div className="flex flex-wrap items-center gap-2 p-4 bg-gray-50 rounded-lg">
+      <span className="text-sm font-medium text-gray-700">선택된 필터:</span>
+
+      {selectedFilters.map((filter) => (
+        <Badge key={filter.key} variant="secondary" className="flex items-center gap-1 px-3 py-1">
+          <span className="text-xs">{filter.label}</span>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-auto p-0 ml-1 hover:bg-transparent"
+            onClick={() => handleRemove(filter.key)}
+          >
+            <X className="w-3 h-3" />
+          </Button>
+        </Badge>
+      ))}
+
+      {/* '전체 해제' 버튼 클릭 시 resetFilters 액션을 호출합니다. */}
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={resetFilters}
+        className="text-xs text-gray-500 hover:text-gray-700 ml-2"
+      >
+        전체 해제
+      </Button>
     </div>
   )
 }

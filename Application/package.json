@@ -45,6 +45,7 @@
     "date-fns": "4.1.0",
     "embla-carousel-react": "8.5.1",
     "geist": "^1.3.1",
+    "immer": "latest",
     "input-otp": "1.4.1",
     "leaflet": "latest",
     "lucide-react": "^0.454.0",
@@ -58,10 +59,13 @@
     "react-resizable-panels": "^2.1.7",
     "recharts": "2.15.4",
     "sonner": "^1.7.4",
+    "swr": "latest",
     "tailwind-merge": "^2.5.5",
     "tailwindcss-animate": "^1.0.7",
+    "use-sync-external-store": "latest",
     "vaul": "^0.9.9",
-    "zod": "^3.25.67"
+    "zod": "3.25.67",
+    "zustand": "latest"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.1.9",

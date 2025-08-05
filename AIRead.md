@@ -11,6 +11,7 @@
 우리 프로젝트의 기술적인 설계도이자 청사진입니다. 이 문서를 통해 우리 프론트엔드의 전체 구조, 사용 기술, DB 스키마, API 명세 등 기술적인 모든 것을 파악할 수 있습니다.
 
 - **✅ 수행할 작업:** `FRONTEND_ARCHITECTURE.md` 파일을 읽어주세요.
+- **✅ 수행할 작업:** `PROJECT_FRONTEND_ROADMAP.md` 파일을 읽어주세요.
 
 ---
 
@@ -22,6 +23,7 @@
   1.  `Communication/COMMUNICATION_GUIDE(Frontend-Backend).md`
   2.  `Communication/COMMUNICATION_GUIDE(Frontend-Infrastructure).md`
   3.  `Communication/COMMUNICATION_GUIDE(Frontend-Pipeline).md`
+  4.  `Communication/COMMUNICATION_GUIDE(Frontend-Analysis).md`
 
 ---
 
@@ -41,10 +43,12 @@
   1.  `Communication/Backend/receive/Request`
   2.  `Communication/Infra/receive/Request`
   3.  `Communication/Pipeline/receive/Request`
+  4.  `Communication/Analysis/receive/Request`
 - **✅ 완료한 작업 확인:** 아래 **`receive/Completed`** 폴더들을 모두 확인하여, Request 상태인 새로운 요청서(.md 파일) 중 완료된 사항(Completed)을 파악하고, 이를 통해 완료되지 않은 Request 요청서(.md 파일)만 골라서 읽고, 진행해야할 사항을 판단하세요.
   1.  `Communication/Backend/receive/Completed`
   2.  `Communication/Infra/receive/Completed`
   3.  `Communication/Pipeline/receive/Completed`
+  4.  `Communication/Analysis/receive/Completed`
 
 ---
 

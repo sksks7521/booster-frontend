@@ -17,9 +17,6 @@ import {
   SortDesc,
   ExternalLink,
   MapPin,
-  Calendar,
-  TrendingUp,
-  TrendingDown,
   Trash2,
   Eye,
   Share2,
@@ -32,25 +29,7 @@ import {
   Store,
   Warehouse,
 } from "lucide-react"
-
-interface FavoriteProperty {
-  id: string
-  title: string
-  address: string
-  price: number
-  area: number
-  buildYear: number
-  buildingType: "villa" | "apartment" | "officetel" | "commercial" | "warehouse"
-  auctionDate?: string
-  status: "scheduled" | "ongoing" | "completed" | "cancelled"
-  estimatedValue?: number
-  profitRate?: number
-  addedDate: string
-  lastUpdated: string
-  notes?: string
-  images?: string[]
-  tags?: string[]
-}
+import { favoriteApi, type Favorite } from "@/lib/api"
 
 interface FilterState {
   search: string
@@ -58,13 +37,13 @@ interface FilterState {
   status: string
   priceRange: [number, number]
   profitRateRange: [number, number]
-  sortBy: "addedDate" | "price" | "profitRate" | "auctionDate"
+  sortBy: "created_at" | "price" | "area" | "built_year"
   sortOrder: "asc" | "desc"
 }
 
 export default function FavoritesPage() {
-  const [favorites, setFavorites] = useState<FavoriteProperty[]>([])
-  const [filteredFavorites, setFilteredFavorites] = useState<FavoriteProperty[]>([])
+  const [favorites, setFavorites] = useState<Favorite[]>([])
+  const [filteredFavorites, setFilteredFavorites] = useState<Favorite[]>([])
   const [selectedItems, setSelectedItems] = useState<string[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
@@ -74,109 +53,15 @@ export default function FavoritesPage() {
 
   const [filters, setFilters] = useState<FilterState>({
     search: "",
-    buildingType: "all", // Updated default value to "all"
-    status: "all", // Updated default value to "all"
+    buildingType: "all",
+    status: "all",
     priceRange: [0, 1000000],
     profitRateRange: [-10, 50],
-    sortBy: "addedDate",
+    sortBy: "created_at",
     sortOrder: "desc",
   })
 
-  // 모의 관심물건 데이터
-  const mockFavorites: FavoriteProperty[] = [
-    {
-      id: "fav_1",
-      title: "서울 강남구 역삼동 빌라",
-      address: "서울특별시 강남구 역삼동 123-45",
-      price: 45000,
-      area: 25,
-      buildYear: 2010,
-      buildingType: "villa",
-      auctionDate: "2024-02-15",
-      status: "scheduled",
-      estimatedValue: 52000,
-      profitRate: 15.6,
-      addedDate: "2024-01-20T10:30:00Z",
-      lastUpdated: "2024-02-01T14:20:00Z",
-      notes: "교통이 편리하고 주변 상권이 발달한 지역",
-      tags: ["고수익", "역세권"],
-      images: ["/placeholder.svg?height=200&width=300"],
-    },
-    {
-      id: "fav_2",
-      title: "서울 서초구 서초동 빌라",
-      address: "서울특별시 서초구 서초동 678-90",
-      price: 38000,
-      area: 22,
-      buildYear: 2008,
-      buildingType: "villa",
-      auctionDate: "2024-02-20",
-      status: "ongoing",
-      estimatedValue: 42000,
-      profitRate: 10.5,
-      addedDate: "2024-01-18T16:45:00Z",
-      lastUpdated: "2024-01-30T09:15:00Z",
-      notes: "학군이 좋은 지역",
-      tags: ["학군", "안정성"],
-      images: ["/placeholder.svg?height=200&width=300"],
-    },
-    {
-      id: "fav_3",
-      title: "부산 해운대구 상가",
-      address: "부산광역시 해운대구 우동 111-22",
-      price: 85000,
-      area: 45,
-      buildYear: 2015,
-      buildingType: "commercial",
-      auctionDate: "2024-03-05",
-      status: "scheduled",
-      estimatedValue: 95000,
-      profitRate: 11.8,
-      addedDate: "2024-01-15T11:20:00Z",
-      lastUpdated: "2024-01-28T13:40:00Z",
-      notes: "관광지 인근 상가, 임대 수요 높음",
-      tags: ["관광지", "임대수요"],
-      images: ["/placeholder.svg?height=200&width=300"],
-    },
-    {
-      id: "fav_4",
-      title: "인천 연수구 오피스텔",
-      address: "인천광역시 연수구 송도동 333-44",
-      price: 32000,
-      area: 18,
-      buildYear: 2018,
-      buildingType: "officetel",
-      auctionDate: "2024-01-25",
-      status: "completed",
-      estimatedValue: 35000,
-      profitRate: 9.4,
-      addedDate: "2024-01-10T08:30:00Z",
-      lastUpdated: "2024-01-25T17:00:00Z",
-      notes: "신도시 지역, 향후 개발 예정",
-      tags: ["신도시", "개발호재"],
-      images: ["/placeholder.svg?height=200&width=300"],
-    },
-    {
-      id: "fav_5",
-      title: "경기 성남시 창고",
-      address: "경기도 성남시 분당구 정자동 555-66",
-      price: 120000,
-      area: 80,
-      buildYear: 2012,
-      buildingType: "warehouse",
-      auctionDate: "2024-02-28",
-      status: "scheduled",
-      estimatedValue: 130000,
-      profitRate: 8.3,
-      addedDate: "2024-01-05T14:15:00Z",
-      lastUpdated: "2024-01-20T10:30:00Z",
-      notes: "물류 중심지, 접근성 우수",
-      tags: ["물류", "접근성"],
-      images: ["/placeholder.svg?height=200&width=300"],
-    },
-  ]
-
-  // 사용자 정보
+  // 사용자 정보 (임시)
   const user = {
     email: "demo@booster.com",
     subscription: {
@@ -186,16 +71,22 @@ export default function FavoritesPage() {
   }
 
   useEffect(() => {
-    // 데이터 로딩 시뮬레이션
-    const loadFavorites = async () => {
-      setIsLoading(true)
-      await new Promise((resolve) => setTimeout(resolve, 1000))
-      setFavorites(mockFavorites)
-      setIsLoading(false)
-    }
-
     loadFavorites()
   }, [])
+
+  const loadFavorites = async () => {
+    setIsLoading(true)
+    try {
+      const data = await favoriteApi.getFavorites()
+      setFavorites(data)
+      setError("")
+    } catch (err) {
+      console.error("Failed to load favorites:", err)
+      setError("관심 매물을 불러오는 중 오류가 발생했습니다.")
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   useEffect(() => {
     // 필터링 및 정렬 적용
@@ -205,40 +96,46 @@ export default function FavoritesPage() {
     if (filters.search) {
       filtered = filtered.filter(
         (item) =>
-          item.title.toLowerCase().includes(filters.search.toLowerCase()) ||
-          item.address.toLowerCase().includes(filters.search.toLowerCase()),
+          item.item.address.toLowerCase().includes(filters.search.toLowerCase()) ||
+          item.item.property_type.toLowerCase().includes(filters.search.toLowerCase()),
       )
     }
 
     // 건물 유형 필터
     if (filters.buildingType !== "all") {
-      filtered = filtered.filter((item) => item.buildingType === filters.buildingType)
-    }
-
-    // 상태 필터
-    if (filters.status !== "all") {
-      filtered = filtered.filter((item) => item.status === filters.status)
+      filtered = filtered.filter((item) => item.item.property_type === filters.buildingType)
     }
 
     // 가격 범위 필터
-    filtered = filtered.filter((item) => item.price >= filters.priceRange[0] && item.price <= filters.priceRange[1])
-
-    // 수익률 범위 필터
-    if (filters.profitRateRange) {
-      filtered = filtered.filter((item) => {
-        const rate = item.profitRate || 0
-        return rate >= filters.profitRateRange[0] && rate <= filters.profitRateRange[1]
-      })
-    }
+    filtered = filtered.filter(
+      (item) => item.item.price >= filters.priceRange[0] && item.item.price <= filters.priceRange[1],
+    )
 
     // 정렬
     filtered.sort((a, b) => {
-      let aValue: any = a[filters.sortBy]
-      let bValue: any = b[filters.sortBy]
+      let aValue: any
+      let bValue: any
 
-      if (filters.sortBy === "addedDate" || filters.sortBy === "auctionDate") {
-        aValue = new Date(aValue || "").getTime()
-        bValue = new Date(bValue || "").getTime()
+      switch (filters.sortBy) {
+        case "created_at":
+          aValue = new Date(a.created_at).getTime()
+          bValue = new Date(b.created_at).getTime()
+          break
+        case "price":
+          aValue = a.item.price
+          bValue = b.item.price
+          break
+        case "area":
+          aValue = a.item.area
+          bValue = b.item.area
+          break
+        case "built_year":
+          aValue = a.item.built_year
+          bValue = b.item.built_year
+          break
+        default:
+          aValue = new Date(a.created_at).getTime()
+          bValue = new Date(b.created_at).getTime()
       }
 
       if (filters.sortOrder === "asc") {
@@ -266,79 +163,69 @@ export default function FavoritesPage() {
     if (selectedItems.length === filteredFavorites.length) {
       setSelectedItems([])
     } else {
-      setSelectedItems(filteredFavorites.map((item) => item.id))
+      setSelectedItems(filteredFavorites.map((item) => item.id.toString()))
     }
   }
 
   const handleRemoveSelected = async () => {
     setIsLoading(true)
     try {
-      // 실제 구현에서는 API 호출
-      await new Promise((resolve) => setTimeout(resolve, 1000))
+      // 선택된 항목들을 병렬로 삭제
+      await Promise.all(
+        selectedItems.map(async (itemId) => {
+          const favorite = favorites.find((f) => f.id.toString() === itemId)
+          if (favorite) {
+            await favoriteApi.removeFavorite(favorite.item_id)
+          }
+        }),
+      )
 
-      setFavorites((prev) => prev.filter((item) => !selectedItems.includes(item.id)))
       setSelectedItems([])
       setSuccess(`${selectedItems.length}개의 관심물건이 삭제되었습니다.`)
+
+      // 목록 새로고침
+      await loadFavorites()
     } catch (err) {
+      console.error("Failed to remove favorites:", err)
       setError("관심물건 삭제 중 오류가 발생했습니다.")
     } finally {
       setIsLoading(false)
     }
   }
 
-  const handleRemoveItem = async (itemId: string) => {
+  const handleRemoveItem = async (itemId: number) => {
     try {
-      setFavorites((prev) => prev.filter((item) => item.id !== itemId))
+      await favoriteApi.removeFavorite(itemId)
       setSuccess("관심물건이 삭제되었습니다.")
+
+      // 목록에서 제거
+      setFavorites((prev) => prev.filter((item) => item.item_id !== itemId))
     } catch (err) {
+      console.error("Failed to remove favorite:", err)
       setError("관심물건 삭제 중 오류가 발생했습니다.")
     }
   }
 
   const getBuildingTypeIcon = (type: string) => {
-    switch (type) {
+    switch (type.toLowerCase()) {
+      case "빌라":
       case "villa":
         return <Home className="w-4 h-4" />
+      case "아파트":
       case "apartment":
         return <Building className="w-4 h-4" />
+      case "오피스텔":
       case "officetel":
         return <Building className="w-4 h-4" />
+      case "상가":
       case "commercial":
         return <Store className="w-4 h-4" />
+      case "창고":
       case "warehouse":
         return <Warehouse className="w-4 h-4" />
       default:
         return <Home className="w-4 h-4" />
     }
-  }
-
-  const getBuildingTypeLabel = (type: string) => {
-    const labels: { [key: string]: string } = {
-      villa: "빌라",
-      apartment: "아파트",
-      officetel: "오피스텔",
-      commercial: "상가",
-      warehouse: "창고",
-    }
-    return labels[type] || type
-  }
-
-  const getStatusBadge = (status: string) => {
-    const variants: { [key: string]: any } = {
-      scheduled: "default",
-      ongoing: "secondary",
-      completed: "outline",
-      cancelled: "destructive",
-    }
-
-    const labels: { [key: string]: string } = {
-      scheduled: "예정",
-      ongoing: "진행중",
-      completed: "완료",
-      cancelled: "취소",
-    }
-
-    return <Badge variant={variants[status] || "outline"}>{labels[status] || "알 수 없음"}</Badge>
   }
 
   const formatDate = (dateString: string) => {
@@ -349,10 +236,12 @@ export default function FavoritesPage() {
   }
 
   const formatPrice = (price: number) => {
-    if (price >= 10000) {
-      return `${(price / 10000).toFixed(1)}억`
+    if (price >= 100000000) {
+      return `${(price / 100000000).toFixed(1)}억`
+    } else if (price >= 10000) {
+      return `${(price / 10000).toFixed(0)}만`
     }
-    return `${price.toLocaleString()}만원`
+    return `${price.toLocaleString()}원`
   }
 
   return (
@@ -404,7 +293,7 @@ export default function FavoritesPage() {
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                 <Input
-                  placeholder="물건명 또는 주소로 검색..."
+                  placeholder="주소 또는 매물 유형으로 검색..."
                   value={filters.search}
                   onChange={(e) => handleFilterChange("search", e.target.value)}
                   className="pl-10"
@@ -430,10 +319,10 @@ export default function FavoritesPage() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="addedDate">추가일순</SelectItem>
+                  <SelectItem value="created_at">추가일순</SelectItem>
                   <SelectItem value="price">가격순</SelectItem>
-                  <SelectItem value="profitRate">수익률순</SelectItem>
-                  <SelectItem value="auctionDate">경매일순</SelectItem>
+                  <SelectItem value="area">면적순</SelectItem>
+                  <SelectItem value="built_year">건축년도순</SelectItem>
                 </SelectContent>
               </Select>
 
@@ -463,54 +352,37 @@ export default function FavoritesPage() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">전체</SelectItem>
-                      <SelectItem value="villa">빌라</SelectItem>
-                      <SelectItem value="apartment">아파트</SelectItem>
-                      <SelectItem value="officetel">오피스텔</SelectItem>
-                      <SelectItem value="commercial">상가</SelectItem>
-                      <SelectItem value="warehouse">창고</SelectItem>
+                      <SelectItem value="빌라">빌라</SelectItem>
+                      <SelectItem value="아파트">아파트</SelectItem>
+                      <SelectItem value="오피스텔">오피스텔</SelectItem>
+                      <SelectItem value="상가">상가</SelectItem>
+                      <SelectItem value="창고">창고</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
 
                 <div>
-                  <label className="text-sm font-medium text-gray-700 mb-2 block">경매 상태</label>
-                  <Select value={filters.status} onValueChange={(value) => handleFilterChange("status", value)}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="전체" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">전체</SelectItem>
-                      <SelectItem value="scheduled">예정</SelectItem>
-                      <SelectItem value="ongoing">진행중</SelectItem>
-                      <SelectItem value="completed">완료</SelectItem>
-                      <SelectItem value="cancelled">취소</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
-                  <label className="text-sm font-medium text-gray-700 mb-2 block">수익률 범위</label>
+                  <label className="text-sm font-medium text-gray-700 mb-2 block">가격 범위 (원)</label>
                   <div className="flex items-center space-x-2">
                     <Input
                       type="number"
                       placeholder="최소"
-                      value={filters.profitRateRange[0]}
+                      value={filters.priceRange[0]}
                       onChange={(e) =>
-                        handleFilterChange("profitRateRange", [Number(e.target.value), filters.profitRateRange[1]])
+                        handleFilterChange("priceRange", [Number(e.target.value), filters.priceRange[1]])
                       }
-                      className="w-20"
+                      className="w-24"
                     />
                     <span className="text-gray-500">~</span>
                     <Input
                       type="number"
                       placeholder="최대"
-                      value={filters.profitRateRange[1]}
+                      value={filters.priceRange[1]}
                       onChange={(e) =>
-                        handleFilterChange("profitRateRange", [filters.profitRateRange[0], Number(e.target.value)])
+                        handleFilterChange("priceRange", [filters.priceRange[0], Number(e.target.value)])
                       }
-                      className="w-20"
+                      className="w-24"
                     />
-                    <span className="text-sm text-gray-500">%</span>
                   </div>
                 </div>
               </div>
@@ -566,128 +438,73 @@ export default function FavoritesPage() {
           </div>
         ) : (
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredFavorites.map((item) => (
+            {filteredFavorites.map((favorite) => (
               <div
-                key={item.id}
+                key={favorite.id}
                 className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow"
               >
                 {/* 이미지 */}
                 <div className="relative h-48 bg-gray-100">
                   <img
-                    src={item.images?.[0] || "/placeholder.svg?height=200&width=300&query=property"}
-                    alt={item.title}
+                    src={`/placeholder.svg?height=200&width=300&query=${encodeURIComponent(favorite.item.property_type + " " + favorite.item.address)}`}
+                    alt={`${favorite.item.property_type} - ${favorite.item.address}`}
                     className="w-full h-full object-cover"
                   />
                   <div className="absolute top-3 left-3">
                     <div className="flex items-center space-x-1 bg-white/90 backdrop-blur-sm rounded-full px-2 py-1">
-                      {getBuildingTypeIcon(item.buildingType)}
-                      <span className="text-xs font-medium">{getBuildingTypeLabel(item.buildingType)}</span>
+                      {getBuildingTypeIcon(favorite.item.property_type)}
+                      <span className="text-xs font-medium">{favorite.item.property_type}</span>
                     </div>
                   </div>
                   <div className="absolute top-3 right-3">
                     <Checkbox
-                      checked={selectedItems.includes(item.id)}
-                      onCheckedChange={() => handleSelectItem(item.id)}
+                      checked={selectedItems.includes(favorite.id.toString())}
+                      onCheckedChange={() => handleSelectItem(favorite.id.toString())}
                       className="bg-white/90 backdrop-blur-sm"
                     />
                   </div>
-                  <div className="absolute bottom-3 right-3">{getStatusBadge(item.status)}</div>
                 </div>
 
                 {/* 콘텐츠 */}
                 <div className="p-6">
                   <div className="mb-4">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2 line-clamp-1">{item.title}</h3>
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2 line-clamp-1">
+                      {favorite.item.property_type}
+                    </h3>
                     <div className="flex items-center text-sm text-gray-500 mb-2">
                       <MapPin className="w-4 h-4 mr-1" />
-                      <span className="line-clamp-1">{item.address}</span>
+                      <span className="line-clamp-1">{favorite.item.address}</span>
                     </div>
                     <div className="flex items-center justify-between text-sm text-gray-500">
                       <span>
-                        {item.area}평 • {item.buildYear}년
+                        {favorite.item.area}평 • {favorite.item.built_year}년
                       </span>
-                      {item.auctionDate && (
-                        <div className="flex items-center">
-                          <Calendar className="w-4 h-4 mr-1" />
-                          <span>{formatDate(item.auctionDate)}</span>
-                        </div>
-                      )}
                     </div>
                   </div>
 
-                  {/* 가격 및 수익률 */}
+                  {/* 가격 */}
                   <div className="mb-4">
-                    <div className="flex items-center justify-between mb-2">
-                      <div>
-                        <div className="text-xl font-bold text-gray-900">{formatPrice(item.price)}</div>
-                        {item.estimatedValue && (
-                          <div className="text-sm text-gray-500">시세: {formatPrice(item.estimatedValue)}</div>
-                        )}
-                      </div>
-                      {item.profitRate && (
-                        <div className="text-right">
-                          <div
-                            className={`flex items-center text-sm font-medium ${
-                              item.profitRate > 0 ? "text-green-600" : "text-red-600"
-                            }`}
-                          >
-                            {item.profitRate > 0 ? (
-                              <TrendingUp className="w-4 h-4 mr-1" />
-                            ) : (
-                              <TrendingDown className="w-4 h-4 mr-1" />
-                            )}
-                            {item.profitRate > 0 ? "+" : ""}
-                            {item.profitRate.toFixed(1)}%
-                          </div>
-                          <div className="text-xs text-gray-500">예상 수익률</div>
-                        </div>
-                      )}
-                    </div>
+                    <div className="text-xl font-bold text-gray-900">{formatPrice(favorite.item.price)}</div>
                   </div>
-
-                  {/* 태그 */}
-                  {item.tags && item.tags.length > 0 && (
-                    <div className="mb-4">
-                      <div className="flex flex-wrap gap-1">
-                        {item.tags.slice(0, 3).map((tag, index) => (
-                          <Badge key={index} variant="secondary" className="text-xs">
-                            {tag}
-                          </Badge>
-                        ))}
-                        {item.tags.length > 3 && (
-                          <Badge variant="outline" className="text-xs">
-                            +{item.tags.length - 3}
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* 메모 */}
-                  {item.notes && (
-                    <div className="mb-4 p-3 bg-gray-50 rounded-lg">
-                      <p className="text-sm text-gray-600 line-clamp-2">{item.notes}</p>
-                    </div>
-                  )}
 
                   {/* 액션 버튼 */}
                   <div className="flex items-center justify-between pt-4 border-t border-gray-200">
-                    <div className="text-xs text-gray-500">추가: {formatDate(item.addedDate)}</div>
+                    <div className="text-xs text-gray-500">추가: {formatDate(favorite.created_at)}</div>
                     <div className="flex items-center space-x-2">
                       <Button variant="ghost" size="sm" asChild>
-                        <Link href={`/item/${item.id}`}>
+                        <Link href={`/item/${favorite.item.id}`}>
                           <Eye className="w-4 h-4" />
                         </Link>
                       </Button>
                       <Button variant="ghost" size="sm" asChild>
-                        <Link href={`/item/${item.id}`} target="_blank">
+                        <Link href={`/item/${favorite.item.id}`} target="_blank">
                           <ExternalLink className="w-4 h-4" />
                         </Link>
                       </Button>
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => handleRemoveItem(item.id)}
+                        onClick={() => handleRemoveItem(favorite.item_id)}
                         className="text-red-600 hover:text-red-700 hover:bg-red-50"
                       >
                         <Trash2 className="w-4 h-4" />
@@ -703,10 +520,91 @@ export default function FavoritesPage() {
         {/* 페이지네이션 (향후 구현) */}
         {filteredFavorites.length > 0 && (
           <div className="mt-8 text-center">
-            <Button variant="outline">더 보기</Button>
+            <Button variant="outline" onClick={loadFavorites}>
+              더 보기
+            </Button>
           </div>
         )}
       </div>
+
+      {/* 푸터 */}
+      <footer className="bg-gray-900 text-white py-12 mt-16">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid md:grid-cols-4 gap-8">
+            <div className="md:col-span-2">
+              <div className="flex items-center mb-4">
+                <div className="text-2xl font-bold text-blue-400">부스터</div>
+                <div className="ml-2 text-sm text-gray-400">Booster</div>
+              </div>
+              <p className="text-gray-400 mb-4">부동산 투자의 새로운 기준을 제시하는 AI 기반 분석 플랫폼입니다.</p>
+              <div className="text-sm text-gray-500">
+                <p>© 2024 Booster. All rights reserved.</p>
+              </div>
+            </div>
+
+            <div>
+              <h3 className="text-lg font-semibold mb-4">서비스</h3>
+              <ul className="space-y-2 text-gray-400">
+                <li>
+                  <Link href="/analysis" className="hover:text-white transition-colors">
+                    부동산 분석
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/calculator" className="hover:text-white transition-colors">
+                    수익률 계산기
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/favorites" className="hover:text-white transition-colors">
+                    관심 물건
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/pricing" className="hover:text-white transition-colors">
+                    요금제
+                  </Link>
+                </li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="text-lg font-semibold mb-4">고객지원</h3>
+              <ul className="space-y-2 text-gray-400">
+                <li>
+                  <Link href="/support" className="hover:text-white transition-colors">
+                    고객센터
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/notices" className="hover:text-white transition-colors">
+                    공지사항
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/terms" className="hover:text-white transition-colors">
+                    이용약관
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/privacy" className="hover:text-white transition-colors">
+                    개인정보처리방침
+                  </Link>
+                </li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="text-lg font-semibold mb-4">연락처</h3>
+              <div className="space-y-2 text-gray-400">
+                <p>이메일: support@booster.com</p>
+                <p>전화: 1588-0000</p>
+                <p>주소: 서울시 강남구 테헤란로 123</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </footer>
     </div>
   )
 }

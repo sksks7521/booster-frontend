@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -31,16 +31,7 @@ import {
   TrendingUp,
   Clock,
 } from "lucide-react"
-
-interface UserProfile {
-  id: string
-  name: string
-  email: string
-  joinDate: string
-  lastLogin: string
-  profileImage?: string
-  phone?: string
-}
+import { userApi, favoriteApi, type User as UserType, type Favorite } from "@/lib/api"
 
 interface Subscription {
   plan: "Free Trial" | "Basic" | "Pro" | "Enterprise"
@@ -73,16 +64,10 @@ export default function MyPage() {
   const [error, setError] = useState("")
 
   // 사용자 프로필 데이터
-  const [userProfile, setUserProfile] = useState<UserProfile>({
-    id: "user_123",
-    name: "김부동산",
-    email: "demo@booster.com",
-    joinDate: "2024-01-15",
-    lastLogin: "2024-02-01T10:30:00Z",
-    phone: "010-1234-5678",
-  })
+  const [userProfile, setUserProfile] = useState<UserType | null>(null)
+  const [favorites, setFavorites] = useState<Favorite[]>([])
 
-  // 구독 정보
+  // 구독 정보 (임시 - 실제로는 API에서 가져와야 함)
   const subscription: Subscription = {
     plan: "Pro",
     status: "active",
@@ -91,7 +76,7 @@ export default function MyPage() {
     autoRenew: true,
     usageLimit: {
       analyses: { used: 45, total: 100 },
-      favorites: { used: 12, total: 50 },
+      favorites: { used: favorites.length, total: 50 },
     },
   }
 
@@ -110,53 +95,76 @@ export default function MyPage() {
     analysis: true,
   })
 
-  // 최근 활동
+  // 최근 활동 (임시 데이터)
   const recentActivities: ActivityItem[] = [
     {
       id: "1",
       type: "analysis",
-      title: "서울 강남구 역삼동 빌라 분석",
-      description: "수익률 15.2% 예상",
-      date: "2024-02-01T09:30:00Z",
+      title: "부동산 분석 완료",
+      description: "새로운 매물 분석이 완료되었습니다",
+      date: new Date().toISOString(),
       status: "completed",
     },
     {
       id: "2",
       type: "favorite",
       title: "관심 물건 추가",
-      description: "서울 서초구 서초동 빌라",
-      date: "2024-01-31T14:20:00Z",
+      description: "새로운 매물을 관심 목록에 추가했습니다",
+      date: new Date(Date.now() - 86400000).toISOString(),
     },
     {
       id: "3",
-      type: "analysis",
-      title: "부산 해운대구 상가 분석",
-      description: "수익률 8.7% 예상",
-      date: "2024-01-30T16:45:00Z",
-      status: "completed",
-    },
-    {
-      id: "4",
       type: "login",
       title: "로그인",
-      description: "Chrome 브라우저에서 접속",
-      date: "2024-01-30T08:15:00Z",
+      description: "계정에 로그인했습니다",
+      date: new Date(Date.now() - 172800000).toISOString(),
     },
   ]
 
+  useEffect(() => {
+    loadUserData()
+  }, [])
+
+  const loadUserData = async () => {
+    setIsLoading(true)
+    try {
+      // 사용자 정보 로드
+      const userData = await userApi.getCurrentUser()
+      setUserProfile(userData)
+
+      // 관심 매물 로드
+      const favoritesData = await favoriteApi.getFavorites()
+      setFavorites(favoritesData)
+
+      setError("")
+    } catch (err) {
+      console.error("Failed to load user data:", err)
+      setError("사용자 정보를 불러오는 중 오류가 발생했습니다.")
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   const handleProfileUpdate = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!userProfile) return
+
     setIsLoading(true)
     setError("")
     setSuccess("")
 
     try {
-      // 실제 구현에서는 API 호출
-      await new Promise((resolve) => setTimeout(resolve, 1500))
+      const updatedUser = await userApi.updateUser({
+        full_name: userProfile.full_name,
+        email: userProfile.email,
+        phone_number: userProfile.phone_number,
+      })
 
+      setUserProfile(updatedUser)
       setSuccess("프로필이 성공적으로 업데이트되었습니다.")
       setIsEditing(false)
     } catch (err) {
+      console.error("Failed to update profile:", err)
       setError("프로필 업데이트 중 오류가 발생했습니다.")
     } finally {
       setIsLoading(false)
@@ -183,7 +191,7 @@ export default function MyPage() {
     }
 
     try {
-      // 실제 구현에서는 API 호출
+      // 실제 구현에서는 비밀번호 변경 API 호출
       await new Promise((resolve) => setTimeout(resolve, 1500))
 
       setSuccess("비밀번호가 성공적으로 변경되었습니다.")
@@ -247,6 +255,33 @@ export default function MyPage() {
     })
   }
 
+  // 로딩 중이거나 사용자 정보가 없는 경우
+  if (isLoading && !userProfile) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-500">사용자 정보를 불러오는 중...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (!userProfile) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">사용자 정보를 불러올 수 없습니다</h2>
+          <p className="text-gray-600 mb-4">다시 로그인해주세요.</p>
+          <Button asChild>
+            <Link href="/login">로그인</Link>
+          </Button>
+        </div>
+      </div>
+    )
+  }
+
   // 사용자 정보 (Header에 전달)
   const user = {
     email: userProfile.email,
@@ -301,9 +336,9 @@ export default function MyPage() {
                 <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
                   <User className="w-10 h-10 text-blue-600" />
                 </div>
-                <h3 className="text-lg font-semibold text-gray-900">{userProfile.name}</h3>
+                <h3 className="text-lg font-semibold text-gray-900">{userProfile.full_name}</h3>
                 <p className="text-sm text-gray-500">{userProfile.email}</p>
-                <p className="text-xs text-gray-400 mt-1">가입일: {formatDate(userProfile.joinDate)}</p>
+                <p className="text-xs text-gray-400 mt-1">가입일: {formatDate(userProfile.created_at)}</p>
               </div>
 
               {/* 사용량 요약 */}
@@ -331,16 +366,14 @@ export default function MyPage() {
                   <div className="flex justify-between text-sm mb-1">
                     <span className="text-gray-600">관심 물건</span>
                     <span className="font-medium">
-                      {subscription.usageLimit.favorites.used}/{subscription.usageLimit.favorites.total}
+                      {favorites.length}/{subscription.usageLimit.favorites.total}
                     </span>
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-2">
                     <div
                       className="bg-red-500 h-2 rounded-full"
                       style={{
-                        width: `${
-                          (subscription.usageLimit.favorites.used / subscription.usageLimit.favorites.total) * 100
-                        }%`,
+                        width: `${(favorites.length / subscription.usageLimit.favorites.total) * 100}%`,
                       }}
                     ></div>
                   </div>
@@ -407,15 +440,17 @@ export default function MyPage() {
                   <form onSubmit={handleProfileUpdate} className="space-y-6">
                     <div className="grid md:grid-cols-2 gap-6">
                       <div className="space-y-2">
-                        <Label htmlFor="name" className="text-sm font-medium text-gray-700">
+                        <Label htmlFor="full_name" className="text-sm font-medium text-gray-700">
                           이름
                         </Label>
                         <div className="relative">
                           <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                           <Input
-                            id="name"
-                            value={userProfile.name}
-                            onChange={(e) => setUserProfile((prev) => ({ ...prev, name: e.target.value }))}
+                            id="full_name"
+                            value={userProfile.full_name}
+                            onChange={(e) =>
+                              setUserProfile((prev) => (prev ? { ...prev, full_name: e.target.value } : null))
+                            }
                             className="pl-10"
                             disabled={!isEditing || isLoading}
                           />
@@ -432,7 +467,9 @@ export default function MyPage() {
                             id="email"
                             type="email"
                             value={userProfile.email}
-                            onChange={(e) => setUserProfile((prev) => ({ ...prev, email: e.target.value }))}
+                            onChange={(e) =>
+                              setUserProfile((prev) => (prev ? { ...prev, email: e.target.value } : null))
+                            }
                             className="pl-10"
                             disabled={!isEditing || isLoading}
                           />
@@ -440,13 +477,15 @@ export default function MyPage() {
                       </div>
 
                       <div className="space-y-2">
-                        <Label htmlFor="phone" className="text-sm font-medium text-gray-700">
+                        <Label htmlFor="phone_number" className="text-sm font-medium text-gray-700">
                           전화번호
                         </Label>
                         <Input
-                          id="phone"
-                          value={userProfile.phone || ""}
-                          onChange={(e) => setUserProfile((prev) => ({ ...prev, phone: e.target.value }))}
+                          id="phone_number"
+                          value={userProfile.phone_number || ""}
+                          onChange={(e) =>
+                            setUserProfile((prev) => (prev ? { ...prev, phone_number: e.target.value } : null))
+                          }
                           placeholder="010-0000-0000"
                           disabled={!isEditing || isLoading}
                         />
@@ -456,8 +495,21 @@ export default function MyPage() {
                         <Label className="text-sm font-medium text-gray-700">가입일</Label>
                         <div className="flex items-center space-x-2 text-sm text-gray-600">
                           <Calendar className="w-4 h-4" />
-                          <span>{formatDate(userProfile.joinDate)}</span>
+                          <span>{formatDate(userProfile.created_at)}</span>
                         </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label className="text-sm font-medium text-gray-700">생년월일</Label>
+                        <div className="flex items-center space-x-2 text-sm text-gray-600">
+                          <Calendar className="w-4 h-4" />
+                          <span>{formatDate(userProfile.birthdate)}</span>
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label className="text-sm font-medium text-gray-700">성별</Label>
+                        <div className="text-sm text-gray-600">{userProfile.gender === "male" ? "남성" : "여성"}</div>
                       </div>
                     </div>
 
@@ -623,25 +675,18 @@ export default function MyPage() {
                           <div className="flex justify-between text-sm mb-2">
                             <span className="text-gray-600">관심 물건 저장</span>
                             <span className="font-medium">
-                              {subscription.usageLimit.favorites.used}/{subscription.usageLimit.favorites.total}
+                              {favorites.length}/{subscription.usageLimit.favorites.total}
                             </span>
                           </div>
                           <div className="w-full bg-gray-200 rounded-full h-3">
                             <div
                               className="bg-red-500 h-3 rounded-full flex items-center justify-end pr-2"
                               style={{
-                                width: `${
-                                  (subscription.usageLimit.favorites.used / subscription.usageLimit.favorites.total) *
-                                  100
-                                }%`,
+                                width: `${(favorites.length / subscription.usageLimit.favorites.total) * 100}%`,
                               }}
                             >
                               <span className="text-xs text-white font-medium">
-                                {Math.round(
-                                  (subscription.usageLimit.favorites.used / subscription.usageLimit.favorites.total) *
-                                    100,
-                                )}
-                                %
+                                {Math.round((favorites.length / subscription.usageLimit.favorites.total) * 100)}%
                               </span>
                             </div>
                           </div>
@@ -808,6 +853,76 @@ export default function MyPage() {
           </div>
         </div>
       </div>
+
+      {/* 푸터 */}
+      <footer className="bg-gray-900 text-white py-12 mt-16">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid md:grid-cols-4 gap-8">
+            <div className="md:col-span-2">
+              <div className="flex items-center mb-4">
+                <div className="text-2xl font-bold text-blue-400">부스터</div>
+                <div className="ml-2 text-sm text-gray-400">Booster</div>
+              </div>
+              <p className="text-gray-400 mb-4">부동산 투자의 새로운 기준을 제시하는 AI 기반 분석 플랫폼입니다.</p>
+              <div className="text-sm text-gray-500">
+                <p>© 2024 Booster. All rights reserved.</p>
+              </div>
+            </div>
+
+            <div>
+              <h3 className="text-lg font-semibold mb-4">서비스</h3>
+              <ul className="space-y-2 text-gray-400">
+                <li>
+                  <Link href="/analysis" className="hover:text-white transition-colors">
+                    부동산 분석
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/calculator" className="hover:text-white transition-colors">
+                    수익률 계산기
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/favorites" className="hover:text-white transition-colors">
+                    관심 물건
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/pricing" className="hover:text-white transition-colors">
+                    요금제
+                  </Link>
+                </li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="text-lg font-semibold mb-4">고객지원</h3>
+              <ul className="space-y-2 text-gray-400">
+                <li>
+                  <Link href="/support" className="hover:text-white transition-colors">
+                    고객센터
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/notices" className="hover:text-white transition-colors">
+                    공지사항
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/terms" className="hover:text-white transition-colors">
+                    이용약관
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/privacy" className="hover:text-white transition-colors">
+                    개인정보처리방침
+                  </Link>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </footer>
     </div>
   )
 }
