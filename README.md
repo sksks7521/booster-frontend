@@ -10,7 +10,7 @@
 
 ## 📖 프로젝트 개요
 
-**Booster**는 데이터 기반 빌라 가치분석을 통해 투자자들에게 정확한 투자 의사결정을 돕는 웹 애플리케이션입니다. 
+**Booster**는 데이터 기반 빌라 가치분석을 통해 투자자들에게 정확한 투자 의사결정을 돕는 웹 애플리케이션입니다.
 실시간 매물 데이터, 시장 분석, 수익률 시뮬레이션을 통해 빌라 투자의 리스크를 최소화하고 수익을 극대화합니다.
 
 ### 🎯 핵심 기능
@@ -24,17 +24,20 @@
 ## 🛠 기술 스택
 
 ### Frontend Core
+
 - **Framework**: Next.js 15 (App Router, SSR/SSG)
 - **Language**: TypeScript
 - **Styling**: Tailwind CSS
 - **UI Components**: shadcn/ui + Radix UI
 
 ### State & Data Management
+
 - **Global State**: Zustand (필터, 인증, 즐겨찾기)
 - **Server State**: SWR (데이터 페칭, 캐싱, 재검증)
 - **Form Handling**: React Hook Form + Zod
 
 ### External APIs
+
 - **Map Visualization**: VWorld API
 - **Charts**: Chart.js
 - **Backend**: FastAPI (Python) + AWS App Runner
@@ -73,7 +76,8 @@ Application/
 ## 🚀 빠른 시작
 
 ### 사전 요구사항
-- Node.js 18+ 
+
+- Node.js 18+
 - pnpm (권장 패키지 매니저)
 
 ### 설치 및 실행
@@ -103,16 +107,19 @@ NEXT_PUBLIC_VWORLD_API_KEY=your_vworld_api_key
 ## 📋 개발 현황
 
 ### ✅ 완료된 기능
+
 - **Phase 0**: 프로젝트 기반 설정 (Next.js, Tailwind, shadcn/ui)
 - **Phase 1**: 핵심 레이아웃 및 사용자 인증
 - **Phase 2**: 필터 상태 관리 (Zustand 구조 구현)
 - **Phase 3**: 상세 분석 페이지 데이터 로딩 (SWR 구조 구현)
 
 ### 🔄 진행 중
+
 - **Phase 2**: 통합 분석 화면 데이터 시각화
 - **Phase 3**: 상세 분석 비교 데이터 기능
 
 ### ⏳ 대기 중 (백엔드 API 의존)
+
 - `GET /api/v1/items` - 매물 목록 API
 - `GET /api/v1/items/{id}/comparables` - 비교 데이터 API
 
@@ -121,11 +128,13 @@ NEXT_PUBLIC_VWORLD_API_KEY=your_vworld_api_key
 ## 🏗 아키텍처 원칙
 
 ### State Management Strategy
+
 - **Server State**: SWR로 API 데이터 캐싱 및 동기화
 - **Global UI State**: Zustand로 필터, 인증, 즐겨찾기 관리
 - **Local State**: useState로 컴포넌트 내부 상태 관리
 
 ### Component Architecture
+
 - **Container/Presenter Pattern**: 데이터 로직과 UI 로직 분리
 - **Single Responsibility**: 각 컴포넌트는 하나의 책임만 담당
 - **Reusability**: shadcn/ui 기반의 재사용 가능한 컴포넌트
@@ -135,11 +144,13 @@ NEXT_PUBLIC_VWORLD_API_KEY=your_vworld_api_key
 ## 🤝 협업 및 커뮤니케이션
 
 ### 팀 간 협업 가이드
-- **백엔드**: [`Communication/COMMUNICATION_GUIDE(Frontend-Backend).md`](./Communication/COMMUNICATION_GUIDE(Frontend-Backend).md)
-- **인프라**: [`Communication/COMMUNICATION_GUIDE(Frontend-Infrastructure).md`](./Communication/COMMUNICATION_GUIDE(Frontend-Infrastructure).md)
-- **데이터분석**: [`Communication/COMMUNICATION_GUIDE(Frontend-Analysis).md`](./Communication/COMMUNICATION_GUIDE(Frontend-Analysis).md)
+
+- **백엔드**: [`Communication/COMMUNICATION_GUIDE(Frontend-Backend).md`](<./Communication/COMMUNICATION_GUIDE(Frontend-Backend).md>)
+- **인프라**: [`Communication/COMMUNICATION_GUIDE(Frontend-Infrastructure).md`](<./Communication/COMMUNICATION_GUIDE(Frontend-Infrastructure).md>)
+- **데이터분석**: [`Communication/COMMUNICATION_GUIDE(Frontend-Analysis).md`](<./Communication/COMMUNICATION_GUIDE(Frontend-Analysis).md>)
 
 ### 일일 개발 로그
+
 개발 진행 상황은 [`Log/`](./Log/) 폴더에서 확인할 수 있습니다.
 
 ## 📝 스크립트
