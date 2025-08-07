@@ -24,6 +24,7 @@
   2.  `Communication/COMMUNICATION_GUIDE(Frontend-Infrastructure).md`
   3.  `Communication/COMMUNICATION_GUIDE(Frontend-Pipeline).md`
   4.  `Communication/COMMUNICATION_GUIDE(Frontend-Analysis).md`
+  5.  `Communication/COMMUNICATION_GUIDE(Frontend-Manage).md`
 
 ---
 
@@ -44,11 +45,13 @@
   2.  `Communication/Infra/receive/Request`
   3.  `Communication/Pipeline/receive/Request`
   4.  `Communication/Analysis/receive/Request`
-- **✅ 완료한 작업 확인:** 아래 **`receive/Completed`** 폴더들을 모두 확인하여, Request 상태인 새로운 요청서(.md 파일) 중 완료된 사항(Completed)을 파악하고, 이를 통해 완료되지 않은 Request 요청서(.md 파일)만 골라서 읽고, 진행해야할 사항을 판단하세요.
+  5.  `Communication/Manage/receive/Request`
+- **✅ 완료한 작업 확인:** 아래 **`receive/Completed`** 폴더들을 모두 확인하여, Request 상태인 새로운 요청서(.md 파일) 중 완료된 사항(Completed)을 확인하고, 다른 팀에서 어떻게 작업을 완료시켰는지 파악하세요.
   1.  `Communication/Backend/receive/Completed`
   2.  `Communication/Infra/receive/Completed`
   3.  `Communication/Pipeline/receive/Completed`
   4.  `Communication/Analysis/receive/Completed`
+  5.  `Communication/Manage/receive/Completed`
 
 ---
 

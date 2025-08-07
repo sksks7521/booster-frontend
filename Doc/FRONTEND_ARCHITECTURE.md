@@ -42,8 +42,7 @@
 |   |-- /features        # (Organisms) 특정 기능(분석, 계산기 등)을 위한 조합 컴포넌트
 |   |-- /layout          # (Templates) 헤더, 사이드 패널 등 뼈대 컴포넌트
 |-- /hooks               # 커스텀 React Hooks (예: useMobile, useItems)
-|-- /lib                 # 외부 라이브러리 설정, 유틸리티 함수 (예: utils.ts)
-|-- /services            # API 요청을 처리하는 함수들 (SWR 훅에서 사용)
+|-- /lib                 # API 클라이언트, 유틸리티 함수 (22개 API 엔드포인트, utils.ts)
 |-- /store               # Zustand 전역 상태 관리 스토어 (예: filterStore.ts)
 |-- /styles              # 전역 CSS 파일 (globals.css)
 ```
@@ -108,9 +107,174 @@ graph TD
 
 ---
 
-## 6. 코딩 컨벤션 및 품질 관리
+## 6. 핵심 컴포넌트 아키텍처 (2025-08-07 업데이트)
 
-### 6-1. 네이밍 컨벤션
+### 6-1. 투자 분석 플랫폼 구조
+
+Booster는 단순한 매물 검색을 넘어 **완전한 투자 분석 플랫폼**으로 진화했습니다.
+
+#### **핵심 기능 컴포넌트**
+
+| 컴포넌트               | 파일 위치                                      | 역할                 | API 연동         |
+| ---------------------- | ---------------------------------------------- | -------------------- | ---------------- |
+| **InvestmentAnalysis** | `/components/features/investment-analysis.tsx` | 3탭 투자 분석 UI     | Comparables API  |
+| **FavoritesSystem**    | `/components/features/favorites-system.tsx`    | 완전한 즐겨찾기 관리 | 5개 즐겨찾기 API |
+| **FilterControl**      | `/components/features/filter-control.tsx`      | 40+ 고급 필터링      | Items API        |
+| **MapView**            | `/components/features/map-view.tsx`            | 지도 시각화          | Items API        |
+| **ItemTable**          | `/components/features/item-table.tsx`          | 테이블 시각화        | Items API        |
+
+#### **InvestmentAnalysis 컴포넌트 구조**
+
+```typescript
+// 3탭 구조로 완전한 투자 분석 제공
+<Tabs defaultValue="comparison">
+  <TabsList>
+    <TabsTrigger value="comparison">비교 분석</TabsTrigger>
+    <TabsTrigger value="statistics">시장 통계</TabsTrigger>
+    <TabsTrigger value="investment">투자 분석</TabsTrigger>
+  </TabsList>
+
+  <TabsContent value="comparison">
+    {/* 유사 매물 비교, 가격 분석 */}
+    <ComparablePropertiesSection data={comparables} />
+  </TabsContent>
+
+  <TabsContent value="statistics">
+    {/* 평균 가격, 가격 범위, 통계 차트 */}
+    <MarketStatisticsSection data={statistics} />
+  </TabsContent>
+
+  <TabsContent value="investment">
+    {/* 투자 잠재력, 유동성 점수, 위험도 평가 */}
+    <InvestmentAnalysisSection data={marketAnalysis} />
+  </TabsContent>
+</Tabs>
+```
+
+### 6-2. API 클라이언트 아키텍처
+
+#### **22개 API 엔드포인트 체계적 관리**
+
+```typescript
+// /lib/api.ts - 완전한 API 클라이언트
+export const apiClient = {
+  // 1. 시스템 (1개)
+  getHealth: () => GET("/health"),
+
+  // 2. 인증 (1개)
+  signup: (userData) => POST("/api/v1/auth/signup", userData),
+
+  // 3. 사용자 (1개)
+  getCurrentUser: () => GET("/api/v1/users/me"),
+
+  // 4. 매물 + 투자 분석 (5개)
+  getItems: (filters) => GET("/api/v1/items/", { params: filters }),
+  getItemsSimple: (filters) => GET("/api/v1/items/simple", { params: filters }),
+  getItem: (id) => GET(`/api/v1/items/${id}`),
+  getComparables: (id, params) =>
+    GET(`/api/v1/items/${id}/comparables`, { params }),
+  createItem: (data) => POST("/api/v1/items/", data),
+
+  // 5. 완전한 즐겨찾기 시스템 (5개)
+  getFavorites: () => GET("/api/v1/users/me/favorites/"),
+  addFavorite: (itemId) =>
+    POST("/api/v1/users/me/favorites/", { auction_item_id: itemId }),
+  removeFavorite: (itemId) => DELETE(`/api/v1/users/me/favorites/${itemId}`),
+  getFavoriteCount: () => GET("/api/v1/users/me/favorites/count"),
+  checkFavoriteStatus: (itemId) =>
+    GET(`/api/v1/users/me/favorites/check/${itemId}`),
+
+  // 6. 경매 완료 데이터 (3개)
+  getAuctionCompleted: (params) =>
+    GET("/api/v1/auction-completed/", { params }),
+  getAuctionCompletedItem: (id) => GET(`/api/v1/auction-completed/${id}`),
+  getAuctionMarketAnalysis: (params) =>
+    GET("/api/v1/auction-completed/market-analysis/", { params }),
+
+  // 7. 실거래 매매 (2개)
+  getRealTransactions: (params) =>
+    GET("/api/v1/real-transactions/", { params }),
+  getMarketPriceAnalysis: (params) =>
+    GET("/api/v1/real-transactions/market-price/", { params }),
+
+  // 8. 실거래 전월세 (2개)
+  getRealRents: (params) => GET("/api/v1/real-rents/", { params }),
+  getRentalYieldAnalysis: (params) =>
+    GET("/api/v1/real-rents/rental-yield/", { params }),
+};
+```
+
+#### **그룹별 편의 함수**
+
+```typescript
+// 사용하기 쉬운 그룹별 API
+export const itemApi = {
+  getItems: (filters) => apiClient.getItems(filters),
+  getComparables: (id, params) => apiClient.getComparables(id, params),
+  // ...
+};
+
+export const favoriteApi = {
+  getFavorites: () => apiClient.getFavorites(),
+  addFavorite: (itemId) => apiClient.addFavorite(itemId),
+  // ...
+};
+```
+
+### 6-3. 실제 데이터 전환 아키텍처
+
+#### **환경 플래그 기반 전환**
+
+```typescript
+// /hooks/useItemDetail.ts
+const USE_REAL_API = false; // PostgreSQL 연결 후 true로 변경
+
+// 실제 API fetcher (준비 완료)
+const realApiFetcher = async ([_, itemId]) => {
+  try {
+    const item = await itemApi.getItem(Number(itemId));
+    const comparables = await itemApi.getComparables(Number(itemId));
+    const favoriteStatus = await favoriteApi.checkFavoriteStatus(
+      Number(itemId)
+    );
+
+    return {
+      ...item,
+      investmentAnalysis: comparables,
+      isFavorite: favoriteStatus.isFavorite,
+    };
+  } catch (error) {
+    // 폴백: 목업 데이터로 자동 전환
+    return mockPropertyDetail;
+  }
+};
+
+// 환경에 따른 fetcher 선택
+const fetcher = USE_REAL_API ? realApiFetcher : mockFetcher;
+```
+
+#### **TypeScript 타입 안전성**
+
+```typescript
+// 모든 API 응답에 대한 완전한 타입 정의
+export interface ComparablesResponse {
+  baseItem: AuctionItem; // 기준 매물
+  comparables: ComparableItem[]; // 비교 매물들
+  statistics: MarketStatistics; // 시장 통계
+  marketAnalysis: MarketAnalysis; // 시장 분석
+}
+
+export interface FavoriteCheck {
+  isFavorite: boolean;
+  favoriteId?: number;
+}
+```
+
+---
+
+## 7. 코딩 컨벤션 및 품질 관리
+
+### 7-1. 네이밍 컨벤션
 
 | 종류         | 규칙              | 예시                                 |
 | :----------- | :---------------- | :----------------------------------- |
@@ -119,7 +283,7 @@ graph TD
 | **Store**    | `...Store` 접미사 | `filterStore.ts`, `authStore.ts`     |
 | **Types**    | PascalCase        | `interface ItemProps { ... }`        |
 
-### 6-2. Pull Request (PR) 템플릿
+### 7-2. Pull Request (PR) 템플릿
 
 모든 PR은 아래 템플릿을 사용하여 작성하여, 코드 리뷰어가 변경 사항을 쉽게 이해할 수 있도록 합니다.
 
@@ -143,7 +307,7 @@ graph TD
 - [ ] 관련 문서를 업데이트했나요?
 ```
 
-### 6-3. 반드시 피해야 할 패턴 (Anti-patterns)
+### 7-3. 반드시 피해야 할 패턴 (Anti-patterns)
 
 - **Prop Drilling:** 2-depth 이상의 prop 전달은 피하고, Zustand나 컴포넌트 조합(Composition)으로 해결합니다.
 - **거대 컴포넌트 (God Component):** 하나의 컴포넌트가 너무 많은 역할을 하도록 만들지 않습니다. 최대한 작은 단위로 분리하고 각자 단일 책임 원칙을 지키도록 합니다.
