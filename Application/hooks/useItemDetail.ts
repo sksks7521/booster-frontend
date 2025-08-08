@@ -212,7 +212,7 @@ const mockFetcher = async ([_, itemId]: [
 };
 
 // 환경 설정: 실제 API 사용 여부 결정
-const USE_REAL_API = false; // 백엔드 서버 실행 후 true로 변경
+const USE_REAL_API = true; // 백엔드 서버 실행 확인됨 → 실제 API 사용
 
 /**
  * 특정 매물의 상세 정보를 가져오는 커스텀 훅입니다.

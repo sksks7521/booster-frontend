@@ -1,5 +1,7 @@
 // API 기본 설정
-const API_BASE_URL = "http://127.0.0.1:8000";
+// NEXT_PUBLIC_API_BASE_URL 환경변수가 있으면 그것을 사용하고, 없으면 로컬 기본값을 사용합니다.
+const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://127.0.0.1:8000";
 
 // API 응답 타입 정의
 export interface User {
@@ -214,12 +216,16 @@ class ApiClient {
 
   // 매물 관련 API (고급 필터링 지원)
   async getItems(params?: Record<string, any>): Promise<ItemsResponse> {
-    const queryParams = params ? new URLSearchParams(params).toString() : "";
+    const finalParams: Record<string, any> = { ...(params ?? {}) };
+    if (finalParams.limit === undefined) finalParams.limit = 20;
+    const queryParams = new URLSearchParams(finalParams).toString();
     return this.request<ItemsResponse>(`/api/v1/items/?${queryParams}`);
   }
 
   async getItemsSimple(params?: Record<string, any>): Promise<Item[]> {
-    const queryParams = params ? new URLSearchParams(params).toString() : "";
+    const finalParams: Record<string, any> = { ...(params ?? {}) };
+    if (finalParams.limit === undefined) finalParams.limit = 20;
+    const queryParams = new URLSearchParams(finalParams).toString();
     return this.request<Item[]>(`/api/v1/items/simple?${queryParams}`);
   }
 
@@ -277,7 +283,9 @@ class ApiClient {
   async getAuctionCompleted(
     params?: Record<string, any>
   ): Promise<AuctionCompleted[]> {
-    const queryParams = params ? new URLSearchParams(params).toString() : "";
+    const finalParams: Record<string, any> = { ...(params ?? {}) };
+    if (finalParams.limit === undefined) finalParams.limit = 20;
+    const queryParams = new URLSearchParams(finalParams).toString();
     return this.request<AuctionCompleted[]>(
       `/api/v1/auction-completed/?${queryParams}`
     );
@@ -300,7 +308,9 @@ class ApiClient {
   async getRealTransactions(
     params?: Record<string, any>
   ): Promise<RealTransaction[]> {
-    const queryParams = params ? new URLSearchParams(params).toString() : "";
+    const finalParams: Record<string, any> = { ...(params ?? {}) };
+    if (finalParams.limit === undefined) finalParams.limit = 20;
+    const queryParams = new URLSearchParams(finalParams).toString();
     return this.request<RealTransaction[]>(
       `/api/v1/real-transactions/?${queryParams}`
     );
@@ -315,7 +325,9 @@ class ApiClient {
 
   // 실거래 전월세 (수익률 분석) API
   async getRealRents(params?: Record<string, any>): Promise<RealRent[]> {
-    const queryParams = params ? new URLSearchParams(params).toString() : "";
+    const finalParams: Record<string, any> = { ...(params ?? {}) };
+    if (finalParams.limit === undefined) finalParams.limit = 20;
+    const queryParams = new URLSearchParams(finalParams).toString();
     return this.request<RealRent[]>(`/api/v1/real-rents/?${queryParams}`);
   }
 

@@ -1,13 +1,17 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import { useParams, useRouter } from "next/navigation"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import Header from "@/components/layout/header"
-import { useItemDetail } from "@/hooks/useItemDetail"
+import { useState } from "react";
+import useSWR from "swr";
+import { useParams, useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import Header from "@/components/layout/header";
+import { useItemDetail } from "@/hooks/useItemDetail";
+import { itemApi } from "@/lib/api";
+import type { ComparablesResponse } from "@/lib/api";
+import { InvestmentAnalysis } from "@/components/features/investment-analysis";
 import {
   ArrowLeft,
   Heart,
@@ -22,19 +26,29 @@ import {
   Download,
   Calculator,
   Phone,
-} from "lucide-react"
+} from "lucide-react";
 
 export default function PropertyDetailPage() {
-  const params = useParams()
-  const router = useRouter()
-  const itemId = params.id as string
+  const params = useParams();
+  const router = useRouter();
+  const itemId = (params as any)?.id as string;
 
   // 새로 만든 커스텀 훅을 호출하여 데이터와 상태를 가져옵니다.
-  const { property, isLoading, error } = useItemDetail(itemId)
+  const { property, isLoading, error } = useItemDetail(itemId);
+
+  // Comparables 실데이터(SWR) - 상세 진입 시 지연 로딩
+  const {
+    data: comparables,
+    error: comparablesError,
+    isLoading: isComparablesLoading,
+  } = useSWR<ComparablesResponse>(
+    itemId ? ["/api/v1/items/", itemId, "comparables"] : null,
+    ([, id]) => itemApi.getComparables(Number(id))
+  );
 
   // UI 상태는 그대로 유지합니다.
-  const [isFavorite, setIsFavorite] = useState(false)
-  const [activeTab, setActiveTab] = useState("overview")
+  const [isFavorite, setIsFavorite] = useState(false);
+  const [activeTab, setActiveTab] = useState("overview");
 
   // 사용자 정보
   const user = {
@@ -43,23 +57,23 @@ export default function PropertyDetailPage() {
       plan: "Pro",
       expiresAt: "2024-12-31",
     },
-  }
+  };
 
   const handleBack = () => {
-    router.back()
-  }
+    router.back();
+  };
 
   const handleFavorite = () => {
-    setIsFavorite(!isFavorite)
-  }
+    setIsFavorite(!isFavorite);
+  };
 
   const handleShare = () => {
     navigator.share?.({
       title: property?.title,
       text: property?.description,
       url: window.location.href,
-    })
-  }
+    });
+  };
 
   const getStatusBadge = (status: string) => {
     const statusConfig = {
@@ -67,28 +81,62 @@ export default function PropertyDetailPage() {
       ongoing: { label: "경매진행중", variant: "default" as const },
       completed: { label: "경매완료", variant: "outline" as const },
       cancelled: { label: "경매취소", variant: "destructive" as const },
-    }
-    return statusConfig[status as keyof typeof statusConfig] || statusConfig.scheduled
-  }
+    };
+    return (
+      statusConfig[status as keyof typeof statusConfig] ||
+      statusConfig.scheduled
+    );
+  };
 
   const getRiskBadge = (risk: string) => {
     const riskConfig = {
-      low: { label: "낮음", variant: "secondary" as const, color: "text-green-600" },
-      medium: { label: "보통", variant: "outline" as const, color: "text-yellow-600" },
-      high: { label: "높음", variant: "destructive" as const, color: "text-red-600" },
-    }
-    return riskConfig[risk as keyof typeof riskConfig] || riskConfig.medium
-  }
+      low: {
+        label: "낮음",
+        variant: "secondary" as const,
+        color: "text-green-600",
+      },
+      medium: {
+        label: "보통",
+        variant: "outline" as const,
+        color: "text-yellow-600",
+      },
+      high: {
+        label: "높음",
+        variant: "destructive" as const,
+        color: "text-red-600",
+      },
+    };
+    return riskConfig[risk as keyof typeof riskConfig] || riskConfig.medium;
+  };
 
   const getProfitabilityBadge = (profitability: string) => {
     const profitConfig = {
-      excellent: { label: "우수", variant: "default" as const, color: "text-blue-600" },
-      good: { label: "양호", variant: "secondary" as const, color: "text-green-600" },
-      fair: { label: "보통", variant: "outline" as const, color: "text-yellow-600" },
-      poor: { label: "주의", variant: "destructive" as const, color: "text-red-600" },
-    }
-    return profitConfig[profitability as keyof typeof profitConfig] || profitConfig.fair
-  }
+      excellent: {
+        label: "우수",
+        variant: "default" as const,
+        color: "text-blue-600",
+      },
+      good: {
+        label: "양호",
+        variant: "secondary" as const,
+        color: "text-green-600",
+      },
+      fair: {
+        label: "보통",
+        variant: "outline" as const,
+        color: "text-yellow-600",
+      },
+      poor: {
+        label: "주의",
+        variant: "destructive" as const,
+        color: "text-red-600",
+      },
+    };
+    return (
+      profitConfig[profitability as keyof typeof profitConfig] ||
+      profitConfig.fair
+    );
+  };
 
   // 로딩 상태 처리
   if (isLoading) {
@@ -111,7 +159,7 @@ export default function PropertyDetailPage() {
           </div>
         </div>
       </div>
-    )
+    );
   }
 
   // 에러 상태 처리
@@ -121,7 +169,9 @@ export default function PropertyDetailPage() {
         <Header user={user} />
         <div className="container mx-auto px-4 py-8">
           <div className="text-center">
-            <h1 className="text-2xl font-bold text-gray-900 mb-4">데이터를 불러오는 데 실패했습니다</h1>
+            <h1 className="text-2xl font-bold text-gray-900 mb-4">
+              데이터를 불러오는 데 실패했습니다
+            </h1>
             <p className="text-gray-600 mb-4">잠시 후 다시 시도해주세요.</p>
             <Button onClick={handleBack}>
               <ArrowLeft className="w-4 h-4 mr-2" />
@@ -130,7 +180,7 @@ export default function PropertyDetailPage() {
           </div>
         </div>
       </div>
-    )
+    );
   }
 
   // 데이터가 없는 경우
@@ -140,7 +190,9 @@ export default function PropertyDetailPage() {
         <Header user={user} />
         <div className="container mx-auto px-4 py-8">
           <div className="text-center">
-            <h1 className="text-2xl font-bold text-gray-900 mb-4">물건을 찾을 수 없습니다</h1>
+            <h1 className="text-2xl font-bold text-gray-900 mb-4">
+              물건을 찾을 수 없습니다
+            </h1>
             <Button onClick={handleBack}>
               <ArrowLeft className="w-4 h-4 mr-2" />
               돌아가기
@@ -148,12 +200,16 @@ export default function PropertyDetailPage() {
           </div>
         </div>
       </div>
-    )
+    );
   }
 
-  const statusBadge = getStatusBadge(property.status)
-  const riskBadge = getRiskBadge(property.investmentAnalysis?.riskLevel || "medium")
-  const profitabilityBadge = getProfitabilityBadge(property.investmentAnalysis?.profitability || "fair")
+  const statusBadge = getStatusBadge(property.status);
+  const riskBadge = getRiskBadge(
+    property.investmentAnalysis?.riskLevel || "medium"
+  );
+  const profitabilityBadge = getProfitabilityBadge(
+    property.investmentAnalysis?.profitability || "fair"
+  );
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -162,13 +218,23 @@ export default function PropertyDetailPage() {
       <div className="container mx-auto px-4 py-8">
         {/* 상단 네비게이션 */}
         <div className="flex items-center justify-between mb-6">
-          <Button variant="ghost" onClick={handleBack} className="flex items-center">
+          <Button
+            variant="ghost"
+            onClick={handleBack}
+            className="flex items-center"
+          >
             <ArrowLeft className="w-4 h-4 mr-2" />
             목록으로 돌아가기
           </Button>
           <div className="flex items-center space-x-2">
-            <Button variant={isFavorite ? "default" : "outline"} size="sm" onClick={handleFavorite}>
-              <Heart className={`w-4 h-4 mr-2 ${isFavorite ? "fill-current" : ""}`} />
+            <Button
+              variant={isFavorite ? "default" : "outline"}
+              size="sm"
+              onClick={handleFavorite}
+            >
+              <Heart
+                className={`w-4 h-4 mr-2 ${isFavorite ? "fill-current" : ""}`}
+              />
               관심등록
             </Button>
             <Button variant="outline" size="sm" onClick={handleShare}>
@@ -186,7 +252,9 @@ export default function PropertyDetailPage() {
               <CardHeader>
                 <div className="flex items-start justify-between">
                   <div>
-                    <CardTitle className="text-2xl font-bold mb-2">{property.title}</CardTitle>
+                    <CardTitle className="text-2xl font-bold mb-2">
+                      {property.title}
+                    </CardTitle>
                     <div className="flex items-center text-gray-600 mb-2">
                       <MapPin className="w-4 h-4 mr-1" />
                       {property.address}
@@ -197,13 +265,17 @@ export default function PropertyDetailPage() {
                       <span>{property.floor}</span>
                     </div>
                   </div>
-                  <Badge variant={statusBadge.variant}>{statusBadge.label}</Badge>
+                  <Badge variant={statusBadge.variant}>
+                    {statusBadge.label}
+                  </Badge>
                 </div>
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
                   <div className="text-center">
-                    <div className="text-2xl font-bold text-blue-600">{property.price.toLocaleString()}만원</div>
+                    <div className="text-2xl font-bold text-blue-600">
+                      {property.price.toLocaleString()}만원
+                    </div>
                     <div className="text-sm text-gray-500">경매 시작가</div>
                   </div>
                   <div className="text-center">
@@ -220,8 +292,12 @@ export default function PropertyDetailPage() {
                   </div>
                   <div className="text-center">
                     <div className="flex items-center justify-center space-x-2">
-                      {property.hasParking && <Car className="w-5 h-5 text-green-500" />}
-                      {property.hasElevator && <Elevator className="w-5 h-5 text-blue-500" />}
+                      {property.hasParking && (
+                        <Car className="w-5 h-5 text-green-500" />
+                      )}
+                      {property.hasElevator && (
+                        <Elevator className="w-5 h-5 text-blue-500" />
+                      )}
                     </div>
                     <div className="text-sm text-gray-500">편의시설</div>
                   </div>
@@ -244,7 +320,10 @@ export default function PropertyDetailPage() {
               <CardContent>
                 <div className="grid grid-cols-2 gap-4">
                   {property.images?.map((image, index) => (
-                    <div key={index} className="aspect-video bg-gray-100 rounded-lg overflow-hidden">
+                    <div
+                      key={index}
+                      className="aspect-video bg-gray-100 rounded-lg overflow-hidden"
+                    >
                       <img
                         src={image || "/placeholder.svg"}
                         alt={`${property.title} 사진 ${index + 1}`}
@@ -282,8 +361,12 @@ export default function PropertyDetailPage() {
                           <div>면적: {property.area}㎡</div>
                           <div>건축년도: {property.buildYear}년</div>
                           <div>층수: {property.floor}</div>
-                          <div>엘리베이터: {property.hasElevator ? "있음" : "없음"}</div>
-                          <div>주차장: {property.hasParking ? "있음" : "없음"}</div>
+                          <div>
+                            엘리베이터: {property.hasElevator ? "있음" : "없음"}
+                          </div>
+                          <div>
+                            주차장: {property.hasParking ? "있음" : "없음"}
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -294,23 +377,34 @@ export default function PropertyDetailPage() {
                       <div className="grid grid-cols-2 gap-4 text-sm">
                         <div>
                           <span className="font-medium">사건번호:</span>
-                          <span className="ml-2">{property.legalInfo?.caseNumber}</span>
+                          <span className="ml-2">
+                            {property.legalInfo?.caseNumber}
+                          </span>
                         </div>
                         <div>
                           <span className="font-medium">법원:</span>
-                          <span className="ml-2">{property.legalInfo?.court}</span>
+                          <span className="ml-2">
+                            {property.legalInfo?.court}
+                          </span>
                         </div>
                         <div>
                           <span className="font-medium">경매구분:</span>
-                          <span className="ml-2">{property.legalInfo?.auctionType}</span>
+                          <span className="ml-2">
+                            {property.legalInfo?.auctionType}
+                          </span>
                         </div>
                         <div>
                           <span className="font-medium">최저입찰가:</span>
-                          <span className="ml-2">{property.legalInfo?.minimumBid.toLocaleString()}만원</span>
+                          <span className="ml-2">
+                            {property.legalInfo?.minimumBid.toLocaleString()}
+                            만원
+                          </span>
                         </div>
                         <div>
                           <span className="font-medium">보증금:</span>
-                          <span className="ml-2">{property.legalInfo?.deposit.toLocaleString()}만원</span>
+                          <span className="ml-2">
+                            {property.legalInfo?.deposit.toLocaleString()}만원
+                          </span>
                         </div>
                       </div>
                     </div>
@@ -321,27 +415,39 @@ export default function PropertyDetailPage() {
                       <div className="grid grid-cols-2 gap-4 text-sm">
                         <div>
                           <span className="font-medium">건물유형:</span>
-                          <span className="ml-2">{property.buildingInfo?.buildingType}</span>
+                          <span className="ml-2">
+                            {property.buildingInfo?.buildingType}
+                          </span>
                         </div>
                         <div>
                           <span className="font-medium">구조:</span>
-                          <span className="ml-2">{property.buildingInfo?.structure}</span>
+                          <span className="ml-2">
+                            {property.buildingInfo?.structure}
+                          </span>
                         </div>
                         <div>
                           <span className="font-medium">총 층수:</span>
-                          <span className="ml-2">{property.buildingInfo?.totalFloors}층</span>
+                          <span className="ml-2">
+                            {property.buildingInfo?.totalFloors}층
+                          </span>
                         </div>
                         <div>
                           <span className="font-medium">대지면적:</span>
-                          <span className="ml-2">{property.buildingInfo?.landArea}㎡</span>
+                          <span className="ml-2">
+                            {property.buildingInfo?.landArea}㎡
+                          </span>
                         </div>
                         <div>
                           <span className="font-medium">건물면적:</span>
-                          <span className="ml-2">{property.buildingInfo?.buildingArea}㎡</span>
+                          <span className="ml-2">
+                            {property.buildingInfo?.buildingArea}㎡
+                          </span>
                         </div>
                         <div>
                           <span className="font-medium">주차대수:</span>
-                          <span className="ml-2">{property.buildingInfo?.parkingSpaces}대</span>
+                          <span className="ml-2">
+                            {property.buildingInfo?.parkingSpaces}대
+                          </span>
                         </div>
                       </div>
                     </div>
@@ -370,6 +476,15 @@ export default function PropertyDetailPage() {
                 </Tabs>
               </CardContent>
             </Card>
+
+            {/* 투자 분석(Comparables) 섹션 */}
+            <div className="mt-6">
+              <InvestmentAnalysis
+                data={comparables ?? null}
+                isLoading={isComparablesLoading}
+                error={comparablesError}
+              />
+            </div>
           </div>
 
           {/* 사이드바 */}
@@ -385,7 +500,9 @@ export default function PropertyDetailPage() {
               <CardContent className="space-y-4">
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-medium">수익성</span>
-                  <Badge variant={profitabilityBadge.variant}>{profitabilityBadge.label}</Badge>
+                  <Badge variant={profitabilityBadge.variant}>
+                    {profitabilityBadge.label}
+                  </Badge>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-medium">리스크</span>
@@ -393,7 +510,9 @@ export default function PropertyDetailPage() {
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-medium">예상 ROI</span>
-                  <span className="font-bold text-green-600">{property.investmentAnalysis?.expectedRoi}%</span>
+                  <span className="font-bold text-green-600">
+                    {property.investmentAnalysis?.expectedRoi}%
+                  </span>
                 </div>
               </CardContent>
             </Card>
@@ -409,19 +528,28 @@ export default function PropertyDetailPage() {
               <CardContent className="space-y-4">
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-medium">주변 평균가</span>
-                  <span className="font-bold">{property.marketAnalysis?.averagePrice.toLocaleString()}만원</span>
+                  <span className="font-bold">
+                    {property.marketAnalysis?.averagePrice.toLocaleString()}만원
+                  </span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-medium">가격 변동</span>
                   <span
-                    className={`font-bold ${property.marketAnalysis?.priceChange && property.marketAnalysis.priceChange > 0 ? "text-red-600" : "text-blue-600"}`}
+                    className={`font-bold ${
+                      property.marketAnalysis?.priceChange &&
+                      property.marketAnalysis.priceChange > 0
+                        ? "text-red-600"
+                        : "text-blue-600"
+                    }`}
                   >
                     {property.marketAnalysis?.priceChange}%
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-medium">경쟁 물건</span>
-                  <span className="font-bold">{property.marketAnalysis?.competitiveProperties}개</span>
+                  <span className="font-bold">
+                    {property.marketAnalysis?.competitiveProperties}개
+                  </span>
                 </div>
               </CardContent>
             </Card>
@@ -436,12 +564,14 @@ export default function PropertyDetailPage() {
               </CardHeader>
               <CardContent>
                 <ul className="space-y-2 text-sm">
-                  {property.investmentAnalysis?.recommendations.map((rec, index) => (
-                    <li key={index} className="flex items-start">
-                      <span className="w-2 h-2 bg-blue-500 rounded-full mt-2 mr-2 flex-shrink-0"></span>
-                      {rec}
-                    </li>
-                  ))}
+                  {property.investmentAnalysis?.recommendations.map(
+                    (rec, index) => (
+                      <li key={index} className="flex items-start">
+                        <span className="w-2 h-2 bg-blue-500 rounded-full mt-2 mr-2 flex-shrink-0"></span>
+                        {rec}
+                      </li>
+                    )
+                  )}
                 </ul>
               </CardContent>
             </Card>
@@ -465,5 +595,5 @@ export default function PropertyDetailPage() {
         </div>
       </div>
     </div>
-  )
+  );
 }

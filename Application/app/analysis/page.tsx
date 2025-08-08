@@ -1,25 +1,26 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from "react"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import Header from "@/components/layout/header"
-import FilterControl from "@/components/features/filter-control"
-import SelectedFilterBar from "@/components/features/selected-filter-bar"
-import ItemTable from "@/components/features/item-table"
-import MapView from "@/components/features/map-view"
-import { useFilterStore } from "@/store/filterStore"
-import { Search, Map, List, Download, Bell } from "lucide-react"
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import Header from "@/components/layout/header";
+import FilterControl from "@/components/features/filter-control";
+import SelectedFilterBar from "@/components/features/selected-filter-bar";
+import ItemTable from "@/components/features/item-table";
+import MapView from "@/components/features/map-view";
+import { useFilterStore } from "@/store/filterStore";
+import { useItems } from "@/hooks/useItems";
+import { Search, Map, List, Download, Bell } from "lucide-react";
 
 export default function AnalysisPage() {
-  const [isFilterCollapsed, setIsFilterCollapsed] = useState(false)
-  const [searchQuery, setSearchQuery] = useState("")
-  const [activeView, setActiveView] = useState<"table" | "map">("table")
-  const [isLoading, setIsLoading] = useState(false)
+  const [isFilterCollapsed, setIsFilterCollapsed] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [activeView, setActiveView] = useState<"table" | "map">("table");
+  const { items, isLoading, error, totalCount, refetch } = useItems();
 
   // 스토어에서 필터 상태를 직접 구독합니다.
-  const filters = useFilterStore((state) => state)
+  const filters = useFilterStore((state) => state);
 
   // 사용자 정보
   const user = {
@@ -28,37 +29,24 @@ export default function AnalysisPage() {
       plan: "Pro",
       expiresAt: "2024-12-31",
     },
-  }
+  };
 
-  // 필터가 변경될 때마다 데이터를 다시 로드합니다.
-  useEffect(() => {
-    const loadData = async () => {
-      setIsLoading(true)
-      // 실제로는 여기서 API를 호출하여 필터링된 데이터를 가져옵니다.
-      console.log("Filters changed:", filters)
-
-      // 모의 로딩 시간
-      await new Promise((resolve) => setTimeout(resolve, 500))
-      setIsLoading(false)
-    }
-
-    loadData()
-  }, [filters])
+  // useItems 훅이 필터 상태를 키로 사용하여 자동 재검증함
 
   const handleSearch = () => {
-    console.log("Search query:", searchQuery)
+    console.log("Search query:", searchQuery);
     // 검색 로직 구현
-  }
+  };
 
   const handleExport = () => {
-    console.log("Exporting data...")
+    console.log("Exporting data...");
     // 데이터 내보내기 로직 구현
-  }
+  };
 
   const handleSetAlert = () => {
-    console.log("Setting up alert...")
+    console.log("Setting up alert...");
     // 알림 설정 로직 구현
-  }
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -69,7 +57,9 @@ export default function AnalysisPage() {
         <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-8">
           <div>
             <h1 className="text-3xl font-bold text-gray-900 mb-2">매물 분석</h1>
-            <p className="text-gray-600">AI 기반 분석으로 최적의 투자 기회를 찾아보세요</p>
+            <p className="text-gray-600">
+              AI 기반 분석으로 최적의 투자 기회를 찾아보세요
+            </p>
           </div>
           <div className="flex items-center space-x-3 mt-4 md:mt-0">
             <Button variant="outline" onClick={handleExport}>
@@ -121,14 +111,30 @@ export default function AnalysisPage() {
             <Card>
               <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
-                  <CardTitle className="text-lg">검색 결과 {isLoading ? "로딩 중..." : "1,234건"}</CardTitle>
-                  <Tabs value={activeView} onValueChange={(value) => setActiveView(value as "table" | "map")}>
+                  <CardTitle className="text-lg">
+                    검색 결과{" "}
+                    {isLoading
+                      ? "로딩 중..."
+                      : (totalCount ?? items?.length ?? 0) + "건"}
+                  </CardTitle>
+                  <Tabs
+                    value={activeView}
+                    onValueChange={(value) =>
+                      setActiveView(value as "table" | "map")
+                    }
+                  >
                     <TabsList>
-                      <TabsTrigger value="table" className="flex items-center space-x-2">
+                      <TabsTrigger
+                        value="table"
+                        className="flex items-center space-x-2"
+                      >
                         <List className="w-4 h-4" />
                         <span>목록</span>
                       </TabsTrigger>
-                      <TabsTrigger value="map" className="flex items-center space-x-2">
+                      <TabsTrigger
+                        value="map"
+                        className="flex items-center space-x-2"
+                      >
                         <Map className="w-4 h-4" />
                         <span>지도</span>
                       </TabsTrigger>
@@ -137,12 +143,26 @@ export default function AnalysisPage() {
                 </div>
               </CardHeader>
               <CardContent>
-                {activeView === "table" ? <ItemTable isLoading={isLoading} /> : <MapView isLoading={isLoading} />}
+                {activeView === "table" ? (
+                  <ItemTable
+                    items={items}
+                    isLoading={isLoading}
+                    error={error}
+                    onRetry={refetch}
+                  />
+                ) : (
+                  <MapView
+                    items={items}
+                    isLoading={isLoading}
+                    error={error}
+                    onRetry={refetch}
+                  />
+                )}
               </CardContent>
             </Card>
           </div>
         </div>
       </div>
     </div>
-  )
+  );
 }

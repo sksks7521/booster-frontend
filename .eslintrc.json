@@ -1,0 +1,23 @@
+{
+  "root": true,
+  "parser": "@typescript-eslint/parser",
+  "parserOptions": {
+    "project": ["Application/tsconfig.json"],
+    "tsconfigRootDir": "./",
+    "sourceType": "module",
+    "ecmaVersion": 2022
+  },
+  "plugins": ["@typescript-eslint", "react"],
+  "extends": ["next/core-web-vitals", "plugin:@typescript-eslint/recommended"],
+  "settings": {
+    "react": {
+      "version": "detect"
+    }
+  },
+  "ignorePatterns": [
+    "node_modules/",
+    ".next/",
+    "Application/node_modules/",
+    "**/*.js"
+  ]
+}

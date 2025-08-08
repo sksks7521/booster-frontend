@@ -1,54 +1,54 @@
-"use client"
+"use client";
 
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { useFilterStore } from "@/store/filterStore"
-import { X } from "lucide-react"
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { useFilterStore } from "@/store/filterStore";
+import { X } from "lucide-react";
 
-type SelectedFilterBarProps = {}
+type SelectedFilterBarProps = Record<string, never>;
 
 export default function SelectedFilterBar({}: SelectedFilterBarProps) {
   // 스토어에서 직접 상태와 액션을 가져옵니다.
-  const filters = useFilterStore((state) => state)
-  const setFilter = useFilterStore((state) => state.setFilter)
-  const setRangeFilter = useFilterStore((state) => state.setRangeFilter)
-  const resetFilters = useFilterStore((state) => state.resetFilters)
+  const filters = useFilterStore((state) => state);
+  const setFilter = useFilterStore((state) => state.setFilter);
+  const setRangeFilter = useFilterStore((state) => state.setRangeFilter);
+  const resetFilters = useFilterStore((state) => state.resetFilters);
 
   // 'x' 버튼 클릭 시 호출되는 함수를 수정합니다.
   const handleRemove = (key: string) => {
     if (key === "hasElevator" || key === "hasParking") {
-      setFilter(key as any, false)
+      setFilter(key as any, false);
     } else if (key === "priceRange") {
-      setRangeFilter("priceRange", [0, 500000])
+      setRangeFilter("priceRange", [0, 500000]);
     } else if (key === "areaRange") {
-      setRangeFilter("areaRange", [0, 200])
+      setRangeFilter("areaRange", [0, 200]);
     } else if (key === "buildYear") {
-      setRangeFilter("buildYear", [1980, 2024])
+      setRangeFilter("buildYear", [1980, 2024]);
     } else {
-      setFilter(key as any, "")
+      setFilter(key as any, "");
     }
-  }
+  };
 
   const formatPrice = (value: number) => {
     if (value >= 10000) {
-      return `${(value / 10000).toFixed(1)}억`
+      return `${(value / 10000).toFixed(1)}억`;
     }
-    return `${value.toLocaleString()}만`
-  }
+    return `${value.toLocaleString()}만`;
+  };
 
   const formatArea = (value: number) => {
-    return `${value}㎡`
-  }
+    return `${value}㎡`;
+  };
 
   const getSelectedFilters = () => {
-    const selected = []
+    const selected = [];
 
     if (filters.region) {
       selected.push({
         key: "region",
         label: `지역: ${filters.region}`,
         value: filters.region,
-      })
+      });
     }
 
     if (filters.buildingType) {
@@ -56,23 +56,27 @@ export default function SelectedFilterBar({}: SelectedFilterBarProps) {
         key: "buildingType",
         label: `건물유형: ${filters.buildingType}`,
         value: filters.buildingType,
-      })
+      });
     }
 
     if (filters.priceRange[0] > 0 || filters.priceRange[1] < 500000) {
       selected.push({
         key: "priceRange",
-        label: `가격: ${formatPrice(filters.priceRange[0])} ~ ${formatPrice(filters.priceRange[1])}`,
+        label: `가격: ${formatPrice(filters.priceRange[0])} ~ ${formatPrice(
+          filters.priceRange[1]
+        )}`,
         value: filters.priceRange,
-      })
+      });
     }
 
     if (filters.areaRange[0] > 0 || filters.areaRange[1] < 200) {
       selected.push({
         key: "areaRange",
-        label: `면적: ${formatArea(filters.areaRange[0])} ~ ${formatArea(filters.areaRange[1])}`,
+        label: `면적: ${formatArea(filters.areaRange[0])} ~ ${formatArea(
+          filters.areaRange[1]
+        )}`,
         value: filters.areaRange,
-      })
+      });
     }
 
     if (filters.buildYear[0] > 1980 || filters.buildYear[1] < 2024) {
@@ -80,7 +84,7 @@ export default function SelectedFilterBar({}: SelectedFilterBarProps) {
         key: "buildYear",
         label: `건축년도: ${filters.buildYear[0]}년 ~ ${filters.buildYear[1]}년`,
         value: filters.buildYear,
-      })
+      });
     }
 
     if (filters.floor) {
@@ -88,7 +92,7 @@ export default function SelectedFilterBar({}: SelectedFilterBarProps) {
         key: "floor",
         label: `층수: ${filters.floor}`,
         value: filters.floor,
-      })
+      });
     }
 
     if (filters.hasElevator) {
@@ -96,7 +100,7 @@ export default function SelectedFilterBar({}: SelectedFilterBarProps) {
         key: "hasElevator",
         label: "엘리베이터",
         value: true,
-      })
+      });
     }
 
     if (filters.hasParking) {
@@ -104,7 +108,7 @@ export default function SelectedFilterBar({}: SelectedFilterBarProps) {
         key: "hasParking",
         label: "주차장",
         value: true,
-      })
+      });
     }
 
     if (filters.auctionStatus) {
@@ -113,21 +117,24 @@ export default function SelectedFilterBar({}: SelectedFilterBarProps) {
         ongoing: "경매진행중",
         completed: "경매완료",
         cancelled: "경매취소",
-      }
+      };
       selected.push({
         key: "auctionStatus",
-        label: `상태: ${statusLabels[filters.auctionStatus as keyof typeof statusLabels] || filters.auctionStatus}`,
+        label: `상태: ${
+          statusLabels[filters.auctionStatus as keyof typeof statusLabels] ||
+          filters.auctionStatus
+        }`,
         value: filters.auctionStatus,
-      })
+      });
     }
 
-    return selected
-  }
+    return selected;
+  };
 
-  const selectedFilters = getSelectedFilters()
+  const selectedFilters = getSelectedFilters();
 
   if (selectedFilters.length === 0) {
-    return null
+    return null;
   }
 
   return (
@@ -135,7 +142,11 @@ export default function SelectedFilterBar({}: SelectedFilterBarProps) {
       <span className="text-sm font-medium text-gray-700">선택된 필터:</span>
 
       {selectedFilters.map((filter) => (
-        <Badge key={filter.key} variant="secondary" className="flex items-center gap-1 px-3 py-1">
+        <Badge
+          key={filter.key}
+          variant="secondary"
+          className="flex items-center gap-1 px-3 py-1"
+        >
           <span className="text-xs">{filter.label}</span>
           <Button
             variant="ghost"
@@ -158,5 +169,5 @@ export default function SelectedFilterBar({}: SelectedFilterBarProps) {
         전체 해제
       </Button>
     </div>
-  )
+  );
 }

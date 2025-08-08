@@ -115,13 +115,15 @@ Booster는 단순한 매물 검색을 넘어 **완전한 투자 분석 플랫폼
 
 #### **핵심 기능 컴포넌트**
 
-| 컴포넌트               | 파일 위치                                      | 역할                 | API 연동         |
-| ---------------------- | ---------------------------------------------- | -------------------- | ---------------- |
-| **InvestmentAnalysis** | `/components/features/investment-analysis.tsx` | 3탭 투자 분석 UI     | Comparables API  |
-| **FavoritesSystem**    | `/components/features/favorites-system.tsx`    | 완전한 즐겨찾기 관리 | 5개 즐겨찾기 API |
-| **FilterControl**      | `/components/features/filter-control.tsx`      | 40+ 고급 필터링      | Items API        |
-| **MapView**            | `/components/features/map-view.tsx`            | 지도 시각화          | Items API        |
-| **ItemTable**          | `/components/features/item-table.tsx`          | 테이블 시각화        | Items API        |
+| 컴포넌트               | 파일 위치                                      | 역할                      | API 연동         |
+| ---------------------- | ---------------------------------------------- | ------------------------- | ---------------- |
+| **InvestmentAnalysis** | `/components/features/investment-analysis.tsx` | 3탭 투자 분석 UI          | Comparables API  |
+| **FavoritesSystem**    | `/components/features/favorites-system.tsx`    | 완전한 즐겨찾기 관리      | 5개 즐겨찾기 API |
+| **FilterControl**      | `/components/features/filter-control.tsx`      | 40+ 고급 필터링           | Items API        |
+| **MapView**            | `/components/features/map-view.tsx`            | 지도 시각화               | Items API        |
+| **ItemTable**          | `/components/features/item-table.tsx`          | 테이블 시각화             | Items API        |
+| **CalculatorPage**     | `/app/calculator/page.tsx`                     | 수익률 계산기 전체 시스템 | 독립적 계산 로직 |
+| **PricingPage**        | `/app/pricing/page.tsx`                        | 4단계 구독 플랜 관리      | 결제 API (예정)  |
 
 #### **InvestmentAnalysis 컴포넌트 구조**
 
@@ -149,6 +151,177 @@ Booster는 단순한 매물 검색을 넘어 **완전한 투자 분석 플랫폼
     <InvestmentAnalysisSection data={marketAnalysis} />
   </TabsContent>
 </Tabs>
+```
+
+#### **CalculatorPage 컴포넌트 구조**
+
+```typescript
+// 완전한 부동산 투자 수익률 계산 시스템
+export default function CalculatorPage() {
+  // 8개 카테고리 상태 관리
+  const [inputs, setInputs] = useState<CalculationInputs>({
+    // 1. 물건 정보
+    purchasePrice: 50000,
+    area: 25,
+    location: "서울특별시",
+    buildingType: "빌라",
+
+    // 2. 임대 수익
+    monthlyRent: 80,
+    deposit: 1000,
+    vacancyRate: 5,
+    rentIncreaseRate: 2,
+
+    // 3-4. 비용 (취득비용 + 운영비용)
+    acquisitionTax: 4,
+    brokerageFee: 0.5,
+    monthlyManagementFee: 10,
+    propertyTax: 0.2,
+
+    // 5. 자금 조달
+    loanAmount: 30000,
+    loanInterestRate: 4.5,
+    loanPeriod: 20,
+
+    // 6. 투자 조건
+    holdingPeriod: 5,
+    expectedAppreciationRate: 3,
+    taxRate: 22,
+  });
+
+  // 실시간 계산 엔진
+  const calculateReturns = () => {
+    // 1. 취득비용 계산
+    const totalAcquisitionCost =
+      purchasePrice + (purchasePrice * acquisitionTax) / 100;
+
+    // 2. 수익률 계산 (표면수익률, 실질수익률, ROI)
+    const grossYield = (annualRentIncome / purchasePrice) * 100;
+    const netYield = (annualNetIncome / totalInvestment) * 100;
+
+    // 3. 현금흐름 분석
+    const monthlyNetIncome = annualNetIncome / 12;
+    const totalCashFlow = annualNetIncome * holdingPeriod;
+
+    // 4. 투자 지표 계산
+    const breakEvenPoint = totalInvestment / monthlyNetIncome;
+    const paybackPeriod = totalInvestment / annualNetIncome;
+  };
+
+  return (
+    <Tabs value={activeTab} onValueChange={setActiveTab}>
+      <TabsList>
+        <TabsTrigger value="inputs">입력</TabsTrigger>
+        <TabsTrigger value="results">결과</TabsTrigger>
+        <TabsTrigger value="analysis">분석</TabsTrigger>
+      </TabsList>
+
+      <TabsContent value="inputs">{/* 8개 카테고리 입력 폼 */}</TabsContent>
+
+      <TabsContent value="results">
+        {/* 수익률, 현금흐름, 비용 분석 결과 */}
+      </TabsContent>
+
+      <TabsContent value="analysis">
+        {/* 투자 등급, 리스크 분석, 권장사항 */}
+      </TabsContent>
+    </Tabs>
+  );
+}
+```
+
+#### **PricingPage 컴포넌트 구조**
+
+```typescript
+// 4단계 구독 플랜 시스템
+export default function PricingPage() {
+  const [isYearly, setIsYearly] = useState(false);
+
+  const plans: PricingPlan[] = [
+    {
+      id: "free",
+      name: "Free Trial",
+      price: { monthly: 0, yearly: 0 },
+      features: [
+        { name: "월 5회 분석", included: true, limit: "5회" },
+        { name: "관심 물건 저장", included: true, limit: "10개" },
+        { name: "기본 분석 리포트", included: true },
+        { name: "고급 분석 도구", included: false },
+      ],
+    },
+    {
+      id: "pro",
+      name: "Pro",
+      price: { monthly: 79000, yearly: 790000 },
+      features: [
+        { name: "월 200회 분석", included: true, limit: "200회" },
+        { name: "API 접근", included: true },
+        { name: "우선 지원", included: true },
+      ],
+      popular: true,
+    },
+    // Basic, Enterprise 플랜...
+  ];
+
+  return (
+    <div>
+      {/* 요금제 토글 (월간/연간) */}
+      <Switch checked={isYearly} onCheckedChange={setIsYearly} />
+
+      {/* 플랜 카드들 */}
+      <div className="grid lg:grid-cols-4 gap-8">
+        {plans.map((plan) => (
+          <Card
+            key={plan.id}
+            className={plan.popular ? "ring-2 ring-purple-500" : ""}
+          >
+            <CardHeader>
+              <CardTitle>{plan.name}</CardTitle>
+              <div className="text-3xl font-bold">
+                {formatPrice(isYearly ? plan.price.yearly : plan.price.monthly)}
+              </div>
+            </CardHeader>
+
+            <CardContent>
+              {/* 기능 목록 체크박스 */}
+              {plan.features.map((feature) => (
+                <div key={feature.name} className="flex items-center">
+                  {feature.included ? <Check /> : <X />}
+                  <span>{feature.name}</span>
+                </div>
+              ))}
+            </CardContent>
+
+            <CardFooter>
+              <Button asChild>
+                <Link href={`/checkout?plan=${plan.id}`}>플랜 선택하기</Link>
+              </Button>
+            </CardFooter>
+          </Card>
+        ))}
+      </div>
+
+      {/* 상세 기능 비교표 */}
+      <table>
+        <thead>
+          <tr>
+            <th>기능</th>
+            {plans.map((plan) => (
+              <th key={plan.id}>{plan.name}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>{/* 기능별 비교 행들 */}</tbody>
+      </table>
+
+      {/* FAQ 섹션 */}
+      <div>
+        <h2>자주 묻는 질문</h2>
+        {/* FAQ 아이템들 */}
+      </div>
+    </div>
+  );
+}
 ```
 
 ### 6-2. API 클라이언트 아키텍처
@@ -312,3 +485,22 @@ export interface FavoriteCheck {
 - **Prop Drilling:** 2-depth 이상의 prop 전달은 피하고, Zustand나 컴포넌트 조합(Composition)으로 해결합니다.
 - **거대 컴포넌트 (God Component):** 하나의 컴포넌트가 너무 많은 역할을 하도록 만들지 않습니다. 최대한 작은 단위로 분리하고 각자 단일 책임 원칙을 지키도록 합니다.
 - **UI 컴포넌트 내 비즈니스 로직:** API 호출, 데이터 가공 등의 로직은 컴포넌트가 아닌 커스텀 훅(`use...`)이나 서비스 함수(`services/...`)로 분리합니다.
+
+---
+
+## 8. 2025-08-08 아키텍처 업데이트
+
+### 8-1. 실제 데이터 전환 및 기본 파라미터 정책
+
+- `Application/hooks/useItemDetail.ts`의 `USE_REAL_API = true`로 실데이터 전환
+- `Application/lib/api.ts` 목록형 API에 `limit=20` 기본값 주입 정책 적용
+
+### 8-2. 상세페이지 Comparables 연동
+
+- `Application/app/analysis/[id]/page.tsx`에 SWR로 `itemApi.getComparables` 호출하여 `InvestmentAnalysis`에 데이터 공급
+- SWR 키: `['/api/v1/items/', id, 'comparables']`
+
+### 8-3. 환경변수
+
+- `NEXT_PUBLIC_API_BASE_URL` 우선 사용, 미설정 시 `http://127.0.0.1:8000`
+- 배포 환경에서는 Amplify 환경변수로 주입 필요
