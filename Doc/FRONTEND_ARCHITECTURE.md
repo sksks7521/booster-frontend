@@ -120,7 +120,7 @@ Booster는 단순한 매물 검색을 넘어 **완전한 투자 분석 플랫폼
 | **InvestmentAnalysis** | `/components/features/investment-analysis.tsx` | 3탭 투자 분석 UI          | Comparables API  |
 | **FavoritesSystem**    | `/components/features/favorites-system.tsx`    | 완전한 즐겨찾기 관리      | 5개 즐겨찾기 API |
 | **FilterControl**      | `/components/features/filter-control.tsx`      | 40+ 고급 필터링           | Items API        |
-| **MapView**            | `/components/features/map-view.tsx`            | 지도 시각화               | Items API        |
+| **MapView**            | `/components/features/map-view.tsx`            | 지도 시각화 (vworld)      | Items API        |
 | **ItemTable**          | `/components/features/item-table.tsx`          | 테이블 시각화             | Items API        |
 | **CalculatorPage**     | `/app/calculator/page.tsx`                     | 수익률 계산기 전체 시스템 | 독립적 계산 로직 |
 | **PricingPage**        | `/app/pricing/page.tsx`                        | 4단계 구독 플랜 관리      | 결제 API (예정)  |
@@ -503,4 +503,5 @@ export interface FavoriteCheck {
 ### 8-3. 환경변수
 
 - `NEXT_PUBLIC_API_BASE_URL` 우선 사용, 미설정 시 `http://127.0.0.1:8000`
+- `NEXT_PUBLIC_VWORLD_API_KEY` 추가 (vworld 지도 스크립트 로딩용)
 - 배포 환경에서는 Amplify 환경변수로 주입 필요

@@ -53,7 +53,7 @@
 | **3.2.3. 40+ 고급 필터링 API 연동**            | Done      |        | 2025-08-07     | **특수권리 제외, 투자 조건**     |
 | 3.3. 데이터 시각화 (지도 & 테이블)             | Done      |        | 2025-08-07     |                                  |
 | 3.3.1. 데이터 Fetching `useItems` 훅 개발      | Done      |        | 2025-08-07     | **22개 API 클라이언트 완료**     |
-| 3.3.2. 지도(`MapView`) 개발                    | Done      |        | 2025-08-05     | VWorld API, 마커 클러스터링      |
+| 3.3.2. 지도(`MapView`) 개발                    | Done      |        | 2025-08-05     | vworld로 전환(Leaflet 제거)      |
 | 3.3.3. 테이블(`ItemTable`) 개발                | Done      |        | 2025-08-05     | 페이지네이션 포함                |
 | 3.3.4. 지도-테이블 상호작용 기능 구현          | Done      |        | 2025-08-05     |                                  |
 | **3.4. 완전한 즐겨찾기 시스템 구현**           | Done      |        | 2025-08-07     | **5개 API 활용 시스템**          |
@@ -97,6 +97,7 @@
 - 백엔드 Fix 재검증 3회 반복 결과: 5개 엔드포인트 모두 200 OK 일관성 확인
   - items/simple, items, auction-completed, real-transactions, real-rents
 - 프론트 실데이터 전환: `USE_REAL_API = true`, `NEXT_PUBLIC_API_BASE_URL` 사용 중
+- 지도 엔진: vworld로 전환, `NEXT_PUBLIC_VWORLD_API_KEY` 필요
 - 목록형 API 기본 파라미터 정합화: `limit=20` 기본 적용 (`lib/api.ts`)
 - 상세페이지 Comparables 연동: `InvestmentAnalysis`에 SWR 기반 `getComparables` 연결 완료
 
