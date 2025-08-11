@@ -51,6 +51,14 @@
 
 ---
 
+## Infra 진행 상태 업데이트 (2025-08-11)
+
+- 가이드 초안 작성: `infra/standards/Windows_Local_Dev_SWC_WASM_Policy.md`
+- 배포 승인 요청: `Communication/Backend/send/Request/250811_Infra_to_Backend_Windows_Local_Dev_SWC_WASM_경로정책_가이드_배포_승인_요청.md`
+- 추후: 승인 수령 시 인프라 공지 채널 공지 및 FE README 링크 반영
+
+---
+
 - Status: Sent
 - Requester: Frontend 팀
 - Assignee: Infra 팀

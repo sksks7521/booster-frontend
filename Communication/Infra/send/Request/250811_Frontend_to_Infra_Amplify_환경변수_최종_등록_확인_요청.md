@@ -33,6 +33,14 @@
 
 ---
 
+## Infra 진행 상태 업데이트 (2025-08-11)
+
+- 준비 완료: ENV/키/브랜치 매핑 정리 (`infra/standards/ENV_SECRETS_MATRIX.md`, `infra/standards/Amplify_Deployment_Plan.md`)
+- 대기 사항: App ID, STG/PRD API Base URL, VWorld Key 수령 시 즉시 등록/재배포 예정
+- 커뮤니케이션: `Communication/Frontend/send/Request/250811_Infra_to_Frontend_Amplify_ENV_값_확정_필수_정보_요청.md` 발신
+
+---
+
 - Status: Pending
 - Requester: Frontend 팀
 - Assignee: Infra 팀

@@ -125,3 +125,12 @@ NEXT_PUBLIC_MIXPANEL_TOKEN=your_mixpanel_token
 - Frontend Application은 `Application/` 폴더 내에 위치해 있습니다.
 - Next.js App Router 기반으로 구현되어 있으며, SSG/SSR 기능을 사용합니다.
 - pnpm을 패키지 매니저로 사용하고 있습니다.
+
+---
+
+### Infra 진행 상태 업데이트 (2025-08-11)
+
+- 준비 완료: `infra/standards/Amplify_Deployment_Plan.md` 초안 작성, 브랜치-환경 매핑/빌드/출력/재배포/롤백 절차 정리
+- 준비 완료: `infra/standards/ENV_SECRETS_MATRIX.md`에 FE ENV 정리(브랜치별 분리)
+- 대기 사항: Amplify App ID, 브랜치-환경 최종 매핑, STG/PRD `NEXT_PUBLIC_API_BASE_URL` 수령 시 즉시 콘솔/CLI로 등록 및 재배포 검증 예정
+- 커뮤니케이션: `Communication/Frontend/send/Request/250811_Infra_to_Frontend_Amplify_ENV_값_확정_필수_정보_요청.md` 발신

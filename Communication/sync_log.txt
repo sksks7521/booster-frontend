@@ -161,3 +161,19 @@
 3. 🆕 [Infra] 발신 Request 새 파일: 250811_Frontend_to_Infra_Local_Dev_SWC_WASM_강제_및_경로정책_가이드_요청.md
 4. 🗑️ [Manage] 발신 Request 파일 삭제: 250811_Manager_AI_일일브리핑_Frontend.md
 총 4개 파일 처리 완료
+
+ ========================================
+ 크로스 프로젝트 반영 실행: 2025-08-11 14:07:34
+ ========================================
+1. 🆕 [Backend] 발신 Request 새 파일: 250811_Frontend_to_Backend_STG_PRD_API_Base_URL_및_CORS_확정_요청.md
+2. 🆕 [Infra] 발신 Request 새 파일: 250811_Frontend_to_Infra_Amplify_빌드_Runtime_Node20_pnpm9_고정_요청.md
+3. 🆕 [Infra] 발신 Request 새 파일: 250811_Frontend_to_Infra_VWorld_허용_도메인_확정_및_등록_요청.md
+4. 🗑️ [Infra] 발신 Request 파일 삭제: 250811_Infra_to_Frontend_Amplify_ENV_값_확정_및_등록_절차_합의_요청.md
+5. 🗑️ [Infra] 발신 Request 파일 삭제: 250811_Infra_to_Frontend_Amplify_ENV_값_확정_필수_정보_요청.md
+6. 🗑️ [Infra] 발신 Request 파일 삭제: 250811_Infra_to_Frontend_VWorld_도메인_목록_및_검증_절차_합의_요청.md
+7. 🗑️ [Infra] 발신 Request 파일 삭제: 250811_Infra_to_Frontend_통합_정보_요청(Amplify_ENV_VWorld_Build_도메인).md
+8. 🆕 [Infra] 발신 Completed 새 파일: 250811_Infra_to_Frontend_Amplify_ENV_값_확정_및_등록_절차_합의_요청_완료.md
+9. 🆕 [Infra] 발신 Completed 새 파일: 250811_Infra_to_Frontend_Amplify_ENV_값_확정_필수_정보_요청_완료.md
+10. 🆕 [Infra] 발신 Completed 새 파일: 250811_Infra_to_Frontend_VWorld_도메인_목록_및_검증_절차_합의_요청_완료.md
+11. 🆕 [Infra] 발신 Completed 새 파일: 250811_Infra_to_Frontend_통합_정보_요청(Amplify_ENV_VWorld_Build_도메인)_완료.md
+총 11개 파일 처리 완료

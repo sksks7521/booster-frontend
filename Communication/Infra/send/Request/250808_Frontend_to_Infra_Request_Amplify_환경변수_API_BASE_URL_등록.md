@@ -22,10 +22,11 @@
 
 ## 4. 진행 상태
 
-- Status: Requested
+- Status: In Progress
 - Requester: Frontend 팀
 - Assignee: Infra 팀
 - Requested At: 2025-08-08
 - Completed At:
 - History:
   - 2025-08-08: 요청서 작성
+  - 2025-08-11: ENV 매트릭스/Amplify 배포 계획 문서 정비, FE에 App ID/URL 요청서 발신

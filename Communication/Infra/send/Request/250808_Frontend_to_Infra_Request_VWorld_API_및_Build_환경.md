@@ -28,3 +28,11 @@
 - 관련 변경사항 브랜치: `feature/vworld-map-and-ux`
 - 주요 파일: `Application/components/features/map-view.tsx`, `Application/components/ui/data-state.tsx`, `Application/.eslintrc.json`
 - 로그 업데이트: `Log/250808.md` (지도 엔진 전환/빌드 이슈 섹션 추가)
+
+---
+
+## Infra 진행 상태 업데이트 (2025-08-11)
+
+- 준비 완료: `infra/standards/VWorld_Domain_Registration_Plan.md` 초안 작성
+- 준비 완료: Windows 경로/SWC WASM 가이드 초안(`infra/standards/Windows_Local_Dev_SWC_WASM_Policy.md`)
+- 커뮤니케이션: `Communication/Frontend/send/Request/250811_Infra_to_Frontend_VWorld_도메인_목록_및_검증_절차_합의_요청.md` 발신(도메인 목록/검증 합의)
