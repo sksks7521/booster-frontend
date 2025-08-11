@@ -107,7 +107,7 @@ graph TD
 
 ---
 
-## 6. 핵심 컴포넌트 아키텍처 (2025-08-07 업데이트)
+## 6. 핵심 컴포넌트 아키텍처 (2025-08-11 업데이트)
 
 ### 6-1. 투자 분석 플랫폼 구조
 
@@ -399,31 +399,32 @@ export const favoriteApi = {
 #### **환경 플래그 기반 전환**
 
 ```typescript
-// /hooks/useItemDetail.ts
-const USE_REAL_API = false; // PostgreSQL 연결 후 true로 변경
+// /hooks/useItemDetail.ts (현행)
+const USE_REAL_API = true; // 실제 API 사용 활성화
+```
 
-// 실제 API fetcher (준비 완료)
-const realApiFetcher = async ([_, itemId]) => {
-  try {
-    const item = await itemApi.getItem(Number(itemId));
-    const comparables = await itemApi.getComparables(Number(itemId));
-    const favoriteStatus = await favoriteApi.checkFavoriteStatus(
-      Number(itemId)
-    );
+#### **API 타임아웃 및 표준 에러(2025-08-11 반영)**
 
-    return {
-      ...item,
-      investmentAnalysis: comparables,
-      isFavorite: favoriteStatus.isFavorite,
-    };
-  } catch (error) {
-    // 폴백: 목업 데이터로 자동 전환
-    return mockPropertyDetail;
+```typescript
+// /lib/api.ts
+export interface ApiError {
+  message: string;
+  status?: number;
+  url: string;
+  method: string;
+  details?: unknown;
+}
+
+class ApiClient {
+  constructor(baseURL = API_BASE_URL, defaultTimeoutMs = 10000) {}
+  private async request<T>(
+    endpoint: string,
+    options: RequestInit = {},
+    timeoutMs = 10000
+  ): Promise<T> {
+    // AbortController 기반 타임아웃 + text/plain 오류 캡처
   }
-};
-
-// 환경에 따른 fetcher 선택
-const fetcher = USE_REAL_API ? realApiFetcher : mockFetcher;
+}
 ```
 
 #### **TypeScript 타입 안전성**
@@ -492,7 +493,7 @@ export interface FavoriteCheck {
 
 ### 8-1. 실제 데이터 전환 및 기본 파라미터 정책
 
-- `Application/hooks/useItemDetail.ts`의 `USE_REAL_API = true`로 실데이터 전환
+- `Application/hooks/useItemDetail.ts`의 `USE_REAL_API = true`로 실데이터 전환(현행)
 - `Application/lib/api.ts` 목록형 API에 `limit=20` 기본값 주입 정책 적용
 
 ### 8-2. 상세페이지 Comparables 연동
@@ -505,3 +506,10 @@ export interface FavoriteCheck {
 - `NEXT_PUBLIC_API_BASE_URL` 우선 사용, 미설정 시 `http://127.0.0.1:8000`
 - `NEXT_PUBLIC_VWORLD_API_KEY` 추가 (vworld 지도 스크립트 로딩용)
 - 배포 환경에서는 Amplify 환경변수로 주입 필요
+
+### 8-4. 2025-08-11 업데이트(회귀 대응 → 재검증 합격 및 UX/안정화)
+
+- 백엔드 Fix 반영 확인: 5개 데이터 엔드포인트 3회 반복 스모크 200 OK 일관성, 상세/Comparables(101~105) 200 OK 추가 확인
+- 프론트 UX 표준화: 로딩/에러/빈 상태 컴포넌트(`LoadingState`, `ErrorState`, `EmptyState`) 도입 및 재시도 버튼 연결
+- Comparables 섹션 에러 시 재시도 버튼 제공(`InvestmentAnalysis.onRetry`)
+- API 레이어: 기본 10s 타임아웃, `ApiError` 표준화, `text/plain` 오류 메시지 캡처

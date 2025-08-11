@@ -137,19 +137,53 @@ export interface ItemCreate {
   lng: number;
 }
 
+// 표준 에러 객체
+export interface ApiError {
+  message: string;
+  status?: number;
+  url: string;
+  method: string;
+  details?: unknown;
+}
+
+function createApiError(params: {
+  message: string;
+  status?: number;
+  url: string;
+  method: string;
+  details?: unknown;
+}): ApiError {
+  return {
+    message: params.message,
+    status: params.status,
+    url: params.url,
+    method: params.method,
+    details: params.details,
+  };
+}
+
 // API 클라이언트 클래스
 class ApiClient {
   private baseURL: string;
+  private defaultTimeoutMs: number;
 
-  constructor(baseURL: string = API_BASE_URL) {
+  constructor(
+    baseURL: string = API_BASE_URL,
+    defaultTimeoutMs: number = 10000
+  ) {
     this.baseURL = baseURL;
+    this.defaultTimeoutMs = defaultTimeoutMs;
   }
 
   private async request<T>(
     endpoint: string,
-    options: RequestInit = {}
+    options: RequestInit = {},
+    timeoutMs: number = this.defaultTimeoutMs
   ): Promise<T> {
     const url = `${this.baseURL}${endpoint}`;
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
     const config: RequestInit = {
       headers: {
@@ -157,22 +191,70 @@ class ApiClient {
         ...options.headers,
       },
       ...options,
+      signal: controller.signal,
     };
 
     try {
       const response = await fetch(url, config);
+      clearTimeout(timeoutId);
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(
-          errorData.detail || `HTTP error! status: ${response.status}`
-        );
+        // 백엔드가 text/plain("Internal Server Error")를 반환할 수 있음
+        let details: unknown = undefined;
+        try {
+          details = await response.json();
+        } catch {
+          try {
+            details = await response.text();
+          } catch {
+            details = undefined;
+          }
+        }
+
+        const msg =
+          (typeof details === "object" && details && (details as any).detail) ||
+          `HTTP error ${response.status}`;
+
+        throw createApiError({
+          message: String(msg),
+          status: response.status,
+          url,
+          method: (config.method || "GET") as string,
+          details,
+        });
       }
 
-      return await response.json();
-    } catch (error) {
-      console.error("API request failed:", error);
-      throw error;
+      // 정상 응답 파싱
+      try {
+        return (await response.json()) as T;
+      } catch (parseError) {
+        throw createApiError({
+          message: "Failed to parse JSON response",
+          status: response.status,
+          url,
+          method: (config.method || "GET") as string,
+          details: await response.text().catch(() => undefined),
+        });
+      }
+    } catch (err: any) {
+      clearTimeout(timeoutId);
+      if (err?.name === "AbortError") {
+        throw createApiError({
+          message: `Request timeout after ${timeoutMs}ms`,
+          url,
+          method: (config.method || "GET") as string,
+        });
+      }
+      if (err && err.message) {
+        // err가 이미 ApiError 형태면 그대로 전달
+        throw err;
+      }
+      throw createApiError({
+        message: "Network error",
+        url,
+        method: (config.method || "GET") as string,
+        details: err,
+      });
     }
   }
 

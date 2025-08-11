@@ -13,6 +13,12 @@ import { itemApi } from "@/lib/api";
 import type { ComparablesResponse } from "@/lib/api";
 import { InvestmentAnalysis } from "@/components/features/investment-analysis";
 import {
+  LoadingState,
+  ErrorState,
+  EmptyState,
+} from "@/components/ui/data-state";
+import { mapApiErrorToMessage } from "@/lib/errors";
+import {
   ArrowLeft,
   Heart,
   Share2,
@@ -34,7 +40,8 @@ export default function PropertyDetailPage() {
   const itemId = (params as any)?.id as string;
 
   // 새로 만든 커스텀 훅을 호출하여 데이터와 상태를 가져옵니다.
-  const { property, isLoading, error } = useItemDetail(itemId);
+  const { property, isLoading, error, refetch, isRefreshing } =
+    useItemDetail(itemId);
 
   // Comparables 실데이터(SWR) - 상세 진입 시 지연 로딩
   const {
@@ -139,24 +146,12 @@ export default function PropertyDetailPage() {
   };
 
   // 로딩 상태 처리
-  if (isLoading) {
+  if (isLoading || isRefreshing) {
     return (
       <div className="min-h-screen bg-gray-50">
         <Header user={user} />
         <div className="container mx-auto px-4 py-8">
-          <div className="animate-pulse">
-            <div className="h-8 bg-gray-200 rounded w-1/4 mb-6"></div>
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-              <div className="lg:col-span-2">
-                <div className="h-96 bg-gray-200 rounded-lg mb-6"></div>
-                <div className="h-64 bg-gray-200 rounded-lg"></div>
-              </div>
-              <div className="space-y-4">
-                <div className="h-32 bg-gray-200 rounded-lg"></div>
-                <div className="h-48 bg-gray-200 rounded-lg"></div>
-              </div>
-            </div>
-          </div>
+          <LoadingState title="불러오는 중입니다..." />
         </div>
       </div>
     );
@@ -168,12 +163,13 @@ export default function PropertyDetailPage() {
       <div className="min-h-screen bg-gray-50">
         <Header user={user} />
         <div className="container mx-auto px-4 py-8">
-          <div className="text-center">
-            <h1 className="text-2xl font-bold text-gray-900 mb-4">
-              데이터를 불러오는 데 실패했습니다
-            </h1>
-            <p className="text-gray-600 mb-4">잠시 후 다시 시도해주세요.</p>
-            <Button onClick={handleBack}>
+          <ErrorState
+            onRetry={refetch}
+            retryText="다시 시도"
+            title={mapApiErrorToMessage(error)}
+          />
+          <div className="mt-4 text-center">
+            <Button variant="ghost" onClick={handleBack}>
               <ArrowLeft className="w-4 h-4 mr-2" />
               돌아가기
             </Button>
@@ -189,11 +185,9 @@ export default function PropertyDetailPage() {
       <div className="min-h-screen bg-gray-50">
         <Header user={user} />
         <div className="container mx-auto px-4 py-8">
-          <div className="text-center">
-            <h1 className="text-2xl font-bold text-gray-900 mb-4">
-              물건을 찾을 수 없습니다
-            </h1>
-            <Button onClick={handleBack}>
+          <EmptyState onRetry={refetch} retryText="다시 불러오기" />
+          <div className="mt-4 text-center">
+            <Button variant="ghost" onClick={handleBack}>
               <ArrowLeft className="w-4 h-4 mr-2" />
               돌아가기
             </Button>
@@ -483,6 +477,7 @@ export default function PropertyDetailPage() {
                 data={comparables ?? null}
                 isLoading={isComparablesLoading}
                 error={comparablesError}
+                onRetry={() => void itemApi.getComparables(Number(itemId))}
               />
             </div>
           </div>

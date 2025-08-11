@@ -225,13 +225,16 @@ export function useItemDetail(itemId: string | null) {
   // 환경에 따라 실제 API 또는 목업 데이터 선택
   const fetcher = USE_REAL_API ? realApiFetcher : mockFetcher;
 
-  const { data, error, isLoading } = useSWR<PropertyDetail>(swrKey, fetcher);
+  const { data, error, isLoading, mutate, isValidating } =
+    useSWR<PropertyDetail>(swrKey, fetcher);
 
   return {
     property: data,
     isLoading,
     error,
     isUsingRealAPI: USE_REAL_API, // 디버깅용
+    refetch: () => mutate(),
+    isRefreshing: isValidating,
   };
 }
 

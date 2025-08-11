@@ -11,13 +11,25 @@ import ItemTable from "@/components/features/item-table";
 import MapView from "@/components/features/map-view";
 import { useFilterStore } from "@/store/filterStore";
 import { useItems } from "@/hooks/useItems";
+import { useDebouncedValue } from "@/hooks/useDebounce";
 import { Search, Map, List, Download, Bell } from "lucide-react";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationPrevious,
+  PaginationNext,
+} from "@/components/ui/pagination";
 
 export default function AnalysisPage() {
   const [isFilterCollapsed, setIsFilterCollapsed] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const debouncedQuery = useDebouncedValue(searchQuery, 300);
   const [activeView, setActiveView] = useState<"table" | "map">("table");
   const { items, isLoading, error, totalCount, refetch } = useItems();
+  const setPage = useFilterStore((s) => s.setPage);
+  const page = useFilterStore((s) => s.page);
+  const size = useFilterStore((s) => s.size);
 
   // 스토어에서 필터 상태를 직접 구독합니다.
   const filters = useFilterStore((state) => state);
@@ -34,8 +46,8 @@ export default function AnalysisPage() {
   // useItems 훅이 필터 상태를 키로 사용하여 자동 재검증함
 
   const handleSearch = () => {
-    console.log("Search query:", searchQuery);
-    // 검색 로직 구현
+    console.log("Search query:", debouncedQuery);
+    // TODO: debouncedQuery를 필터 스토어에 반영하여 서버 질의로 연동
   };
 
   const handleExport = () => {
@@ -158,6 +170,41 @@ export default function AnalysisPage() {
                     onRetry={refetch}
                   />
                 )}
+
+                <div className="mt-4">
+                  <Pagination>
+                    <PaginationContent>
+                      <PaginationItem>
+                        <PaginationPrevious
+                          href="#"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            setPage(Math.max(1, page - 1));
+                          }}
+                        />
+                      </PaginationItem>
+                      <PaginationItem>
+                        <span className="px-3 text-sm text-gray-600">
+                          페이지 {page} /{" "}
+                          {Math.max(1, Math.ceil((totalCount ?? 0) / size))}
+                        </span>
+                      </PaginationItem>
+                      <PaginationItem>
+                        <PaginationNext
+                          href="#"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            const totalPages = Math.max(
+                              1,
+                              Math.ceil((totalCount ?? 0) / size)
+                            );
+                            setPage(Math.min(totalPages, page + 1));
+                          }}
+                        />
+                      </PaginationItem>
+                    </PaginationContent>
+                  </Pagination>
+                </div>
               </CardContent>
             </Card>
           </div>

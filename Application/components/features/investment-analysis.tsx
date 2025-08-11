@@ -39,12 +39,14 @@ interface InvestmentAnalysisProps {
   data: ComparablesResponse | null;
   isLoading?: boolean;
   error?: any;
+  onRetry?: () => void;
 }
 
 export function InvestmentAnalysis({
   data,
   isLoading,
   error,
+  onRetry,
 }: InvestmentAnalysisProps) {
   const [selectedComparable, setSelectedComparable] = useState<number | null>(
     null
@@ -88,6 +90,16 @@ export function InvestmentAnalysis({
           <p className="text-gray-600">
             투자 분석 정보를 불러올 수 없습니다. 잠시 후 다시 시도해주세요.
           </p>
+          {onRetry && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="mt-3"
+              onClick={onRetry}
+            >
+              다시 시도
+            </Button>
+          )}
         </CardContent>
       </Card>
     );

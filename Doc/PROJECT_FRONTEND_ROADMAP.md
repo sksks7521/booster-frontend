@@ -92,14 +92,13 @@
 
 ---
 
-## 2025-08-08 상태 업데이트
+## 2025-08-11 상태 업데이트
 
-- 백엔드 Fix 재검증 3회 반복 결과: 5개 엔드포인트 모두 200 OK 일관성 확인
+- 백엔드 Fix 이후 재검증 결과: 5개 엔드포인트 3회 반복 200 OK 일관성 확보
   - items/simple, items, auction-completed, real-transactions, real-rents
-- 프론트 실데이터 전환: `USE_REAL_API = true`, `NEXT_PUBLIC_API_BASE_URL` 사용 중
-- 지도 엔진: vworld로 전환, `NEXT_PUBLIC_VWORLD_API_KEY` 필요
-- 목록형 API 기본 파라미터 정합화: `limit=20` 기본 적용 (`lib/api.ts`)
-- 상세페이지 Comparables 연동: `InvestmentAnalysis`에 SWR 기반 `getComparables` 연결 완료
+- 상세/Comparables 스모크(101~105): 모두 200 OK
+- 프론트 개선: UX 표준화(Loading/Empty/Error + 재시도), API 타임아웃/표준 에러, 페이지네이션(API/UI)
+- 다음 액션: 통합 QA 체크리스트 기반 점검 → 인프라 Amplify 환경변수 등록 최종 확인 → 배포 환경 검증
 
 ### 다음 액션 (단기)
 

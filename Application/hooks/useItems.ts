@@ -10,6 +10,7 @@ export interface UseItemsResult {
   error: any;
   totalCount?: number;
   refetch: () => void;
+  isRefreshing: boolean;
 }
 
 function buildQueryParamsFromFilters(
@@ -18,7 +19,8 @@ function buildQueryParamsFromFilters(
   const params: Record<string, any> = {};
 
   // 기본 페이지 크기 정책
-  params.limit = 20;
+  params.limit = filters.size ?? 20;
+  params.page = filters.page ?? 1;
 
   // 매핑 가능한 필드 위주 최소 적용 (백엔드 스키마와의 합의 필요)
   if (filters.region) params.region = filters.region;
@@ -58,16 +60,21 @@ export function useItems(): UseItemsResult {
     String(filters.hasElevator),
     String(filters.hasParking),
     filters.auctionStatus,
+    `p:${filters.page}`,
+    `s:${filters.size}`,
   ];
 
-  const { data, error, isLoading, mutate } = useSWR(swrKey, async () => {
-    const params = buildQueryParamsFromFilters(filters);
-    const response = await itemApi.getItems(params);
-    // `ItemsResponse` 스키마 상이 시 대응 (lib/api.ts 기준으로 우선 처리)
-    const items = (response as any).items ?? (response as any) ?? [];
-    const total = (response as any).total ?? (response as any).total_items;
-    return { items, total } as { items: Item[]; total?: number };
-  });
+  const { data, error, isLoading, isValidating, mutate } = useSWR(
+    swrKey,
+    async () => {
+      const params = buildQueryParamsFromFilters(filters);
+      const response = await itemApi.getItems(params);
+      // `ItemsResponse` 스키마 상이 시 대응 (lib/api.ts 기준으로 우선 처리)
+      const items = (response as any).items ?? (response as any) ?? [];
+      const total = (response as any).total ?? (response as any).total_items;
+      return { items, total } as { items: Item[]; total?: number };
+    }
+  );
 
   return {
     items: data?.items,
@@ -77,5 +84,6 @@ export function useItems(): UseItemsResult {
     refetch: () => {
       void mutate();
     },
+    isRefreshing: isValidating,
   };
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
+import { mapApiErrorToMessage } from "@/lib/errors";
 import { AlertCircle, RefreshCw, Search } from "lucide-react";
 import React from "react";
 
@@ -18,10 +19,16 @@ export function LoadingState({
   className,
 }: Omit<StateBaseProps, "onRetry" | "retryText">) {
   return (
-    <div className={`flex flex-col items-center justify-center py-8 ${className ?? ""}`}>
+    <div
+      className={`flex flex-col items-center justify-center py-8 ${
+        className ?? ""
+      }`}
+    >
       <RefreshCw className="h-5 w-5 animate-spin text-gray-400" />
       <p className="mt-2 text-sm text-gray-700">{title}</p>
-      {description && <p className="mt-1 text-xs text-gray-500">{description}</p>}
+      {description && (
+        <p className="mt-1 text-xs text-gray-500">{description}</p>
+      )}
     </div>
   );
 }
@@ -32,12 +39,18 @@ export function ErrorState({
   onRetry,
   retryText = "다시 시도",
   className,
-}: StateBaseProps) {
+}: StateBaseProps & { error?: unknown }) {
   return (
-    <div className={`flex flex-col items-center justify-center py-8 ${className ?? ""}`}>
+    <div
+      className={`flex flex-col items-center justify-center py-8 ${
+        className ?? ""
+      }`}
+    >
       <AlertCircle className="h-5 w-5 text-red-500" />
       <p className="mt-2 text-sm text-red-700">{title}</p>
-      {description && <p className="mt-1 text-xs text-red-500/80">{description}</p>}
+      {description && (
+        <p className="mt-1 text-xs text-red-500/80">{description}</p>
+      )}
       {onRetry && (
         <Button variant="outline" size="sm" className="mt-3" onClick={onRetry}>
           <RefreshCw className="h-4 w-4 mr-1" />
@@ -56,10 +69,16 @@ export function EmptyState({
   className,
 }: StateBaseProps) {
   return (
-    <div className={`flex flex-col items-center justify-center py-8 ${className ?? ""}`}>
+    <div
+      className={`flex flex-col items-center justify-center py-8 ${
+        className ?? ""
+      }`}
+    >
       <Search className="h-5 w-5 text-gray-400" />
       <p className="mt-2 text-sm text-gray-700">{title}</p>
-      {description && <p className="mt-1 text-xs text-gray-500">{description}</p>}
+      {description && (
+        <p className="mt-1 text-xs text-gray-500">{description}</p>
+      )}
       {onRetry && (
         <Button variant="ghost" size="sm" className="mt-3" onClick={onRetry}>
           <RefreshCw className="h-4 w-4 mr-1" />
@@ -69,5 +88,3 @@ export function EmptyState({
     </div>
   );
 }
-
-
