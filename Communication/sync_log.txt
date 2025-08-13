@@ -223,3 +223,22 @@
 1. 🗑️ [Backend] 발신 Request 파일 삭제: 250813_Backend_to_Frontend_SWR_Error_재현_환경_및_Base_URL_확인_요청.md
 2. 🆕 [Backend] 발신 Completed 새 파일: 250813_Backend_to_Frontend_SWR_Error_재현_환경_및_Base_URL_확인_요청_완료.md
 총 2개 파일 처리 완료
+
+ ========================================
+ 크로스 프로젝트 반영 실행: 2025-08-13 20:44:09
+ ========================================
+1. 🆕 [Backend] 발신 Request 새 파일: 250813_Frontend_to_Backend_Base_URL_8001_고정_및_CORS_재확인_요청.md
+2. 🆕 [Backend] 발신 Completed 새 파일: 250813_Frontend_to_Backend_SWR_Key_Fetcher_표준화_적용_및_Base_URL_확인_회신_완료.md
+3. 🆕 [Infra] 발신 Request 새 파일: 250813_Frontend_to_Infra_Kakao_도메인_목록_회신_및_JS_키_요청.md
+4. 🆕 [Infra] 발신 Request 새 파일: 250813_Frontend_to_Infra_로컬_Base_URL_8001_고정_정책_공유_및_Amplify_ENV_메모.md
+5. 🗑️ [Infra] 발신 Request 파일 삭제: 250813_Infra_to_Frontend_Amplify_ENV_파라미터_수집_요청.md
+총 5개 파일 처리 완료
+
+ ========================================
+ 크로스 프로젝트 반영 실행: 2025-08-13 23:07:32
+ ========================================
+1. 🆕 [Backend] 발신 Completed 새 파일: 250813_Frontend_to_Backend_Items_Simple_전환_및_렌더링_검증_완료.md
+2. 📝 [Analysis] 발신 요청서 수정: 250805_Frontend_to_Analysis_Request_Investment_Algorithm.md
+3. 📝 [Analysis] 발신 요청서 수정: 250808_Frontend_to_Analysis_Request_Comparables_사용행태_이벤트정의.md
+4. 🆕 [Infra] 발신 Request 새 파일: 250813_Frontend_to_Infra_Kakao_도메인_재확인_및_VWorld_키_승인_ETA_요청.md
+총 4개 파일 처리 완료

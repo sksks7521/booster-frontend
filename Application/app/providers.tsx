@@ -1,6 +1,7 @@
 "use client";
 
 import { SWRConfig } from "swr";
+import { fetcher } from "@/lib/fetcher";
 import React from "react";
 
 interface ProvidersProps {
@@ -11,6 +12,7 @@ export function Providers({ children }: ProvidersProps) {
   return (
     <SWRConfig
       value={{
+        fetcher,
         // 전역 재시도/캐시 정책(보수적)
         errorRetryCount: 2,
         errorRetryInterval: 2000,

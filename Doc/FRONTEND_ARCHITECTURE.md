@@ -519,3 +519,17 @@ export interface FavoriteCheck {
 - VWorld 운영키 승인 대기(약 10일) 동안 지도 Provider를 Kakao JS로 임시 전환
 - ENV 스위치: `NEXT_PUBLIC_MAP_PROVIDER` = `vworld`(기본) / `kakao`(임시), Kakao 키 `NEXT_PUBLIC_KAKAO_APP_KEY`
 - 코드 위치: `Application/lib/map/kakaoLoader.ts`, `Application/components/features/map-view.tsx` (Provider 스위치 적용)
+
+---
+
+### 2025-08-13 업데이트: 데이터/지도 전환 안정화
+
+- 목록 데이터 소스 전환: /api/v1/items/simple (안정 우선)
+  - SWR 키: ["/api/v1/items/simple", params]
+  - 파라미터 표준: region, buildingType, min_built_year, max_built_year, min_price, max_price, min_area, max_area, has_elevator, auction_status, page, limit
+  - 신규 파라미터 확장: province, cityDistrict, town, auction_date_from, auction_date_to, auction_month, under100
+  - 응답 총건수: totalItems | total | count 호환 처리
+  - 테이블 컬럼 매핑: buildYear|built_year, buildingType|property_type
+- SWR 전역 fetcher 도입: 배열 키 해체 + 표준 Error throw, SWRConfig.fetcher 등록, dev 모드 URL 로그(debug)
+- Dev 설정: next.config.mjs의 experimental.allowedDevOrigins=["127.0.0.1","localhost"]로 정적 자산 404 해소
+- 지도 Provider: .env.local로 Kakao 임시 전환 (NEXT_PUBLIC_MAP_PROVIDER=kakao, NEXT_PUBLIC_KAKAO_APP_KEY=<issued>)

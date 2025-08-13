@@ -1,15 +1,21 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Checkbox } from "@/components/ui/checkbox"
-import { Slider } from "@/components/ui/slider"
-import { Badge } from "@/components/ui/badge"
-import { useFilterStore } from "@/store/filterStore"
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Slider } from "@/components/ui/slider";
+import { Badge } from "@/components/ui/badge";
+import { useFilterStore } from "@/store/filterStore";
 import {
   ChevronDown,
   ChevronUp,
@@ -23,19 +29,22 @@ import {
   Car,
   CableCarIcon as Elevator,
   Gavel,
-} from "lucide-react"
+} from "lucide-react";
 
 interface FilterControlProps {
-  isCollapsed: boolean
-  onToggleCollapse: () => void
+  isCollapsed: boolean;
+  onToggleCollapse: () => void;
 }
 
-export default function FilterControl({ isCollapsed, onToggleCollapse }: FilterControlProps) {
+export default function FilterControl({
+  isCollapsed,
+  onToggleCollapse,
+}: FilterControlProps) {
   // 스토어에서 상태와 액션을 직접 가져옵니다.
-  const filters = useFilterStore((state) => state)
-  const setFilter = useFilterStore((state) => state.setFilter)
-  const setRangeFilter = useFilterStore((state) => state.setRangeFilter)
-  const resetFilters = useFilterStore((state) => state.resetFilters)
+  const filters = useFilterStore((state) => state);
+  const setFilter = useFilterStore((state) => state.setFilter);
+  const setRangeFilter = useFilterStore((state) => state.setRangeFilter);
+  const resetFilters = useFilterStore((state) => state.resetFilters);
 
   const [expandedSections, setExpandedSections] = useState({
     location: true,
@@ -43,39 +52,39 @@ export default function FilterControl({ isCollapsed, onToggleCollapse }: FilterC
     price: true,
     building: false,
     auction: false,
-  })
+  });
 
   const toggleSection = (section: keyof typeof expandedSections) => {
     setExpandedSections((prev) => ({
       ...prev,
       [section]: !prev[section],
-    }))
-  }
+    }));
+  };
 
   const formatPrice = (value: number) => {
     if (value >= 10000) {
-      return `${(value / 10000).toFixed(1)}억`
+      return `${(value / 10000).toFixed(1)}억`;
     }
-    return `${value.toLocaleString()}만`
-  }
+    return `${value.toLocaleString()}만`;
+  };
 
   const formatArea = (value: number) => {
-    return `${value}㎡`
-  }
+    return `${value}㎡`;
+  };
 
   const getActiveFiltersCount = () => {
-    let count = 0
-    if (filters.region) count++
-    if (filters.buildingType) count++
-    if (filters.priceRange[0] > 0 || filters.priceRange[1] < 500000) count++
-    if (filters.areaRange[0] > 0 || filters.areaRange[1] < 200) count++
-    if (filters.buildYear[0] > 1980 || filters.buildYear[1] < 2024) count++
-    if (filters.floor) count++
-    if (filters.hasElevator) count++
-    if (filters.hasParking) count++
-    if (filters.auctionStatus) count++
-    return count
-  }
+    let count = 0;
+    if (filters.region) count++;
+    if (filters.buildingType) count++;
+    if (filters.priceRange[0] > 0 || filters.priceRange[1] < 500000) count++;
+    if (filters.areaRange[0] > 0 || filters.areaRange[1] < 200) count++;
+    if (filters.buildYear[0] > 1980 || filters.buildYear[1] < 2024) count++;
+    if (filters.floor) count++;
+    if (filters.hasElevator) count++;
+    if (filters.hasParking) count++;
+    if (filters.auctionStatus) count++;
+    return count;
+  };
 
   return (
     <Card className="w-full">
@@ -99,8 +108,17 @@ export default function FilterControl({ isCollapsed, onToggleCollapse }: FilterC
             >
               초기화
             </Button>
-            <Button variant="ghost" size="sm" onClick={onToggleCollapse} className="p-1">
-              {isCollapsed ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onToggleCollapse}
+              className="p-1"
+            >
+              {isCollapsed ? (
+                <ChevronDown className="w-4 h-4" />
+              ) : (
+                <ChevronUp className="w-4 h-4" />
+              )}
             </Button>
           </div>
         </div>
@@ -108,55 +126,78 @@ export default function FilterControl({ isCollapsed, onToggleCollapse }: FilterC
 
       {!isCollapsed && (
         <CardContent className="space-y-6">
-          {/* 지역 필터 */}
+          {/* 주소 계층 필터 */}
           <div className="space-y-3">
-            <div className="flex items-center justify-between cursor-pointer" onClick={() => toggleSection("location")}>
+            <div
+              className="flex items-center justify-between cursor-pointer"
+              onClick={() => toggleSection("location")}
+            >
               <div className="flex items-center space-x-2">
                 <MapPin className="w-4 h-4" />
-                <Label className="font-medium">지역</Label>
+                <Label className="font-medium">주소</Label>
               </div>
-              {expandedSections.location ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+              {expandedSections.location ? (
+                <ChevronUp className="w-4 h-4" />
+              ) : (
+                <ChevronDown className="w-4 h-4" />
+              )}
             </div>
             {expandedSections.location && (
-              <Select value={filters.region} onValueChange={(value) => setFilter("region", value)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="지역을 선택하세요" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">전체</SelectItem>
-                  <SelectItem value="서울">서울특별시</SelectItem>
-                  <SelectItem value="부산">부산광역시</SelectItem>
-                  <SelectItem value="대구">대구광역시</SelectItem>
-                  <SelectItem value="인천">인천광역시</SelectItem>
-                  <SelectItem value="광주">광주광역시</SelectItem>
-                  <SelectItem value="대전">대전광역시</SelectItem>
-                  <SelectItem value="울산">울산광역시</SelectItem>
-                  <SelectItem value="세종">세종특별자치시</SelectItem>
-                  <SelectItem value="경기">경기도</SelectItem>
-                  <SelectItem value="강원">강원도</SelectItem>
-                  <SelectItem value="충북">충청북도</SelectItem>
-                  <SelectItem value="충남">충청남도</SelectItem>
-                  <SelectItem value="전북">전라북도</SelectItem>
-                  <SelectItem value="전남">전라남도</SelectItem>
-                  <SelectItem value="경북">경상북도</SelectItem>
-                  <SelectItem value="경남">경상남도</SelectItem>
-                  <SelectItem value="제주">제주특별자치도</SelectItem>
-                </SelectContent>
-              </Select>
+              <div className="space-y-2">
+                <div>
+                  <Label className="text-xs text-gray-500">
+                    주소(구역/시도)
+                  </Label>
+                  <Input
+                    value={(filters as any).province || ""}
+                    onChange={(e) => setFilter("province", e.target.value)}
+                    placeholder="예: 경기도, 서울특별시"
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs text-gray-500">주소(시군구)</Label>
+                  <Input
+                    value={(filters as any).cityDistrict || ""}
+                    onChange={(e) => setFilter("cityDistrict", e.target.value)}
+                    placeholder="예: 화성시, 미추홀구"
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs text-gray-500">읍면동</Label>
+                  <Input
+                    value={(filters as any).town || ""}
+                    onChange={(e) => setFilter("town", e.target.value)}
+                    placeholder="예: 송산면, 주안동"
+                    className="mt-1"
+                  />
+                </div>
+              </div>
             )}
           </div>
 
           {/* 건물 유형 */}
           <div className="space-y-3">
-            <div className="flex items-center justify-between cursor-pointer" onClick={() => toggleSection("property")}>
+            <div
+              className="flex items-center justify-between cursor-pointer"
+              onClick={() => toggleSection("property")}
+            >
               <div className="flex items-center space-x-2">
                 <Building className="w-4 h-4" />
                 <Label className="font-medium">건물 유형</Label>
               </div>
-              {expandedSections.property ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+              {expandedSections.property ? (
+                <ChevronUp className="w-4 h-4" />
+              ) : (
+                <ChevronDown className="w-4 h-4" />
+              )}
             </div>
             {expandedSections.property && (
-              <Select value={filters.buildingType} onValueChange={(value) => setFilter("buildingType", value)}>
+              <Select
+                value={filters.buildingType}
+                onValueChange={(value) => setFilter("buildingType", value)}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="건물 유형을 선택하세요" />
                 </SelectTrigger>
@@ -177,19 +218,28 @@ export default function FilterControl({ isCollapsed, onToggleCollapse }: FilterC
 
           {/* 가격 범위 */}
           <div className="space-y-3">
-            <div className="flex items-center justify-between cursor-pointer" onClick={() => toggleSection("price")}>
+            <div
+              className="flex items-center justify-between cursor-pointer"
+              onClick={() => toggleSection("price")}
+            >
               <div className="flex items-center space-x-2">
                 <DollarSign className="w-4 h-4" />
                 <Label className="font-medium">가격 범위</Label>
               </div>
-              {expandedSections.price ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+              {expandedSections.price ? (
+                <ChevronUp className="w-4 h-4" />
+              ) : (
+                <ChevronDown className="w-4 h-4" />
+              )}
             </div>
             {expandedSections.price && (
               <div className="space-y-4">
                 <div className="px-2">
                   <Slider
                     value={filters.priceRange}
-                    onValueChange={(value) => setRangeFilter("priceRange", value as [number, number])}
+                    onValueChange={(value) =>
+                      setRangeFilter("priceRange", value as [number, number])
+                    }
                     max={500000}
                     min={0}
                     step={1000}
@@ -202,25 +252,35 @@ export default function FilterControl({ isCollapsed, onToggleCollapse }: FilterC
                 </div>
                 <div className="grid grid-cols-2 gap-2">
                   <div>
-                    <Label className="text-xs text-gray-500">최소 가격 (만원)</Label>
+                    <Label className="text-xs text-gray-500">
+                      최소 가격 (만원)
+                    </Label>
                     <Input
                       type="number"
                       value={filters.priceRange[0]}
                       onChange={(e) => {
-                        const value = Number.parseInt(e.target.value) || 0
-                        setRangeFilter("priceRange", [value, filters.priceRange[1]])
+                        const value = Number.parseInt(e.target.value) || 0;
+                        setRangeFilter("priceRange", [
+                          value,
+                          filters.priceRange[1],
+                        ]);
                       }}
                       className="mt-1"
                     />
                   </div>
                   <div>
-                    <Label className="text-xs text-gray-500">최대 가격 (만원)</Label>
+                    <Label className="text-xs text-gray-500">
+                      최대 가격 (만원)
+                    </Label>
                     <Input
                       type="number"
                       value={filters.priceRange[1]}
                       onChange={(e) => {
-                        const value = Number.parseInt(e.target.value) || 500000
-                        setRangeFilter("priceRange", [filters.priceRange[0], value])
+                        const value = Number.parseInt(e.target.value) || 500000;
+                        setRangeFilter("priceRange", [
+                          filters.priceRange[0],
+                          value,
+                        ]);
                       }}
                       className="mt-1"
                     />
@@ -240,7 +300,9 @@ export default function FilterControl({ isCollapsed, onToggleCollapse }: FilterC
               <div className="px-2">
                 <Slider
                   value={filters.areaRange}
-                  onValueChange={(value) => setRangeFilter("areaRange", value as [number, number])}
+                  onValueChange={(value) =>
+                    setRangeFilter("areaRange", value as [number, number])
+                  }
                   max={200}
                   min={0}
                   step={5}
@@ -256,19 +318,28 @@ export default function FilterControl({ isCollapsed, onToggleCollapse }: FilterC
 
           {/* 건축년도 */}
           <div className="space-y-3">
-            <div className="flex items-center justify-between cursor-pointer" onClick={() => toggleSection("building")}>
+            <div
+              className="flex items-center justify-between cursor-pointer"
+              onClick={() => toggleSection("building")}
+            >
               <div className="flex items-center space-x-2">
                 <Calendar className="w-4 h-4" />
                 <Label className="font-medium">건축년도</Label>
               </div>
-              {expandedSections.building ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+              {expandedSections.building ? (
+                <ChevronUp className="w-4 h-4" />
+              ) : (
+                <ChevronDown className="w-4 h-4" />
+              )}
             </div>
             {expandedSections.building && (
               <div className="space-y-4">
                 <div className="px-2">
                   <Slider
                     value={filters.buildYear}
-                    onValueChange={(value) => setRangeFilter("buildYear", value as [number, number])}
+                    onValueChange={(value) =>
+                      setRangeFilter("buildYear", value as [number, number])
+                    }
                     max={2024}
                     min={1980}
                     step={1}
@@ -278,6 +349,43 @@ export default function FilterControl({ isCollapsed, onToggleCollapse }: FilterC
                 <div className="flex items-center justify-between text-sm text-gray-600">
                   <span>{filters.buildYear[0]}년</span>
                   <span>{filters.buildYear[1]}년</span>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <Label className="text-xs text-gray-500">
+                      매각기일(From)
+                    </Label>
+                    <Input
+                      type="date"
+                      value={(filters as any).auctionDateFrom || ""}
+                      onChange={(e) =>
+                        setFilter("auctionDateFrom", e.target.value)
+                      }
+                      className="mt-1"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs text-gray-500">
+                      매각기일(To)
+                    </Label>
+                    <Input
+                      type="date"
+                      value={(filters as any).auctionDateTo || ""}
+                      onChange={(e) =>
+                        setFilter("auctionDateTo", e.target.value)
+                      }
+                      className="mt-1"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <Label className="text-xs text-gray-500">매각_월</Label>
+                  <Input
+                    type="month"
+                    value={(filters as any).auctionMonth || ""}
+                    onChange={(e) => setFilter("auctionMonth", e.target.value)}
+                    className="mt-1"
+                  />
                 </div>
               </div>
             )}
@@ -289,7 +397,10 @@ export default function FilterControl({ isCollapsed, onToggleCollapse }: FilterC
               <Layers className="w-4 h-4" />
               <Label className="font-medium">층수</Label>
             </div>
-            <Select value={filters.floor} onValueChange={(value) => setFilter("floor", value)}>
+            <Select
+              value={filters.floor}
+              onValueChange={(value) => setFilter("floor", value)}
+            >
               <SelectTrigger>
                 <SelectValue placeholder="층수를 선택하세요" />
               </SelectTrigger>
@@ -316,7 +427,9 @@ export default function FilterControl({ isCollapsed, onToggleCollapse }: FilterC
                 <Checkbox
                   id="elevator"
                   checked={filters.hasElevator}
-                  onCheckedChange={(checked) => setFilter("hasElevator", checked)}
+                  onCheckedChange={(checked) =>
+                    setFilter("hasElevator", checked)
+                  }
                 />
                 <Elevator className="w-4 h-4" />
                 <Label htmlFor="elevator" className="text-sm">
@@ -327,11 +440,23 @@ export default function FilterControl({ isCollapsed, onToggleCollapse }: FilterC
                 <Checkbox
                   id="parking"
                   checked={filters.hasParking}
-                  onCheckedChange={(checked) => setFilter("hasParking", checked)}
+                  onCheckedChange={(checked) =>
+                    setFilter("hasParking", checked)
+                  }
                 />
                 <Car className="w-4 h-4" />
                 <Label htmlFor="parking" className="text-sm">
                   주차장
+                </Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="under100"
+                  checked={(filters as any).under100}
+                  onCheckedChange={(checked) => setFilter("under100", checked)}
+                />
+                <Label htmlFor="under100" className="text-sm">
+                  1억 이하 여부
                 </Label>
               </div>
             </div>
@@ -339,15 +464,25 @@ export default function FilterControl({ isCollapsed, onToggleCollapse }: FilterC
 
           {/* 경매 상태 */}
           <div className="space-y-3">
-            <div className="flex items-center justify-between cursor-pointer" onClick={() => toggleSection("auction")}>
+            <div
+              className="flex items-center justify-between cursor-pointer"
+              onClick={() => toggleSection("auction")}
+            >
               <div className="flex items-center space-x-2">
                 <Gavel className="w-4 h-4" />
                 <Label className="font-medium">경매 상태</Label>
               </div>
-              {expandedSections.auction ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+              {expandedSections.auction ? (
+                <ChevronUp className="w-4 h-4" />
+              ) : (
+                <ChevronDown className="w-4 h-4" />
+              )}
             </div>
             {expandedSections.auction && (
-              <Select value={filters.auctionStatus} onValueChange={(value) => setFilter("auctionStatus", value)}>
+              <Select
+                value={filters.auctionStatus}
+                onValueChange={(value) => setFilter("auctionStatus", value)}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="경매 상태를 선택하세요" />
                 </SelectTrigger>
@@ -364,5 +499,5 @@ export default function FilterControl({ isCollapsed, onToggleCollapse }: FilterC
         </CardContent>
       )}
     </Card>
-  )
+  );
 }

@@ -2,6 +2,10 @@ import { create } from "zustand";
 
 // 필터 상태의 타입(Type)을 정의합니다.
 interface FilterState {
+  // 주소 계층
+  province: string; // 주소(구역)
+  cityDistrict: string; // 주소(시군구)
+  town: string; // 읍면동
   region: string;
   buildingType: string;
   priceRange: [number, number];
@@ -11,6 +15,12 @@ interface FilterState {
   hasElevator: boolean;
   hasParking: boolean;
   auctionStatus: string;
+  // 경매 일정
+  auctionDateFrom: string; // YYYY-MM-DD
+  auctionDateTo: string; // YYYY-MM-DD
+  auctionMonth: string; // YYYY-MM
+  // 편의 필터
+  under100: boolean; // 1억 이하 여부
   page: number;
   size: number;
 }
@@ -29,6 +39,9 @@ interface FilterActions {
 
 // 필터의 초기 상태 값입니다.
 const initialState: FilterState = {
+  province: "",
+  cityDistrict: "",
+  town: "",
   region: "",
   buildingType: "",
   priceRange: [0, 500000],
@@ -38,6 +51,10 @@ const initialState: FilterState = {
   hasElevator: false,
   hasParking: false,
   auctionStatus: "",
+  auctionDateFrom: "",
+  auctionDateTo: "",
+  auctionMonth: "",
+  under100: false,
   page: 1,
   size: 20,
 };

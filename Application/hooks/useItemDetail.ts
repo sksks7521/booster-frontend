@@ -1,5 +1,6 @@
 import useSWR from "swr";
 import { itemApi } from "@/lib/api";
+import { fetcher } from "@/lib/fetcher";
 
 // PropertyDetail 타입 정의
 interface PropertyDetail {
@@ -220,13 +221,13 @@ const USE_REAL_API = true; // 백엔드 서버 실행 확인됨 → 실제 API �
  */
 export function useItemDetail(itemId: string | null) {
   // SWR 키는 API 엔드포인트와 파라미터를 배열로 구성하는 것이 일반적입니다.
-  const swrKey = itemId ? [`/api/v1/items/`, itemId] : null;
+  const swrKey = itemId ? ["/api/v1/items/" as const, itemId] : null;
 
   // 환경에 따라 실제 API 또는 목업 데이터 선택
-  const fetcher = USE_REAL_API ? realApiFetcher : mockFetcher;
+  const detailFetcher = USE_REAL_API ? realApiFetcher : mockFetcher;
 
   const { data, error, isLoading, mutate, isValidating } =
-    useSWR<PropertyDetail>(swrKey, fetcher);
+    useSWR<PropertyDetail>(swrKey as any, detailFetcher);
 
   return {
     property: data,

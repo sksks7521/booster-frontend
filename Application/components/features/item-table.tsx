@@ -82,8 +82,14 @@ function ItemTable({
                   {item.address}
                 </a>
               </TableCell>
-              <TableCell>{(item as any).property_type}</TableCell>
-              <TableCell>{(item as any).built_year}</TableCell>
+              <TableCell>
+                {(item as any).property_type ??
+                  (item as any).buildingType ??
+                  "-"}
+              </TableCell>
+              <TableCell>
+                {(item as any).built_year ?? (item as any).buildYear ?? "-"}
+              </TableCell>
               <TableCell>{item.area}</TableCell>
               <TableCell className="text-right">
                 {(item.price ?? 0).toLocaleString()}

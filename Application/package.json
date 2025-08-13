@@ -4,8 +4,10 @@
   "private": true,
   "scripts": {
     "build": "set NEXT_SWC_WASM=1&& set NEXT_DISABLE_SWC_BINARY=1&& next build",
-    "dev": "cross-env NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8000 NEXT_SWC_WASM=1 NEXT_DISABLE_SWC_BINARY=1 next dev",
-    "dev:msw": "cross-env NEXT_PUBLIC_ENABLE_MSW=true NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8000 NEXT_SWC_WASM=1 NEXT_DISABLE_SWC_BINARY=1 next dev",
+    "dev": "cross-env NEXT_SWC_WASM=1 NEXT_DISABLE_SWC_BINARY=1 next dev",
+    "dev:8000": "cross-env NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8000 NEXT_SWC_WASM=1 NEXT_DISABLE_SWC_BINARY=1 next dev",
+    "dev:8001": "cross-env NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8001 NEXT_SWC_WASM=1 NEXT_DISABLE_SWC_BINARY=1 next dev",
+    "dev:msw": "cross-env NEXT_PUBLIC_ENABLE_MSW=true NEXT_SWC_WASM=1 NEXT_DISABLE_SWC_BINARY=1 next dev",
     "lint": "next lint",
     "start": "set NEXT_SWC_WASM=1&& set NEXT_DISABLE_SWC_BINARY=1&& next start"
   },
