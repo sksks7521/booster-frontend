@@ -1,6 +1,7 @@
 "use client";
 import * as React from "react";
 import { useEffect, useRef, useState } from "react";
+import { loadKakaoSdk } from "@/lib/map/kakaoLoader";
 
 interface MapViewProps {
   onItemSelect?: (item: any) => void;
@@ -20,12 +21,31 @@ function MapView({
   const mapRef = useRef<HTMLDivElement | null>(null);
   const [mapReady, setMapReady] = useState(false);
 
-  useEffect(() => {
-    const apiKey = process.env.NEXT_PUBLIC_VWORLD_API_KEY;
-    if (!mapRef.current) return;
-    if (!apiKey) return; // 키가 없으면 로딩만 스킵 (UI는 정상 표시)
+  const provider = (
+    process.env.NEXT_PUBLIC_MAP_PROVIDER || "vworld"
+  ).toLowerCase();
 
-    // vworld 스크립트 동적 로드
+  useEffect(() => {
+    if (!mapRef.current) return;
+
+    if (provider === "kakao") {
+      const kakaoKey = process.env.NEXT_PUBLIC_KAKAO_APP_KEY;
+      if (!kakaoKey) return;
+      loadKakaoSdk(kakaoKey)
+        .then(() => {
+          const w = window as any;
+          const map = new w.kakao.maps.Map(mapRef.current, {
+            center: new w.kakao.maps.LatLng(37.5665, 126.978),
+            level: 4,
+          });
+          setMapReady(true);
+        })
+        .catch(() => setMapReady(false));
+      return;
+    }
+
+    const vworldKey = process.env.NEXT_PUBLIC_VWORLD_API_KEY;
+    if (!vworldKey) return;
     const existing = document.querySelector(
       'script[data-vendor="vworld"]'
     ) as HTMLScriptElement | null;
@@ -34,18 +54,14 @@ function MapView({
       return;
     }
     const script = document.createElement("script");
-    script.src = `https://map.vworld.kr/js/vworldMapInit.js.do?apiKey=${apiKey}`;
+    script.src = `https://map.vworld.kr/js/vworldMapInit.js.do?apiKey=${vworldKey}`;
     script.async = true;
     script.defer = true;
     script.setAttribute("data-vendor", "vworld");
     script.onload = () => {
-      // 전역에 로딩이 완료되면 이후 단계에서 지도 초기화 로직을 추가합니다
       setMapReady(true);
     };
-    script.onerror = () => {
-      // 실패 시에도 화면은 유지
-      setMapReady(false);
-    };
+    script.onerror = () => setMapReady(false);
     document.head.appendChild(script);
   }, []);
 

@@ -1,0 +1,19 @@
+version: 1
+frontend:
+  phases:
+    preBuild:
+      commands:
+        - corepack enable
+        - corepack prepare pnpm@9.0.0 --activate
+        - node -v && pnpm -v
+        - cd Application && pnpm install --frozen-lockfile
+    build:
+      commands:
+        - cd Application && pnpm build
+  artifacts:
+    baseDirectory: Application/.next
+    files:
+      - "**/*"
+  cache:
+    paths:
+      - Application/node_modules/**/*

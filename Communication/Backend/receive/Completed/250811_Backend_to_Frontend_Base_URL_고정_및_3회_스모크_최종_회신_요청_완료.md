@@ -7,15 +7,15 @@
 
 ## 2. 작업 요청 사항 (What & How?)
 
-- [ ] 로컬 개발 Base URL 고정 확인: `NEXT_PUBLIC_API_BASE_URL = http://127.0.0.1:8000`
-- [ ] 스모크(3회 반복, 상태코드만)
+- [x] 로컬 개발 Base URL 고정 확인: `NEXT_PUBLIC_API_BASE_URL = http://127.0.0.1:8000`
+- [x] 스모크(3회 반복, 상태코드만)
   - `GET /api/v1/items/simple?limit=1`
   - `GET /api/v1/items/?limit=1`
   - `GET /api/v1/auction-completed/?limit=1`
   - `GET /api/v1/real-transactions/?limit=1`
   - `GET /api/v1/real-rents/?limit=1`
-- [ ] 상세/Comparables 각 2건(예: 101, 102) 200 확인
-- [ ] 결과를 `Communication/Frontend/receive/Request/250811_Frontend_to_Backend_API_Base_URL_변경_및_스모크_재검증_결과_회신.md`에 업데이트
+- [x] 상세/Comparables 각 2건(예: 101, 102) 200 확인
+- [x] 결과 회신 완료: `Communication/Backend/send/Completed/250813_Frontend_to_Backend_3회_스모크_최종_결과_회신_완료.md`
 
 ## 3. 참고
 
@@ -24,10 +24,11 @@
 
 ## 4. 진행 상태
 
-- **Status:** Requested
+- **Status:** Completed
 - **Requester:** Backend 팀
 - **Assignee:** Frontend 팀
 - **Requested At:** 2025-08-11
-- **Completed At:**
+- **Completed At:** 2025-08-13
 - **History:**
   - 2025-08-11: 요청서 작성 (Base URL 고정 및 3회 스모크 최종 회신 요청)
+  - 2025-08-13: 프론트 3회 스모크 및 상세/Comparables 결과 회신 완료 → `Communication/Backend/send/Completed/250813_Frontend_to_Backend_3회_스모크_최종_결과_회신_완료.md`

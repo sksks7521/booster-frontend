@@ -177,3 +177,49 @@
 10. 🆕 [Infra] 발신 Completed 새 파일: 250811_Infra_to_Frontend_VWorld_도메인_목록_및_검증_절차_합의_요청_완료.md
 11. 🆕 [Infra] 발신 Completed 새 파일: 250811_Infra_to_Frontend_통합_정보_요청(Amplify_ENV_VWorld_Build_도메인)_완료.md
 총 11개 파일 처리 완료
+
+ ========================================
+ 크로스 프로젝트 반영 실행: 2025-08-13 12:59:00
+ ========================================
+1. 🆕 [Backend] 발신 Completed 새 파일: 250813_Frontend_to_Backend_3회_스모크_최종_결과_회신_완료.md
+2. 🗑️ [Backend] 발신 Request 파일 삭제: 250811_Backend_to_Frontend_Base_URL_고정_및_3회_스모크_최종_회신_요청.md
+3. 🆕 [Backend] 발신 Completed 새 파일: 250811_Backend_to_Frontend_Base_URL_고정_및_3회_스모크_최종_회신_요청_완료.md
+4. 🗑️ [Infra] 발신 Request 파일 삭제: 250813_Infra_to_Frontend_Windows_Local_Dev_SWC_WASM_경로정책_가이드_공지_요청.md
+5. 🆕 [Infra] 발신 Completed 새 파일: 250813_Infra_to_Frontend_Windows_Local_Dev_SWC_WASM_경로정책_가이드_공지_요청_완료.md
+6. 🗑️ [Manage] 발신 Request 파일 삭제: 250813_Manager_AI_일일브리핑_Frontend.md
+총 6개 파일 처리 완료
+
+ ========================================
+ 크로스 프로젝트 반영 실행: 2025-08-13 13:31:38
+ ========================================
+1. 🆕 [Infra] 발신 Request 새 파일: 250813_Frontend_to_Infra_Amplify_첫_배포_빌드_로그_확인_요청.md
+2. 📝 [Infra] 발신 요청서 수정: 250813_Infra_to_Frontend_Amplify_빌드_런타임_고정_합의_요청.md
+3. 📝 [Infra] 발신 요청서 수정: 250813_Infra_to_Frontend_VWorld_허용_도메인_최종_확정_합의_요청.md
+총 3개 파일 처리 완료
+
+ ========================================
+ 크로스 프로젝트 반영 실행: 2025-08-13 14:03:57
+ ========================================
+1. 🆕 [Infra] 발신 Request 새 파일: 250813_Frontend_to_Infra_ENV_등록_상태_업데이트_및_VWorld_등록_착수_타임라인_요청.md
+2. 🆕 [Infra] 발신 Completed 새 파일: 250813_Frontend_to_Infra_Amplify_첫_빌드_검증_런북_단일출처_합의_완료.md
+총 2개 파일 처리 완료
+
+ ========================================
+ 크로스 프로젝트 반영 실행: 2025-08-13 15:21:03
+ ========================================
+1. 📝 [Infra] 발신 요청서 수정: 250813_Infra_to_Frontend_Amplify_ENV_최종_등록_요청.md
+총 1개 파일 처리 완료
+
+ ========================================
+ 크로스 프로젝트 반영 실행: 2025-08-13 16:08:28
+ ========================================
+1. 🆕 [Backend] 발신 Request 새 파일: 250813_Frontend_to_Backend_API_Regression_조치_불일치_재현_및_환경로그_공유_요청.md
+2. 🗑️ [Infra] 발신 Completed 파일 삭제: 250813_Infra_to_Frontend_Kakao_도메인_등록_JS_키_수신_완료.md
+총 2개 파일 처리 완료
+
+ ========================================
+ 크로스 프로젝트 반영 실행: 2025-08-13 16:29:56
+ ========================================
+1. 🗑️ [Backend] 발신 Request 파일 삭제: 250813_Backend_to_Frontend_SWR_Error_재현_환경_및_Base_URL_확인_요청.md
+2. 🆕 [Backend] 발신 Completed 새 파일: 250813_Backend_to_Frontend_SWR_Error_재현_환경_및_Base_URL_확인_요청_완료.md
+총 2개 파일 처리 완료

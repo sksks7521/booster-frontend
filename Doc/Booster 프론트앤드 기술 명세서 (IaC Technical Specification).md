@@ -18,25 +18,24 @@
 - **상태 관리**: Zustand (전역), React Hooks (지역)
 - **데이터 통신**: SWR
 - **스타일링**: Tailwind CSS
-- **지도/차트**: VWorld API, Chart.js
+- **지도/차트**: Map Provider 스위치(VWorld 기본 / Kakao 임시), Chart.js
 - **애플리케이션 배포**: AWS Amplify Hosting
 
 ---
 
 ### **2. 프로젝트 구조 (Folder Structure)**
 
-`src` 디렉토리 내의 폴더 구조는 아래와 같이 역할에 따라 명확하게 분리한다.
+`Application` 디렉토리 내의 폴더 구조는 아래와 같이 역할에 따라 명확하게 분리한다.
 
 ```
-/src
-|-- /app                 # Next.js의 App Router. 페이지 및 레이아웃
+/Application
+|-- /app                 # Next.js App Router. 페이지 및 레이아웃
 |-- /components          # 재사용 가능한 UI 컴포넌트
 |   |-- /ui              # 버튼, 인풋 등 가장 작은 단위의 기초 블록
 |   |-- /layout          # 헤더, 사이드 패널 등 뼈대 컴포넌트
 |   |-- /features        # 특정 기능(분석, 계산기 등)을 위한 조합 컴포넌트
-|-- /hooks               # 커스텀 React Hooks (예: useAuth)
-|-- /lib                 # 외부 라이브러리 설정, 유틸리티 함수
-|-- /services            # API 요청을 처리하는 함수들 (SWR 사용)
+|-- /hooks               # 커스텀 React Hooks (예: useItems, useItemDetail)
+|-- /lib                 # API 클라이언트, 유틸리티, 외부 SDK 로더(map/kakaoLoader 등)
 |-- /store               # Zustand 전역 상태 관리 스토어
 |-- /styles              # 전역 CSS 파일
 ```

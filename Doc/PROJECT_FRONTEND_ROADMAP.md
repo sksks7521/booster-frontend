@@ -100,6 +100,12 @@
 - 프론트 개선: UX 표준화(Loading/Empty/Error + 재시도), API 타임아웃/표준 에러, 페이지네이션(API/UI)
 - 다음 액션: 통합 QA 체크리스트 기반 점검 → 인프라 Amplify 환경변수 등록 최종 확인 → 배포 환경 검증
 
+### 2025-08-13 운영 메모 (지도 Provider 임시 전환)
+
+- VWorld 운영키 승인 대기(약 10일) 동안 Kakao JS로 임시 전환
+- ENV 스위치: `NEXT_PUBLIC_MAP_PROVIDER` = `kakao`(임시) / 승인 후 `vworld` 복귀
+- 로컬/개발: `.env.local` 적용, 배포: Amplify ENV 일괄 반영(최종 게이트)
+
 ### 다음 액션 (단기)
 
 - 통합 화면 QA: 필터→지도/테이블 데이터 일관성, 빈/에러/로딩 UX 점검 및 개선

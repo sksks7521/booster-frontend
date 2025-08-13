@@ -513,3 +513,9 @@ export interface FavoriteCheck {
 - 프론트 UX 표준화: 로딩/에러/빈 상태 컴포넌트(`LoadingState`, `ErrorState`, `EmptyState`) 도입 및 재시도 버튼 연결
 - Comparables 섹션 에러 시 재시도 버튼 제공(`InvestmentAnalysis.onRetry`)
 - API 레이어: 기본 10s 타임아웃, `ApiError` 표준화, `text/plain` 오류 메시지 캡처
+
+### 8-5. 2025-08-13 업데이트(지도 Provider 임시 전환 정책)
+
+- VWorld 운영키 승인 대기(약 10일) 동안 지도 Provider를 Kakao JS로 임시 전환
+- ENV 스위치: `NEXT_PUBLIC_MAP_PROVIDER` = `vworld`(기본) / `kakao`(임시), Kakao 키 `NEXT_PUBLIC_KAKAO_APP_KEY`
+- 코드 위치: `Application/lib/map/kakaoLoader.ts`, `Application/components/features/map-view.tsx` (Provider 스위치 적용)

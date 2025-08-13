@@ -102,6 +102,9 @@ pnpm dev
 # .env.local 파일 생성
 NEXT_PUBLIC_API_BASE_URL=your_backend_api_url
 NEXT_PUBLIC_VWORLD_API_KEY=your_vworld_api_key
+# 지도 Provider 임시 전환 (Kakao)
+NEXT_PUBLIC_MAP_PROVIDER=kakao
+NEXT_PUBLIC_KAKAO_APP_KEY=your_kakao_js_app_key
 ```
 
 ## 📋 개발 현황
@@ -171,6 +174,14 @@ pnpm lint
 # 타입 체크
 pnpm type-check
 ```
+
+## 🪟 Windows 로컬 개발 환경 가이드 (SWC WASM/경로 정책)
+
+- 경로 정책: 영문 경로 권장(예: `C:\work\booster-frontend`), OneDrive 동기화 경로 회피
+- SWC 설정: 환경변수로 WASM 강제 사용 권장
+  - 개발: `pnpm dev`에 이미 반영된 값 사용
+  - 수동 실행 시: `NEXT_SWC_WASM=1 NEXT_DISABLE_SWC_BINARY=1 next dev`
+- 참고 문서: `booster-infra/infra/standards/Windows_Local_Dev_SWC_WASM_Policy.md`
 
 ## 🔧 코드 품질
 
