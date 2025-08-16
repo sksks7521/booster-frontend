@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { trackEvent } from "@/lib/analytics";
 import {
   Card,
   CardContent,
@@ -142,6 +143,15 @@ export function InvestmentAnalysis({
     }
   };
 
+  useEffect(() => {
+    if (data) {
+      trackEvent("view_investment_report", {
+        baseItemId: data.baseItem.id,
+        comparablesCount: data.comparables.length,
+      });
+    }
+  }, [data]);
+
   return (
     <div className="space-y-6">
       {/* 투자 종합 점수 */}
@@ -227,11 +237,15 @@ export function InvestmentAnalysis({
                         ? "border-blue-500 bg-blue-50"
                         : "border-gray-200 hover:border-gray-300"
                     }`}
-                    onClick={() =>
-                      setSelectedComparable(
-                        selectedComparable === index ? null : index
-                      )
-                    }
+                    onClick={() => {
+                      const next = selectedComparable === index ? null : index;
+                      setSelectedComparable(next);
+                      trackEvent("click_comparable_item", {
+                        baseItemId: data.baseItem.id,
+                        comparableId: comparable.id,
+                        selected: next !== null,
+                      });
+                    }}
                   >
                     <div className="flex items-start justify-between">
                       <div className="flex-1">

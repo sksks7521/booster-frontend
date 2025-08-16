@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import useSWR from "swr";
 import { useParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,7 @@ import { useItemDetail } from "@/hooks/useItemDetail";
 import { itemApi } from "@/lib/api";
 import type { ComparablesResponse } from "@/lib/api";
 import { InvestmentAnalysis } from "@/components/features/investment-analysis";
+import { trackEvent } from "@/lib/analytics";
 import {
   LoadingState,
   ErrorState,
@@ -56,6 +57,12 @@ export default function PropertyDetailPage() {
   // UI 상태는 그대로 유지합니다.
   const [isFavorite, setIsFavorite] = useState(false);
   const [activeTab, setActiveTab] = useState("overview");
+
+  // GA4/Mixpanel: 상세 진입 이벤트
+  useEffect(() => {
+    if (!itemId) return;
+    trackEvent("view_analysis_detail", { itemId });
+  }, [itemId]);
 
   // 사용자 정보
   const user = {
@@ -332,7 +339,16 @@ export default function PropertyDetailPage() {
             {/* 상세 정보 탭 */}
             <Card>
               <CardContent className="p-0">
-                <Tabs value={activeTab} onValueChange={setActiveTab}>
+                <Tabs
+                  value={activeTab}
+                  onValueChange={(val) => {
+                    setActiveTab(val);
+                    trackEvent("tab_investment_analysis", {
+                      itemId,
+                      tab: val,
+                    });
+                  }}
+                >
                   <TabsList className="grid w-full grid-cols-4">
                     <TabsTrigger value="overview">개요</TabsTrigger>
                     <TabsTrigger value="legal">법적정보</TabsTrigger>

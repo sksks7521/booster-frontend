@@ -3,12 +3,20 @@
 import { SWRConfig } from "swr";
 import { fetcher } from "@/lib/fetcher";
 import React from "react";
+import { useEffect } from "react";
+import { computeDefaultSuperProps, initAnalytics, setSuperProperties } from "@/lib/analytics";
 
 interface ProvidersProps {
   children: React.ReactNode;
 }
 
 export function Providers({ children }: ProvidersProps) {
+  useEffect(() => {
+    void (async () => {
+      await initAnalytics();
+      setSuperProperties(computeDefaultSuperProps());
+    })();
+  }, []);
   return (
     <SWRConfig
       value={{

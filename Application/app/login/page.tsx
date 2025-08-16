@@ -5,6 +5,7 @@ import type React from "react"
 import { useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
+import { identifyUser, setSuperProperties } from "@/lib/analytics"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -76,6 +77,12 @@ export default function LoginPage() {
             },
           }),
         )
+
+        // Mixpanel identify + super props
+        try {
+          identifyUser(formData.email)
+          setSuperProperties({ environment: process.env.NODE_ENV, route: "/login" })
+        } catch {}
 
         // 분석 페이지로 리다이렉트
         router.push("/analysis")
