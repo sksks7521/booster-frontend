@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "build": "set NEXT_SWC_WASM=1&& set NEXT_DISABLE_SWC_BINARY=1&& next build",
-    "dev": "cross-env NEXT_SWC_WASM=1 NEXT_DISABLE_SWC_BINARY=1 next dev",
+    "dev": "next dev",
     "dev:8000": "cross-env NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8000 NEXT_SWC_WASM=1 NEXT_DISABLE_SWC_BINARY=1 next dev",
     "dev:8001": "cross-env NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8001 NEXT_SWC_WASM=1 NEXT_DISABLE_SWC_BINARY=1 next dev",
     "dev:msw": "cross-env NEXT_PUBLIC_ENABLE_MSW=true NEXT_SWC_WASM=1 NEXT_DISABLE_SWC_BINARY=1 next dev",
@@ -69,8 +69,8 @@
     "zustand": "latest"
   },
   "devDependencies": {
-    "@next/swc-wasm-nodejs": "^15.2.4",
-    "@next/swc-wasm-web": "^15.2.4",
+    "@next/swc-wasm-nodejs": "^15.4.7",
+    "@next/swc-wasm-web": "^15.4.7",
     "@tailwindcss/postcss": "^4.1.9",
     "@types/node": "^22",
     "@types/react": "18.3.3",

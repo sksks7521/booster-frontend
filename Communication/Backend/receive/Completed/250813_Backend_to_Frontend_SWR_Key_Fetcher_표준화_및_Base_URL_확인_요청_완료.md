@@ -98,10 +98,19 @@ curl -i "http://127.0.0.1:8001/api/v1/items/?limit=1"
 
 ---
 
-- Status: Requested
+## 프론트엔드 적용 결과(완료)
+
+- `Application/lib/fetcher.ts`: SWR 배열 키 표준화 및 에러 메시지 표준화 적용, Base URL 기본값을 8001로 안전 가드.
+- `Application/app/providers.tsx`: SWR 전역 fetcher 등록 및 보수적 재검증 정책.
+- `Application/hooks/useItems.ts`: 배열 키 기반 호출 일원화.
+
+---
+
+- Status: Done
 - Requester: Backend Team
 - Assignee: Frontend Team
 - Requested At: 2025-08-13
-- Completed At:
+- Completed At: 2025-08-16
 - History:
   - 2025-08-13: 요청서 신규 송부
+  - 2025-08-16: 프론트엔드 적용 완료 — fetcher 표준화, Base URL 8001 고정(기본값), /analysis 재검증 준비

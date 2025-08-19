@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import Header from "@/components/layout/header";
+import Footer from "@/components/layout/footer";
 import FilterControl from "@/components/features/filter-control";
 import SelectedFilterBar from "@/components/features/selected-filter-bar";
 import ItemTable from "@/components/features/item-table";
@@ -25,7 +26,9 @@ export default function AnalysisPage() {
   const [isFilterCollapsed, setIsFilterCollapsed] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const debouncedQuery = useDebouncedValue(searchQuery, 300);
-  const [activeView, setActiveView] = useState<"table" | "map">("table");
+  const [activeView, setActiveView] = useState<"table" | "map" | "both">(
+    "table"
+  );
   const { items, isLoading, error, totalCount, refetch } = useItems();
   const setPage = useFilterStore((s) => s.setPage);
   const page = useFilterStore((s) => s.page);
@@ -85,131 +88,143 @@ export default function AnalysisPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          {/* 필터 사이드바 */}
-          <div className="lg:col-span-1">
-            <FilterControl
-              isCollapsed={isFilterCollapsed}
-              onToggleCollapse={() => setIsFilterCollapsed(!isFilterCollapsed)}
-            />
-          </div>
+        <div className="space-y-6">
+          {/* 필터 컨트롤 (전체 너비) */}
+          <FilterControl
+            isCollapsed={isFilterCollapsed}
+            onToggleCollapse={() => setIsFilterCollapsed(!isFilterCollapsed)}
+            searchQuery={searchQuery}
+            setSearchQuery={setSearchQuery}
+            handleSearch={handleSearch}
+          />
 
-          {/* 메인 콘텐츠 */}
-          <div className="lg:col-span-3 space-y-6">
-            {/* 검색 바 */}
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center space-x-3">
-                  <div className="flex-1 relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                    <input
-                      type="text"
-                      placeholder="주소, 법원, 사건번호로 검색..."
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      onKeyPress={(e) => e.key === "Enter" && handleSearch()}
+          {/* 선택된 필터 표시 */}
+          <SelectedFilterBar />
+
+          {/* 뷰 전환 및 결과 요약 */}
+          <Card>
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-lg">
+                  검색 결과{" "}
+                  {isLoading
+                    ? "로딩 중..."
+                    : (totalCount ?? items?.length ?? 0) + "건"}
+                </CardTitle>
+                <Tabs
+                  value={activeView}
+                  onValueChange={(value) =>
+                    setActiveView(value as "table" | "map" | "both")
+                  }
+                >
+                  <TabsList>
+                    <TabsTrigger
+                      value="table"
+                      className="flex items-center space-x-2"
+                    >
+                      <List className="w-4 h-4" />
+                      <span>목록</span>
+                    </TabsTrigger>
+                    <TabsTrigger
+                      value="map"
+                      className="flex items-center space-x-2"
+                    >
+                      <Map className="w-4 h-4" />
+                      <span>지도</span>
+                    </TabsTrigger>
+                    <TabsTrigger
+                      value="both"
+                      className="flex items-center space-x-2"
+                    >
+                      <List className="w-4 h-4" />
+                      <Map className="w-4 h-4" />
+                      <span>통합</span>
+                    </TabsTrigger>
+                  </TabsList>
+                </Tabs>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {activeView === "table" && (
+                <ItemTable
+                  items={items}
+                  isLoading={isLoading}
+                  error={error}
+                  onRetry={refetch}
+                />
+              )}
+              {activeView === "map" && (
+                <MapView
+                  items={items}
+                  isLoading={isLoading}
+                  error={error}
+                  onRetry={refetch}
+                />
+              )}
+              {activeView === "both" && (
+                <div className="space-y-6">
+                  <div>
+                    <h3 className="text-lg font-semibold mb-3">지도</h3>
+                    <MapView
+                      items={items}
+                      isLoading={isLoading}
+                      error={error}
+                      onRetry={refetch}
                     />
                   </div>
-                  <Button onClick={handleSearch}>검색</Button>
+                  <div>
+                    <h3 className="text-lg font-semibold mb-3">목록</h3>
+                    <ItemTable
+                      items={items}
+                      isLoading={isLoading}
+                      error={error}
+                      onRetry={refetch}
+                    />
+                  </div>
                 </div>
-              </CardContent>
-            </Card>
+              )}
 
-            {/* 선택된 필터 표시 */}
-            <SelectedFilterBar />
-
-            {/* 뷰 전환 및 결과 요약 */}
-            <Card>
-              <CardHeader className="pb-3">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-lg">
-                    검색 결과{" "}
-                    {isLoading
-                      ? "로딩 중..."
-                      : (totalCount ?? items?.length ?? 0) + "건"}
-                  </CardTitle>
-                  <Tabs
-                    value={activeView}
-                    onValueChange={(value) =>
-                      setActiveView(value as "table" | "map")
-                    }
-                  >
-                    <TabsList>
-                      <TabsTrigger
-                        value="table"
-                        className="flex items-center space-x-2"
-                      >
-                        <List className="w-4 h-4" />
-                        <span>목록</span>
-                      </TabsTrigger>
-                      <TabsTrigger
-                        value="map"
-                        className="flex items-center space-x-2"
-                      >
-                        <Map className="w-4 h-4" />
-                        <span>지도</span>
-                      </TabsTrigger>
-                    </TabsList>
-                  </Tabs>
-                </div>
-              </CardHeader>
-              <CardContent>
-                {activeView === "table" ? (
-                  <ItemTable
-                    items={items}
-                    isLoading={isLoading}
-                    error={error}
-                    onRetry={refetch}
-                  />
-                ) : (
-                  <MapView
-                    items={items}
-                    isLoading={isLoading}
-                    error={error}
-                    onRetry={refetch}
-                  />
-                )}
-
-                <div className="mt-4">
-                  <Pagination>
-                    <PaginationContent>
-                      <PaginationItem>
-                        <PaginationPrevious
-                          href="#"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            setPage(Math.max(1, page - 1));
-                          }}
-                        />
-                      </PaginationItem>
-                      <PaginationItem>
-                        <span className="px-3 text-sm text-gray-600">
-                          페이지 {page} /{" "}
-                          {Math.max(1, Math.ceil((totalCount ?? 0) / size))}
-                        </span>
-                      </PaginationItem>
-                      <PaginationItem>
-                        <PaginationNext
-                          href="#"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            const totalPages = Math.max(
-                              1,
-                              Math.ceil((totalCount ?? 0) / size)
-                            );
-                            setPage(Math.min(totalPages, page + 1));
-                          }}
-                        />
-                      </PaginationItem>
-                    </PaginationContent>
-                  </Pagination>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+              <div className="mt-4">
+                <Pagination>
+                  <PaginationContent>
+                    <PaginationItem>
+                      <PaginationPrevious
+                        href="#"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          setPage(Math.max(1, page - 1));
+                        }}
+                      />
+                    </PaginationItem>
+                    <PaginationItem>
+                      <span className="px-3 text-sm text-gray-600">
+                        페이지 {page} /{" "}
+                        {Math.max(1, Math.ceil((totalCount ?? 0) / size))}
+                      </span>
+                    </PaginationItem>
+                    <PaginationItem>
+                      <PaginationNext
+                        href="#"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          const totalPages = Math.max(
+                            1,
+                            Math.ceil((totalCount ?? 0) / size)
+                          );
+                          setPage(Math.min(totalPages, page + 1));
+                        }}
+                      />
+                    </PaginationItem>
+                  </PaginationContent>
+                </Pagination>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
+
+      {/* 푸터 */}
+      <Footer />
     </div>
   );
 }

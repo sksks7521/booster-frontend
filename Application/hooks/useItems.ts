@@ -23,39 +23,66 @@ function buildQueryParamsFromFilters(
   params.limit = filters.size ?? 20;
   params.page = filters.page ?? 1;
 
-  // 주소 계층
-  if (filters.province) params.province = filters.province;
-  if (filters.cityDistrict) params.cityDistrict = filters.cityDistrict;
-  if (filters.town) params.town = filters.town;
-  if (filters.region) params.region = filters.region; // 하위호환
-  if (filters.buildingType) params.buildingType = filters.buildingType;
-  if (filters.hasElevator) params.has_elevator = true;
-  if (filters.hasParking) params.has_parking = true;
-  if (filters.floor) params.floor = filters.floor;
-  if (filters.auctionStatus) params.auction_status = filters.auctionStatus;
+  // ✅ 지역 (코드 기반 - 백엔드 가이드 3-1)
+  if (filters.sido_code) params.sido_code = filters.sido_code;
+  if (filters.city_code) params.city_code = filters.city_code;
+  if (filters.town_code) params.town_code = filters.town_code;
 
-  // 범위형 필드 (합의된 키가 없다면 보수적으로 최소/최대 키 사용)
+  // 하위호환용 이름 기반 (백엔드에서 지원)
+  if (!filters.sido_code && filters.province)
+    params.province = filters.province;
+  if (!filters.city_code && filters.cityDistrict)
+    params.cityDistrict = filters.cityDistrict;
+  if (!filters.town_code && filters.town) params.town = filters.town;
+  if (filters.region) params.region = filters.region;
+
+  // ✅ 건물 유형 (백엔드 가이드: buildingType → usage)
+  if (filters.buildingType && filters.buildingType !== "all") {
+    params.buildingType = filters.buildingType;
+  }
+
+  // ✅ 편의시설 (camelCase - 백엔드 가이드 3-1)
+  if (filters.hasElevator && filters.hasElevator !== "all") {
+    params.hasElevator = filters.hasElevator === "있음" ? true : false;
+  }
+  // ❌ hasParking 제거 (백엔드 데이터 없음)
+
+  // ⚠️ 층수 (현재 필터링 안됨 - 백엔드 가이드 주의사항)
+  if (filters.floor && filters.floor !== "all") {
+    params.floor = filters.floor;
+  }
+
+  // ✅ 경매상태 (camelCase - 백엔드 가이드 3-1)
+  if (filters.auctionStatus && filters.auctionStatus !== "all") {
+    params.auctionStatus = filters.auctionStatus;
+  }
+
+  // ✅ 가격 범위 (camelCase - 백엔드 가이드 3-1: minPrice/maxPrice)
   const [minPrice, maxPrice] = filters.priceRange;
-  if (minPrice) params.min_price = minPrice;
-  if (maxPrice) params.max_price = maxPrice;
+  if (minPrice && minPrice > 0) params.minPrice = minPrice;
+  if (maxPrice && maxPrice < 500000) params.maxPrice = maxPrice;
 
+  // ✅ 면적 범위 (camelCase - 백엔드 가이드 3-1: minArea/maxArea)
   const [minArea, maxArea] = filters.areaRange;
-  if (minArea) params.min_area = minArea;
-  if (maxArea) params.max_area = maxArea;
+  if (minArea && minArea > 0) params.minArea = minArea;
+  if (maxArea && maxArea < 200) params.maxArea = maxArea;
 
+  // ✅ 건축년도 (camelCase - 백엔드 가이드 3-1: minBuildYear/maxBuildYear)
   const [minYear, maxYear] = filters.buildYear;
-  if (minYear) params.min_built_year = minYear;
-  if (maxYear) params.max_built_year = maxYear;
+  if (minYear && minYear > 1980) params.minBuildYear = minYear;
+  if (maxYear && maxYear < 2024) params.maxBuildYear = maxYear;
 
-  // 경매 일정
-  if (filters.auctionDateFrom)
-    params.auction_date_from = filters.auctionDateFrom;
-  if (filters.auctionDateTo) params.auction_date_to = filters.auctionDateTo;
+  // ✅ 매각기일 (백엔드 가이드 3-1)
+  if (filters.auctionDateFrom) params.auctionDateFrom = filters.auctionDateFrom;
+  if (filters.auctionDateTo) params.auctionDateTo = filters.auctionDateTo;
+
+  // 하위호환 (기존 코드)
   if (filters.auctionMonth) params.auction_month = filters.auctionMonth;
 
-  // 1억 이하 여부
-  if (filters.under100)
-    params.max_price = Math.min(params.max_price ?? 10000, 10000);
+  // 1억 이하 여부 (기존 로직 유지)
+  if (filters.under100) {
+    params.maxPrice = Math.min(params.maxPrice ?? 10000, 10000);
+  }
 
   return params;
 }

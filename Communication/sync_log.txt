@@ -242,3 +242,47 @@
 3. 📝 [Analysis] 발신 요청서 수정: 250808_Frontend_to_Analysis_Request_Comparables_사용행태_이벤트정의.md
 4. 🆕 [Infra] 발신 Request 새 파일: 250813_Frontend_to_Infra_Kakao_도메인_재확인_및_VWorld_키_승인_ETA_요청.md
 총 4개 파일 처리 완료
+
+ ========================================
+ 크로스 프로젝트 반영 실행: 2025-08-19 17:44:10
+ ========================================
+1. 🆕 [Backend] 발신 Request 새 파일: 250117_Frontend_to_Backend_Analysis_필터_연동_백엔드_상태_확인_요청.md
+2. 📝 [Backend] 발신 요청서 수정: 250817_Backend_to_Frontend_Analysis_Filters_데이터사양_및_연동가이드_완료.md
+3. 🗑️ [Analysis] 발신 Request 파일 삭제: 250817_Frontend_to_Analysis_UX_이벤트_매핑_검토_승인_요청.md
+4. 🗑️ [Analysis] 발신 Request 파일 삭제: 250816_Analysis_to_Frontend_UX_이벤트_매핑_적용_요청.md
+5. 🆕 [Infra] 발신 Request 새 파일: 250813_Frontend_to_Infra_Amplify_첫_배포_빌드_로그_확인_요청.md
+6. 🆕 [Infra] 발신 Request 새 파일: 250813_Frontend_to_Infra_ENV_등록_상태_업데이트_및_VWorld_등록_착수_타임라인_요청.md
+7. 🆕 [Infra] 발신 Request 새 파일: 250813_Frontend_to_Infra_Kakao_도메인_목록_회신_및_JS_키_요청.md
+8. 🆕 [Infra] 발신 Request 새 파일: 250813_Frontend_to_Infra_Kakao_도메인_재확인_및_VWorld_키_승인_ETA_요청.md
+9. 🆕 [Infra] 발신 Request 새 파일: 250813_Frontend_to_Infra_로컬_Base_URL_8001_고정_정책_공유_및_Amplify_ENV_메모.md
+10. 🆕 [Infra] 발신 Request 새 파일: 250814_Frontend_to_Infra_Kakao_로컬_도메인_허용_재확인_및_JS_SDK_403_증빙_전달.md
+11. 🗑️ [Infra] 발신 Request 파일 삭제: 250817_Frontend_to_Infra_ENV_Amplify_및_지도_도메인_키_통합_요청.md
+12. 🗑️ [Infra] 발신 Request 파일 삭제: 250817_Frontend_to_Infra_GA4_Mixpanel_키_발급_ENV_주입_요청.md
+13. 🗑️ [Infra] 발신 Completed 파일 삭제: 250816_Frontend_to_Infra_Kakao_JS_중앙관리_전환_중간_회신.md
+14. 🗑️ [Infra] 발신 Completed 파일 삭제: 250816_Infra_to_Frontend_Amplify_ENV_파라미터_수집_요청_완료.md
+15. 🗑️ [Infra] 발신 Completed 파일 삭제: 250816_Infra_to_Frontend_Kakao_JS_키_중앙관리_전환_FE_레포_키_제거_요청_완료.md
+16. 🗑️ [Infra] 발신 Request 파일 삭제: 250816_Infra_to_Frontend_Kakao_JS_키_중앙관리_전환_FE_레포_키_제거_요청.md
+17. 🗑️ [Infra] 발신 Completed 파일 삭제: 250816_Infra_to_Frontend_Amplify_ENV_파라미터_수집_요청_완료.md
+18. 🗑️ [Infra] 발신 Completed 파일 삭제: 250816_Infra_to_Frontend_Kakao_JS_키_중앙관리_전환_FE_레포_키_제거_요청_완료.md
+19. 🗑️ [Manage] 발신 Request 파일 삭제: 250817_090000_Invite_Manage_to_Backend-Frontend-Analysis-Infra_PRD_Alignment_AWSKey_Prep.md
+총 19개 파일 처리 완료
+
+ ========================================
+ 크로스 프로젝트 반영 실행: 2025-08-19 21:47:45
+ ========================================
+1. 🆕 [Backend] 발신 Request 새 파일: 250120_Frontend_to_Backend_Locations_API_빈데이터_문제해결_요청.md
+2. 🆕 [Backend] 발신 Completed 새 파일: 250119_Frontend_to_Backend_Analysis_연동_성공_완료보고.md
+총 2개 파일 처리 완료
+
+ ========================================
+ 크로스 프로젝트 반영 실행: 2025-08-19 21:48:37
+ ========================================
+1. 🆕 [Backend] 발신 Request 새 파일: 250819_Frontend_to_Backend_Analysis_필터_연동_백엔드_상태_확인_요청.md
+2. 🆕 [Backend] 발신 Request 새 파일: 250819_Frontend_to_Backend_Locations_API_빈데이터_문제해결_요청.md
+3. 🗑️ [Backend] 발신 Request 파일 삭제: 250117_Frontend_to_Backend_Analysis_필터_연동_백엔드_상태_확인_요청.md
+4. 🗑️ [Backend] 발신 Request 파일 삭제: 250120_Frontend_to_Backend_Locations_API_빈데이터_문제해결_요청.md
+5. 🆕 [Backend] 발신 Completed 새 파일: 250819_Frontend_to_Backend_Analysis_연동_성공_완료보고.md
+6. 🗑️ [Backend] 발신 Completed 파일 삭제: 250119_Frontend_to_Backend_Analysis_연동_성공_완료보고.md
+7. 🆕 [Backend] 발신 Request 새 파일: 250819_Backend_to_Frontend_Analysis_Filters_데이터사양_및_연동가이드_완료.md
+8. 🗑️ [Backend] 발신 Request 파일 삭제: 250817_Backend_to_Frontend_Analysis_Filters_데이터사양_및_연동가이드_완료.md
+총 8개 파일 처리 완료

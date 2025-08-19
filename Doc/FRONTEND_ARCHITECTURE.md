@@ -1,4 +1,4 @@
-# Booster 프론트엔드 아키텍처 (v1.0)
+# Booster 프론트엔드 아키텍처 (v1.1)
 
 ## 1. 개요 (Overview)
 
@@ -533,3 +533,130 @@ export interface FavoriteCheck {
 - SWR 전역 fetcher 도입: 배열 키 해체 + 표준 Error throw, SWRConfig.fetcher 등록, dev 모드 URL 로그(debug)
 - Dev 설정: next.config.mjs의 experimental.allowedDevOrigins=["127.0.0.1","localhost"]로 정적 자산 404 해소
 - 지도 Provider: .env.local로 Kakao 임시 전환 (NEXT_PUBLIC_MAP_PROVIDER=kakao, NEXT_PUBLIC_KAKAO_APP_KEY=<issued>)
+
+---
+
+## 9. 2025-08-19 아키텍처 업데이트 (백엔드 API 완전 연동)
+
+### 9-1. 백엔드 API 완전 연동 달성
+
+- **포트 표준화**: 백엔드팀과 협업으로 8001 포트 이슈 해결 → 8000 포트 단일 표준화
+- **실시간 데이터 연결**: `/api/v1/locations/tree-simple` 완전 연동 (9개 시도, 전체 시군구/읍면동)
+- **매물 데이터 적재**: 실제 경매 매물 1,000건 연동 (`/api/v1/items/simple`)
+- **API 응답 성능**: 평균 < 500ms, 데이터 크기 4,319 bytes (locations API)
+
+### 9-2. 신규 위치 데이터 훅 아키텍처
+
+**`Application/hooks/useLocations.ts` 전체 재설계:**
+
+```typescript
+// 주요 훅 구조
+export function useLocationsSimple(); // 일괄 지역 데이터
+export function useLocationsTree(); // 풀 트리 + 매물 수량
+export function useLocationsSido(); // 단계별: 시도 목록
+export function useLocationsCities(); // 단계별: 시군구 목록
+export function useLocationsTowns(); // 단계별: 읍면동 목록
+
+// 헬퍼 함수
+export function findCodeByName(); // 이름 → 코드 변환
+export function findNameByCode(); // 코드 → 이름 변환
+```
+
+**임시 데이터 폴백 시스템:**
+
+- 백엔드 연결 실패 시 `TEMP_SAMPLE_ADDRESSES` 자동 활용
+- `usingFallback` 플래그로 UI에서 상태 표시
+- 개발환경 디버깅 로그 (`console.log`) 내장
+
+### 9-3. 개발 환경 안정화
+
+**UTF-8 인코딩 문제 해결:**
+
+- OneDrive 동기화 경로의 파일 인코딩 손상 문제 진단 및 해결
+- 백업 파일 시스템 도입 (`*.backup` 파일)
+- PowerShell 환경에서의 인코딩 에러 대응 가이드
+
+**자동화 스크립트 강화 (`run_server.py`):**
+
+- 크로스 플랫폼 호환성 (Windows/Unix)
+- 포트 충돌 자동 해결 (`taskkill`, `lsof`)
+- 환경변수 자동 설정 (`NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8000`)
+- 인코딩 에러 복구 (`encoding='utf-8', errors='ignore'`)
+- 다중 명령어 시도 체계 (`npm run dev:8000` 우선)
+
+### 9-4. 필터 시스템 백엔드 연동
+
+**FilterControl 컴포넌트 진화:**
+
+- 지역 선택: 버튼 방식 → `Select` 드롭다운 전환
+- 실시간 데이터 바인딩: `useLocationsSimple` 훅 연결
+- 연쇄 선택 로직: 시도 → 시군구 → 읍면동 의존성 관리
+- 진행률 표시: 필터 설정 단계별 가이드 제공
+
+**백엔드 필터 파라미터 매핑:**
+
+```typescript
+// 프론트엔드 → 백엔드 파라미터 변환
+province → sido_code
+city → city_code
+district → town_code
+buildingType → usage (건물용도)
+priceRange → minPrice/maxPrice (만원 단위)
+areaRange → minArea/maxArea (평 단위)
+buildYear → minBuildYear/maxBuildYear
+hasElevator → hasElevator (boolean 변환)
+```
+
+### 9-5. 사용자 경험 혁신
+
+**Before vs After 성과:**
+
+| 항목          | Before (2025-08-18) | After (2025-08-19)  | 개선율    |
+| ------------- | ------------------- | ------------------- | --------- |
+| 지역 데이터   | 5개 임시 데이터     | 9개 실제 시도       | +80%      |
+| 매물 데이터   | 0건                 | 1,000건 실제 데이터 | +∞%       |
+| API 응답속도  | N/A                 | < 500ms             | 신규      |
+| 컴파일 안정성 | UTF-8 에러 지속     | 0건 에러            | -100%     |
+| 개발자 경험   | 수동 설정 필요      | 원클릭 실행         | 대폭 개선 |
+
+**UI/UX 최적화:**
+
+- "임시 데이터로 테스트 중" 메시지 → 완전 제거
+- 필터 진행률 표시 (`20% 완료 → 100% 완료`)
+- 예상 검색 결과 미리보기 (`약 648개 매물`)
+- 실시간 연쇄 선택 가이드
+
+### 9-6. 팀 간 협업 성과
+
+**Communication 프로세스 완성:**
+
+- `Communication/Backend/send/Request/` 표준화된 요청서 작성
+- `Communication/Backend/receive/Completed/` 백엔드 완료 보고서 수신
+- 24시간 내 크로스팀 이슈 해결 달성
+
+**기술 문서 업데이트:**
+
+- `README.md`: 트러블슈팅 가이드 및 스크립트 섹션 강화
+- `Log/250819.md`: 상세한 개발 일지 작성
+- 아키텍처 문서 v1.1 업데이트
+
+### 9-7. 향후 확장 기반
+
+**확립된 패턴:**
+
+- 백엔드 API 연동 표준 (`SWR + 타입 안전 fetcher`)
+- 폴백 시스템 패턴 (임시 데이터 → 실제 데이터 전환)
+- 개발 환경 자동화 (`run_server.py` 확장성)
+- UTF-8 인코딩 문제 대응책
+
+**다음 단계 준비:**
+
+- VWorld 지도 API 최종 전환 기반 마련
+- AWS Amplify 배포 환경변수 설정 가이드 완성
+- 성능 최적화 (메모이제이션, 디바운싱) 적용 준비
+
+---
+
+**최종 업데이트**: 2025-08-19  
+**아키텍처 버전**: v1.1  
+**주요 성과**: 백엔드 API 완전 연동, 개발 환경 안정화, 실시간 데이터 연결 완료

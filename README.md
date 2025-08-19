@@ -99,8 +99,8 @@ pnpm dev
 ### 환경 변수 설정
 
 ```bash
-# .env.local 파일 생성
-NEXT_PUBLIC_API_BASE_URL=your_backend_api_url
+# .env.local 파일 생성 (또는 PowerShell에서 직접 설정)
+NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8000
 NEXT_PUBLIC_VWORLD_API_KEY=your_vworld_api_key
 # 지도 Provider 임시 전환 (Kakao)
 NEXT_PUBLIC_MAP_PROVIDER=kakao
@@ -115,16 +115,20 @@ NEXT_PUBLIC_KAKAO_APP_KEY=your_kakao_js_app_key
 - **Phase 1**: 핵심 레이아웃 및 사용자 인증
 - **Phase 2**: 필터 상태 관리 (Zustand 구조 구현)
 - **Phase 3**: 상세 분석 페이지 데이터 로딩 (SWR 구조 구현)
+- **🎉 백엔드 API 완전 연동**: 실시간 매물 데이터 1,000건 연동
+- **🎯 지역 필터 완성**: 9개 시도 → 시군구 → 읍면동 연쇄 선택
+- **⚡ 개발환경 안정화**: UTF-8 인코딩, 포트 표준화 완료
 
 ### 🔄 진행 중
 
-- **Phase 2**: 통합 분석 화면 데이터 시각화
+- **Phase 2**: 통합 분석 화면 데이터 시각화 (UI/UX 개선 완료)
 - **Phase 3**: 상세 분석 비교 데이터 기능
 
-### ⏳ 대기 중 (백엔드 API 의존)
+### 📊 연동 완료 (백엔드 API)
 
-- `GET /api/v1/items` - 매물 목록 API
-- `GET /api/v1/items/{id}/comparables` - 비교 데이터 API
+- ✅ `GET /api/v1/locations/tree-simple` - 지역 데이터 API
+- ✅ `GET /api/v1/items/simple` - 매물 목록 API (1,000건)
+- 🔄 `GET /api/v1/items/{id}/comparables` - 비교 데이터 API (진행중)
 
 자세한 개발 로드맵은 [`PROJECT_FRONTEND_ROADMAP.md`](./PROJECT_FRONTEND_ROADMAP.md)를 참고해주세요.
 
@@ -159,8 +163,12 @@ NEXT_PUBLIC_KAKAO_APP_KEY=your_kakao_js_app_key
 ## 📝 스크립트
 
 ```bash
-# 개발 서버 실행
-pnpm dev
+# 🚀 자동화 개발 서버 실행 (권장)
+python run_server.py
+
+# 수동 개발 서버 실행
+pnpm dev:8000  # 백엔드 8000 포트 연결
+pnpm dev       # 기본 실행
 
 # 프로덕션 빌드
 pnpm build
@@ -174,6 +182,16 @@ pnpm lint
 # 타입 체크
 pnpm type-check
 ```
+
+### 🤖 자동화 스크립트 (run_server.py)
+
+Windows 개발 환경의 복잡한 설정을 자동화하는 Python 스크립트:
+
+- ✅ **환경변수 자동 설정**: API Base URL, SWC WASM 설정
+- ✅ **포트 충돌 자동 해결**: 기존 프로세스 자동 종료
+- ✅ **종속성 자동 확인**: Node.js, npm 버전 체크
+- ✅ **크로스 플랫폼 지원**: Windows/Unix 호환
+- ✅ **에러 처리**: 인코딩, 명령어 실패 자동 복구
 
 ## 🪟 Windows 로컬 개발 환경 가이드 (SWC WASM/경로 정책)
 
@@ -190,6 +208,170 @@ pnpm type-check
 - **TypeScript**: 타입 안전성 보장
 - **Husky**: Git hooks를 통한 품질 관리
 
+## 🚨 트러블슈팅 가이드
+
+### 개발 서버 실행 문제 해결
+
+#### ❌ 문제 1: `npm run dev:8000` 스크립트 없음
+
+```bash
+PS C:\...\booster-frontend> npm run dev:8000
+npm error Missing script: "dev:8000"
+```
+
+**원인**: 프로젝트 루트에서 실행했지만, package.json이 `Application/` 디렉터리에 있음
+
+**해결책**:
+
+```bash
+# 올바른 경로로 이동 후 실행
+cd Application
+npm run dev:8000
+
+# 또는 자동화 스크립트 사용 (권장)
+python run_server.py
+```
+
+#### ❌ 문제 2: SWC 바이너리 로딩 실패
+
+```bash
+⚠ Attempted to load @next/swc-win32-x64-msvc, but an error occurred
+⨯ Failed to load SWC binary for win32/x64
+```
+
+**원인**: OneDrive 동기화 폴더의 한글 경로와 SWC 바이너리 호환성 문제
+
+**해결책**:
+
+```bash
+# WASM 패키지 설치 (권장)
+npm install @next/swc-wasm-nodejs @next/swc-wasm-web
+
+# 또는 환경변수로 WASM 강제 사용
+$env:NEXT_SWC_WASM="1"
+$env:NEXT_DISABLE_SWC_BINARY="1"
+npx next dev
+```
+
+#### ❌ 문제 3: PowerShell 구문 오류
+
+```bash
+'&&' 토큰은 이 버전에서 올바른 문 구분 기호가 아닙니다.
+```
+
+**원인**: PowerShell에서는 `&&` 연산자 대신 `;` 사용해야 함
+
+**해결책**:
+
+```bash
+# ❌ Bash/CMD 구문
+set VAR=value && command
+
+# ✅ PowerShell 구문
+$env:VAR="value"; command
+```
+
+#### ❌ 문제 4: 패키지 다운로드 프롬프트
+
+```bash
+Need to install the following packages:
+next@15.4.7
+Ok to proceed? (y)
+```
+
+**원인**: npx가 Next.js 패키지를 찾을 수 없어서 다운로드하려 함
+
+**해결책**:
+
+```bash
+# 의존성이 설치되었는지 확인
+npm install
+
+# 또는 직접 Next.js 실행
+npx next@latest dev
+```
+
+#### ❌ 문제 5: UTF-8 인코딩 에러
+
+```bash
+⨯ ./hooks/useLocations.ts
+Error: Failed to read source code from [...]/useLocations.ts
+Caused by:
+stream did not contain valid UTF-8
+```
+
+**원인**: 파일 편집 중 UTF-8 인코딩이 손상됨 (특히 OneDrive 동기화 경로)
+
+**해결책**:
+
+```bash
+# 1. 손상된 파일 삭제
+Remove-Item Application/hooks/useLocations.ts -Force
+
+# 2. 백업 파일에서 복구 (있는 경우)
+Copy-Item Application/hooks/useLocations.ts.backup Application/hooks/useLocations.ts
+
+# 3. 또는 파일 다시 생성 (UTF-8 인코딩으로)
+# 코드 에디터에서 "UTF-8" 인코딩으로 저장
+```
+
+#### ❌ 문제 6: Next.js 빌드 캐시 에러
+
+```bash
+[Error: EINVAL: invalid argument, readlink 'C:\...\Application\.next\static\chunks\app']
+```
+
+**원인**: Next.js 빌드 캐시와 OneDrive 경로 충돌
+
+**해결책**:
+
+```bash
+# 캐시 정리 후 재시작
+Remove-Item .next -Recurse -Force
+npm run dev:8000
+```
+
+### 💡 빠른 해결 방법 (올인원)
+
+Windows에서 개발 서버 실행 시 아래 단계를 따르세요:
+
+```bash
+# 1. 올바른 디렉터리로 이동
+cd Application
+
+# 2. 의존성 설치 확인
+npm install
+
+# 3. PowerShell에서 환경변수 설정 후 실행
+$env:NEXT_PUBLIC_API_BASE_URL="http://127.0.0.1:8000"
+$env:NEXT_TELEMETRY_DISABLED="1"
+npx next dev
+
+# 또는 package.json 스크립트 사용 (추천)
+npm run dev:8000
+
+# 🚀 가장 간단한 방법: 자동화 스크립트
+python run_server.py
+```
+
+### 🔍 문제 진단 체크리스트
+
+개발 서버가 실행되지 않을 때 아래를 확인하세요:
+
+- [ ] **위치 확인**: `Application/` 디렉터리에서 실행하고 있는가?
+- [ ] **패키지 설치**: `node_modules` 폴더가 존재하는가?
+- [ ] **포트 충돌**: 3000 포트가 이미 사용 중인가? (`netstat -an | findstr :3000`)
+- [ ] **환경변수**: API Base URL이 올바르게 설정되었는가?
+- [ ] **Node.js 버전**: 18+ 버전을 사용하고 있는가? (`node --version`)
+
+### 📞 추가 지원
+
+위 방법으로도 해결되지 않으면:
+
+1. `Log/` 폴더의 최신 개발 로그 확인
+2. `Communication/` 폴더의 팀 간 요청서 확인
+3. GitHub Issues에 에러 로그와 함께 문의
+
 ## 📄 라이선스
 
 이 프로젝트는 MIT 라이선스 하에 배포됩니다.
@@ -205,5 +387,5 @@ pnpm type-check
 ---
 
 **개발팀**: Frontend Team  
-**마지막 업데이트**: 2025-08-05  
-**버전**: MVP v1.0
+**마지막 업데이트**: 2025-08-19  
+**버전**: MVP v1.1 (백엔드 API 연동 완료)

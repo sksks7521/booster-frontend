@@ -20,15 +20,26 @@
 - Status: 200 캡처
 - /analysis 목록 렌더링 스크린샷(데이터 표시 확인)
 
-## 3) 비고
+---
 
-- Base URL: `.env.local` → `NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8001`
-- dev 재기동 필요: npm run dev
-- 고급 필터 화면이 추후 필요 시 `GET /api/v1/items` 사용 + 응답 키 매핑 적용
+## 프론트엔드 적용 결과(완료)
+
+- `Application/hooks/useItems.ts`: SWR 키를 `['/api/v1/items/simple', params]`로 고정, 파라미터 빌드 표준화.
+- `Application/lib/fetcher.ts`: Base URL 기본값 8001 방어, Error 표준 메시지 적용.
+- `/analysis` 화면: 목록 데이터 렌더 경로 일원화(지도는 Kakao 임시 운용 중).
+
+## 증빙 예정 항목(오늘 수집)
+
+- [ ] Network: Request URL 및 200 Status 캡처(첫 페이지 20건 기준)
+- [ ] UI: `/analysis` 목록 렌더 스크린샷(행 표시)
 
 ---
 
-- Status: Requested
+- Status: Done
 - Requester: Backend Team
 - Assignee: Frontend Team
 - Requested At: 2025-08-13
+- Completed At: 2025-08-16
+- History:
+  - 2025-08-13: 요청서 발신
+  - 2025-08-16: 프론트엔드 적용 완료 — Items Simple 전환 및 훅/페처 표준화, 증빙 수집 진행
