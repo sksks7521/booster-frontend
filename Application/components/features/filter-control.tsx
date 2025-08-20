@@ -1069,27 +1069,21 @@ export default function FilterControl({
                   <div>
                     <div className="flex items-center justify-between mb-4">
                       <Label className="text-xl font-bold">층수</Label>
-                      <Badge variant="destructive" className="text-xs">
-                        ⚠️ 필터 미적용
-                      </Badge>
+                      {/* 경고 배지 제거 - 이제 완전 지원! */}
                     </div>
                     <ButtonGroup
                       options={[
                         { value: "all", label: "전체" },
-                        { value: "일반층", label: "일반층" },
-                        { value: "지층", label: "지층" },
-                        { value: "1층", label: "1층" },
-                        { value: "탑층", label: "탑층" },
-                        { value: "모름", label: "모름" },
+                        { value: "1-2", label: "1-2층" },
+                        { value: "3-4", label: "3-4층" },
+                        { value: "5+", label: "5층 이상" },
+                        { value: "지하", label: "지하" },
                       ]}
                       value={filters.floor || "all"}
                       onChange={(value) => setFilter("floor", value)}
                       disabled={!isLocationSelected}
                     />
-                    <p className="text-xs text-amber-600 mt-2 flex items-center">
-                      <AlertTriangle className="w-3 h-3 mr-1" />※ 층수 필터는
-                      현재 백엔드에서 적용되지 않습니다 (표시만)
-                    </p>
+                    {/* 경고 메시지 제거 - 백엔드에서 완전 지원 확인! */}
                   </div>
 
                   {/* 엘리베이터 */}
@@ -1103,7 +1097,7 @@ export default function FilterControl({
                         { value: "all", label: "전체" },
                         { value: "있음", label: "있음" },
                         { value: "없음", label: "없음" },
-                        { value: "모름", label: "모름" },
+                        // "모름" 옵션 제거 (실제 데이터에는 O/null만 있음)
                       ]}
                       value={(filters as any).hasElevator || "all"}
                       onChange={(value) => setFilter("hasElevator", value)}

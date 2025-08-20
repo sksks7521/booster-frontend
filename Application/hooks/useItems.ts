@@ -38,7 +38,7 @@ function buildQueryParamsFromFilters(
 
   // ✅ 건물 유형 (백엔드 가이드: buildingType → usage)
   if (filters.buildingType && filters.buildingType !== "all") {
-    params.buildingType = filters.buildingType;
+    params.usage = filters.buildingType;
   }
 
   // ✅ 편의시설 (camelCase - 백엔드 가이드 3-1)
@@ -47,15 +47,15 @@ function buildQueryParamsFromFilters(
   }
   // ❌ hasParking 제거 (백엔드 데이터 없음)
 
-  // ⚠️ 층수 (현재 필터링 안됨 - 백엔드 가이드 주의사항)
+  // ✅ 층수 필터 (백엔드에서 완전 지원 확인!)
   if (filters.floor && filters.floor !== "all") {
     params.floor = filters.floor;
   }
 
-  // ✅ 경매상태 (camelCase - 백엔드 가이드 3-1)
-  if (filters.auctionStatus && filters.auctionStatus !== "all") {
-    params.auctionStatus = filters.auctionStatus;
-  }
+  // ❌ 경매상태 (사용자 요청에 의해 비활성화)
+  // if (filters.auctionStatus && filters.auctionStatus !== "all") {
+  //   params.currentStatus = filters.auctionStatus;
+  // }
 
   // ✅ 가격 범위 (camelCase - 백엔드 가이드 3-1: minPrice/maxPrice)
   const [minPrice, maxPrice] = filters.priceRange;
@@ -67,10 +67,10 @@ function buildQueryParamsFromFilters(
   if (minArea && minArea > 0) params.minArea = minArea;
   if (maxArea && maxArea < 200) params.maxArea = maxArea;
 
-  // ✅ 건축년도 (camelCase - 백엔드 가이드 3-1: minBuildYear/maxBuildYear)
+  // ✅ 건축년도 (백엔드 가이드: minBuildYear/maxBuildYear → minYearBuilt/maxYearBuilt)
   const [minYear, maxYear] = filters.buildYear;
-  if (minYear && minYear > 1980) params.minBuildYear = minYear;
-  if (maxYear && maxYear < 2024) params.maxBuildYear = maxYear;
+  if (minYear && minYear > 1980) params.minYearBuilt = minYear;
+  if (maxYear && maxYear < 2024) params.maxYearBuilt = maxYear;
 
   // ✅ 매각기일 (백엔드 가이드 3-1)
   if (filters.auctionDateFrom) params.auctionDateFrom = filters.auctionDateFrom;
@@ -90,8 +90,33 @@ function buildQueryParamsFromFilters(
 export function useItems(): UseItemsResult {
   const filters = useFilterStore();
 
+  // 🎉 /custom API 사용 (16개 컬럼 선택 + 모든 필터링 완전 지원 확인!)
+  const requiredFields = [
+    "id",
+    "usage",
+    "case_number",
+    "road_address",
+    "building_area_pyeong",
+    "land_area_pyeong",
+    "appraised_value",
+    "minimum_bid_price",
+    "bid_to_appraised_ratio",
+    "public_price",
+    "sale_month",
+    "special_rights",
+    "floor_confirmation",
+    "under_100million",
+    "construction_year",
+    "elevator_available",
+  ].join(",");
+
+  const allParams = {
+    ...buildQueryParamsFromFilters(filters),
+    fields: requiredFields,
+  };
+
   const { data, error, isLoading, isValidating, mutate } = useSWR(
-    ["/api/v1/items/simple", buildQueryParamsFromFilters(filters)],
+    ["/api/v1/items/custom", allParams], // ✅ /custom 엔드포인트 - 완전 지원 확인!
     fetcher
   );
 

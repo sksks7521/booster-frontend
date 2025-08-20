@@ -256,3 +256,35 @@ Frontend에서 다음 시나리오로 즉시 테스트 가능:
 **Frontend Team**  
 **연락처**: [Frontend 담당자 연락처]  
 **작성일시**: 2025-01-20 현재
+
+---
+
+## ✅ 백엔드 회신 (완료)
+
+- 현상 재현 및 원인
+
+  - `http://127.0.0.1:8001/api/v1/locations/tree-simple`는 200 OK이나 빈 구조를 반환
+  - 8001 포트 인스턴스가 DB 미연결/오환경으로 인해 `tree-simple`의 예외 폴백(빈 구조)이 동작함
+  - 8000 포트 인스턴스는 정상(DB 연결 및 데이터 적재 완료)으로 비어있지 않은 트리를 반환
+
+- 조치
+
+  - 8001 인스턴스 종료(혼선 제거), 8000 인스턴스만 사용하도록 표준화
+  - 검증: `curl http://127.0.0.1:8000/api/v1/locations/tree-simple` → 200 OK, provinces 다수 반환
+
+- 프론트 적용 지시
+
+  - `.env.local`: `NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8000`
+  - 초기 로드: `GET /api/v1/locations/tree-simple`
+  - 단계 로드(선택): `/locations/sido` → `/locations/cities` → `/locations/towns`
+
+- 빠른 자체 테스트
+
+  - `curl http://127.0.0.1:8000/api/v1/locations/sido`
+  - `curl "http://127.0.0.1:8000/api/v1/items/simple?sido=경기도&city=수원시&minPrice=2000&maxPrice=6000"`
+
+- 비고
+
+  - `tree-simple`은 현재 인벤토리 기반 트리(실데이터 존재 지역) 반환 설계이며, 전체 17개 시도 상시 고정 제공은 요구사항 변경에 해당합니다(필요 시 옵션화 가능).
+
+- 상태: Done
