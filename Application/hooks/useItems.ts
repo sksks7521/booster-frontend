@@ -57,6 +57,18 @@ function clientSideSort(
 
 // 🔄 정렬 값 추출 함수 (타입별 적절한 변환)
 function getSortValue(item: any, sortBy: string): any {
+  // 🎯 computed field: calculated_ratio (최저가/공시가격)
+  if (sortBy === "calculated_ratio") {
+    const minBid = parseFloat(item.minimum_bid_price) || 0;
+    const publicPrice = parseFloat(item.public_price) || 0;
+
+    if (publicPrice === 0 || isNaN(publicPrice) || isNaN(minBid)) {
+      return 999999; // 계산 불가능한 값은 맨 뒤로
+    }
+
+    return minBid / publicPrice;
+  }
+
   const value = item[sortBy];
 
   // 숫자형 컬럼들
@@ -93,16 +105,19 @@ function buildQueryParamsFromFilters(
 ) {
   const params: Record<string, any> = {};
 
-  // 🚨 D번 문제 해결: 클라이언트 필터링 필요 시 전체 데이터 로드
-  const needsClientSideFiltering =
+  // 🚨 핵심 수정: 클라이언트 처리가 필요한 모든 경우 통합
+  const needsClientProcessing =
     (filters.floorConfirmation && filters.floorConfirmation !== "all") ||
-    (filters.hasElevator && filters.hasElevator !== "all");
+    (filters.hasElevator && filters.hasElevator !== "all") ||
+    (filters.sortBy && filters.sortOrder); // 🎯 정렬도 클라이언트 처리에 포함
 
-  if (needsClientSideFiltering) {
-    // 클라이언트 필터링이 필요하면 전체 데이터를 가져온다
+  if (needsClientProcessing) {
+    // 클라이언트 처리가 필요하면 전체 데이터를 가져온다
     params.limit = 1000; // 백엔드가 지원하는 범위로 조정
     params.page = 1;
-    console.log("🚨 [Debug] 클라이언트 필터링 감지 - 전체 데이터 로드 모드");
+    console.log(
+      "🚨 [Debug] 클라이언트 처리 감지 (필터링/정렬) - 전체 데이터 로드 모드"
+    );
   } else {
     // 일반적인 페이지네이션
     params.limit = filters.size ?? 20;
@@ -249,12 +264,32 @@ export function useItems(): UseItemsResult {
     "elevator_available",
   ].join(",");
 
+  // 🚨 핵심 수정: 클라이언트 처리 활성화 여부 확인 (필터링 + 정렬)
+  const needsClientProcessing =
+    (filters.floorConfirmation && filters.floorConfirmation !== "all") ||
+    (filters.hasElevator && filters.hasElevator !== "all") ||
+    (filters.sortBy && filters.sortOrder);
+
   const allParams = {
     ...buildQueryParamsFromFilters(filters),
     fields: requiredFields,
   };
 
-  // 🔍 디버깅 로그 - 페이지네이션 확인
+  // 🎯 핵심 수정: 클라이언트 처리가 활성화된 경우 전체 데이터 로드
+  const swrKey = hasLocationSelected
+    ? needsClientProcessing
+      ? [
+          "/api/v1/items/custom",
+          {
+            ...allParams,
+            page: 1, // 페이지는 1로 고정하여 전체 데이터 로드
+            limit: 1000, // 전체 데이터 로드
+          },
+        ]
+      : ["/api/v1/items/custom", allParams] // 일반 모드: 서버 페이지네이션
+    : null;
+
+  // 🔍 디버깅 로그 - 페이지네이션 및 SWR 키 확인
   if (hasLocationSelected) {
     console.log(
       `🔍 [Debug] 📄 페이지네이션: ${filters.page}페이지, ${filters.size}개씩`
@@ -263,15 +298,15 @@ export function useItems(): UseItemsResult {
     console.log("🔍 [Debug] floorConfirmation 값:", filters.floorConfirmation);
     console.log("🔍 [Debug] hasElevator 값:", filters.hasElevator);
     console.log("🔍 [Debug] buildingType 값:", filters.buildingType);
+    console.log("🚨 [Debug] 클라이언트 처리 활성화:", needsClientProcessing);
+    console.log("🔑 [Debug] SWR 키:", swrKey);
   } else {
     console.log("🚨 [Debug] 지역이 선택되지 않아서 데이터 로딩 중지");
   }
 
   // 🎯 지역 선택된 경우에만 API 호출 (성능 최적화)
   const { data, error, isLoading, isValidating, mutate } = useSWR(
-    hasLocationSelected
-      ? ["/api/v1/items/custom", allParams] // ✅ 지역 선택 시에만 API 호출
-      : null, // ❌ 지역 미선택 시 API 호출 안함
+    swrKey,
     fetcher
   );
 
@@ -360,28 +395,16 @@ export function useItems(): UseItemsResult {
     console.log("🔍 [Debug] 엘리베이터 필터링 후 아이템 수:", items.length);
   }
 
-  // 🔄 C번 문제 해결: 서버 사이드 정렬 폴백 메커니즘
+  // 🚨 핵심 수정: 정렬 로직 단순화
+  // 정렬이 활성화되면 무조건 클라이언트에서 정렬 (전역 정렬 보장)
   if (filters.sortBy && filters.sortOrder && items.length > 1) {
-    // 서버 정렬이 제대로 되었는지 검증
-    const isServerSorted = checkIfSorted(
-      items,
-      filters.sortBy,
-      filters.sortOrder
+    console.log(
+      `🔄 [Sort] 클라이언트 전역 정렬 적용: ${filters.sortBy} ${filters.sortOrder} (${items.length}건 데이터)`
     );
-
-    if (!isServerSorted) {
-      console.warn(
-        `⚠️ [Sort] 서버 정렬 실패 감지 - 클라이언트 정렬로 폴백: ${filters.sortBy} ${filters.sortOrder}`
-      );
-      items = clientSideSort(items, filters.sortBy, filters.sortOrder);
-      console.log(
-        `✅ [Sort] 클라이언트 정렬 완료: ${filters.sortBy} ${filters.sortOrder}`
-      );
-    } else {
-      console.log(
-        `✅ [Sort] 서버 정렬 정상 동작: ${filters.sortBy} ${filters.sortOrder}`
-      );
-    }
+    items = clientSideSort(items, filters.sortBy, filters.sortOrder);
+    console.log(
+      `✅ [Sort] 전역 정렬 완료: ${filters.sortBy} ${filters.sortOrder}`
+    );
   }
 
   // 🏢 데이터 분석: usage 및 층확인 컬럼의 모든 unique 값들 확인 (동적 필터 옵션 생성용)
@@ -414,21 +437,17 @@ export function useItems(): UseItemsResult {
     );
   }
 
-  // 🎯 D번 문제 해결: 클라이언트 필터링 후 총 개수 재계산
-  const hasClientSideFiltering =
-    (filters.floorConfirmation && filters.floorConfirmation !== "all") ||
-    (filters.hasElevator && filters.hasElevator !== "all");
-
+  // 🎯 핵심 수정: 클라이언트 처리 후 총 개수 재계산 및 페이지네이션
   let actualTotalCount = originalTotalCount;
 
-  if (hasClientSideFiltering) {
-    // 클라이언트 필터링이 적용된 경우, 실제 필터링된 개수로 업데이트
+  if (needsClientProcessing) {
+    // 클라이언트 처리가 적용된 경우, 실제 처리된 개수로 업데이트
     actualTotalCount = items.length;
     console.log(
-      `🔄 [Filter] 클라이언트 필터링 적용됨 - 총 개수 업데이트: ${originalTotalCount} → ${actualTotalCount}`
+      `🔄 [Client] 클라이언트 처리 적용됨 - 총 개수 업데이트: ${originalTotalCount} → ${actualTotalCount}`
     );
 
-    // 🎯 D번 문제 해결: 클라이언트 필터링 후 페이지네이션 재적용
+    // 🎯 클라이언트 처리 후 페이지네이션 재적용 (전역 정렬 보장)
     const pageSize = filters.size ?? 20;
     const currentPage = filters.page ?? 1;
     const startIndex = (currentPage - 1) * pageSize;
@@ -445,10 +464,10 @@ export function useItems(): UseItemsResult {
 
   // 🔍 페이지네이션 관련 서버 응답 로그
   console.log(
-    `🔍 [Debug] 📊 서버 응답: ${
+    `🔍 [Debug] 📊 최종 결과: ${
       items.length
     }개 아이템, 총 ${actualTotalCount}개 데이터 ${
-      hasClientSideFiltering ? "(클라이언트 필터링 적용)" : "(서버 데이터)"
+      needsClientProcessing ? "(클라이언트 처리 적용)" : "(서버 데이터)"
     }`
   );
 
