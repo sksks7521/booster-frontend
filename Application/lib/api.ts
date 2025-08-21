@@ -39,6 +39,26 @@ export interface Item {
   lng: number;
   id: number;
   created_at: string;
+
+  // 🎯 경매 전용 필드들 추가
+  usage?: string;
+  case_number?: string;
+  road_address?: string;
+  building_area_pyeong?: number;
+  land_area_pyeong?: number;
+  appraised_value?: number;
+  minimum_bid_price?: number;
+  bid_to_appraised_ratio?: string;
+  calculated_ratio?: number;
+  sale_month?: string;
+  special_rights?: string;
+  floor_confirmation?: string;
+  public_price?: number;
+  under_100million?: string;
+  construction_year?: number;
+  elevator_available?: string;
+  hasElevator?: boolean;
+  buildYear?: number; // 호환성을 위한 별칭
 }
 
 // 새로운 API 응답 타입들
