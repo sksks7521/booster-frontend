@@ -16,7 +16,11 @@ export default function SelectedFilterBar({}: SelectedFilterBarProps) {
 
   // 'x' 버튼 클릭 시 호출되는 함수를 수정합니다.
   const handleRemove = (key: string) => {
-    if (key === "hasElevator" || key === "hasParking") {
+    if (key === "hasElevator") {
+      setFilter(key as any, "all"); // ✅ string 방식으로 수정
+    } else if (key === "floorConfirmation") {
+      setFilter(key as any, "all"); // ✅ 새로운 필터 처리 추가
+    } else if (key === "hasParking") {
       setFilter(key as any, false);
     } else if (key === "priceRange") {
       setRangeFilter("priceRange", [0, 500000]);
@@ -25,7 +29,7 @@ export default function SelectedFilterBar({}: SelectedFilterBarProps) {
     } else if (key === "buildYear") {
       setRangeFilter("buildYear", [1980, 2024]);
     } else {
-      setFilter(key as any, "");
+      setFilter(key as any, "all"); // ✅ 기본값을 "all"로 변경
     }
   };
 
@@ -87,19 +91,27 @@ export default function SelectedFilterBar({}: SelectedFilterBarProps) {
       });
     }
 
-    if (filters.floor) {
+    // ✅ floorConfirmation 필터로 수정
+    if (
+      (filters as any).floorConfirmation &&
+      (filters as any).floorConfirmation !== "all"
+    ) {
       selected.push({
-        key: "floor",
-        label: `층수: ${filters.floor}`,
-        value: filters.floor,
+        key: "floorConfirmation",
+        label: `층확인: ${(filters as any).floorConfirmation}`,
+        value: (filters as any).floorConfirmation,
       });
     }
 
-    if (filters.hasElevator) {
+    // ✅ hasElevator를 string 방식으로 수정
+    if (
+      (filters as any).hasElevator &&
+      (filters as any).hasElevator !== "all"
+    ) {
       selected.push({
         key: "hasElevator",
-        label: "엘리베이터",
-        value: true,
+        label: `엘리베이터: ${(filters as any).hasElevator}`,
+        value: (filters as any).hasElevator,
       });
     }
 

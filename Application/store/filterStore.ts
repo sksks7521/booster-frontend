@@ -13,12 +13,19 @@ interface FilterState {
   town: string; // 읍면동
   region: string;
 
+  // 🔍 키워드 검색 (새로 추가)
+  searchQuery: string; // 주소, 법원, 사건번호 등 키워드 검색
+  searchField: string; // 검색 필드 선택 (all, case_number, road_address)
+
   // ✅ 건물/편의시설 필터
   buildingType: string;
   priceRange: [number, number];
-  areaRange: [number, number];
+  areaRange: [number, number]; // 하위호환용 (deprecated)
+  buildingAreaRange: [number, number]; // 건축면적 범위 (평)
+  landAreaRange: [number, number]; // 토지면적 범위 (평)
   buildYear: [number, number];
-  floor: string;
+  floor: string; // 기존 층수 필터 (하위호환)
+  floorConfirmation: string; // 새로운 층확인 필터 (탑층, 일반층, 1층, 반지하)
   hasElevator: string; // boolean → string ("있음"/"없음"/"모름"/"all")
   hasParking?: boolean; // ❌ 백엔드 데이터 없음 (optional로 변경)
   auctionStatus: string;
@@ -27,6 +34,10 @@ interface FilterState {
   auctionDateFrom?: string; // YYYY-MM-DD (optional)
   auctionDateTo?: string; // YYYY-MM-DD (optional)
   auctionMonth?: string; // YYYY-MM (하위호환)
+
+  // 🔄 서버 사이드 정렬
+  sortBy?: string; // 정렬 컬럼명 (building_area_pyeong, minimum_bid_price 등)
+  sortOrder?: "asc" | "desc"; // 정렬 방향
 
   // 편의 필터
   under100: boolean; // 1억 이하 여부
@@ -38,11 +49,17 @@ interface FilterState {
 interface FilterActions {
   setFilter: (key: keyof FilterState, value: any) => void;
   setRangeFilter: (
-    key: "priceRange" | "areaRange" | "buildYear",
+    key:
+      | "priceRange"
+      | "areaRange"
+      | "buildingAreaRange"
+      | "landAreaRange"
+      | "buildYear",
     value: [number, number]
   ) => void;
   setPage: (page: number) => void;
   setSize: (size: number) => void;
+  setSortConfig: (sortBy?: string, sortOrder?: "asc" | "desc") => void; // 정렬 설정
   resetFilters: () => void;
 }
 
@@ -59,12 +76,19 @@ const initialState: FilterState = {
   town: "",
   region: "",
 
+  // 🔍 키워드 검색
+  searchQuery: "",
+  searchField: "all", // 기본값: 전체 검색
+
   // 기존 필터들
   buildingType: "all", // 기본값을 "all"로 설정
   priceRange: [0, 500000],
-  areaRange: [0, 200],
+  areaRange: [0, 200], // 하위호환용 (deprecated)
+  buildingAreaRange: [0, 100], // 건축면적 범위 (평) - 일반적인 빌라 크기
+  landAreaRange: [0, 200], // 토지면적 범위 (평) - 일반적인 토지 크기
   buildYear: [1980, 2024],
-  floor: "all", // 기본값을 "all"로 설정
+  floor: "all", // 기존 층수 필터 (하위호환)
+  floorConfirmation: "all", // 새로운 층확인 필터 기본값
   hasElevator: "all", // boolean → string ("all" 기본값)
   hasParking: undefined, // optional
   auctionStatus: "all", // 기본값을 "all"로 설정
@@ -77,7 +101,7 @@ const initialState: FilterState = {
   // 편의 필터
   under100: false,
   page: 1,
-  size: 20,
+  size: 20, // 서버 사이드 페이지네이션 (20/50/100개 선택 가능)
 };
 
 // Zustand 스토어를 생성합니다.
@@ -93,6 +117,14 @@ export const useFilterStore = create<FilterState & FilterActions>((set) => ({
   // 페이지/사이즈 변경 액션
   setPage: (page) => set({ page }),
   setSize: (size) => set({ size }),
+
+  // 🔄 정렬 설정 액션
+  setSortConfig: (sortBy, sortOrder) =>
+    set({
+      sortBy,
+      sortOrder,
+      page: 1, // 정렬 변경 시 1페이지로 초기화
+    }),
 
   // 모든 필터를 초기 상태로 되돌리는 액션
   resetFilters: () => set(initialState),

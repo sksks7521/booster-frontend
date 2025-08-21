@@ -18,9 +18,18 @@ import {
   Pagination,
   PaginationContent,
   PaginationItem,
+  PaginationLink,
   PaginationPrevious,
   PaginationNext,
+  PaginationEllipsis,
 } from "@/components/ui/pagination";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 export default function AnalysisPage() {
   const [isFilterCollapsed, setIsFilterCollapsed] = useState(false);
@@ -31,6 +40,7 @@ export default function AnalysisPage() {
   );
   const { items, isLoading, error, totalCount, refetch } = useItems();
   const setPage = useFilterStore((s) => s.setPage);
+  const setSize = useFilterStore((s) => s.setSize);
   const page = useFilterStore((s) => s.page);
   const size = useFilterStore((s) => s.size);
 
@@ -48,9 +58,29 @@ export default function AnalysisPage() {
 
   // useItems 훅이 필터 상태를 키로 사용하여 자동 재검증함
 
+  // 필터 스토어에서 setFilter와 정렬 관련 함수들 가져오기
+  const setFilter = useFilterStore((s) => s.setFilter);
+  const setSortConfig = useFilterStore((s) => s.setSortConfig);
+  const sortBy = useFilterStore((s) => s.sortBy);
+  const sortOrder = useFilterStore((s) => s.sortOrder);
+
   const handleSearch = () => {
-    console.log("Search query:", debouncedQuery);
-    // TODO: debouncedQuery를 필터 스토어에 반영하여 서버 질의로 연동
+    console.log("🔍 [Search] 키워드 검색 실행:", debouncedQuery);
+    // ✅ 키워드를 필터 스토어에 반영하여 즉시 검색 실행
+    setFilter("searchQuery", debouncedQuery);
+
+    // 페이지를 1페이지로 초기화 (검색 시 새로운 결과)
+    setPage(1);
+
+    console.log(
+      "🔍 [Search] 필터 업데이트 완료 - 자동으로 useItems가 재검색됩니다"
+    );
+  };
+
+  // 🔄 서버 사이드 정렬 핸들러
+  const handleSort = (column: string, direction: "asc" | "desc") => {
+    console.log(`🔄 [Sort] 정렬 변경: ${column} ${direction}`);
+    setSortConfig(column || undefined, direction);
   };
 
   const handleExport = () => {
@@ -151,6 +181,9 @@ export default function AnalysisPage() {
                   isLoading={isLoading}
                   error={error}
                   onRetry={refetch}
+                  sortBy={sortBy}
+                  sortOrder={sortOrder}
+                  onSort={handleSort}
                 />
               )}
               {activeView === "map" && (
@@ -179,29 +212,150 @@ export default function AnalysisPage() {
                       isLoading={isLoading}
                       error={error}
                       onRetry={refetch}
+                      sortBy={sortBy}
+                      sortOrder={sortOrder}
+                      onSort={handleSort}
                     />
                   </div>
                 </div>
               )}
 
-              <div className="mt-4">
+              {/* 🚀 완전한 페이지네이션 시스템 */}
+              <div className="mt-6 space-y-4">
+                {/* 페이지 크기 선택과 정보 표시 */}
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                  <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-gray-600">페이지당</span>
+                      <Select
+                        value={size.toString()}
+                        onValueChange={(value) => {
+                          setSize(parseInt(value));
+                          setPage(1); // 페이지 크기 변경시 첫 페이지로
+                        }}
+                      >
+                        <SelectTrigger className="w-20">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="20">20</SelectItem>
+                          <SelectItem value="50">50</SelectItem>
+                          <SelectItem value="100">100</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <span className="text-sm text-gray-600">개</span>
+                    </div>
+                  </div>
+
+                  <div className="text-sm text-gray-600">
+                    전체 {(totalCount ?? 0).toLocaleString()}건 중{" "}
+                    {Math.min(size * (page - 1) + 1, totalCount ?? 0)}-
+                    {Math.min(size * page, totalCount ?? 0)}건 표시
+                  </div>
+                </div>
+
+                {/* 페이지 번호 네비게이션 */}
                 <Pagination>
                   <PaginationContent>
+                    {/* 이전 페이지 */}
                     <PaginationItem>
                       <PaginationPrevious
                         href="#"
                         onClick={(e) => {
                           e.preventDefault();
-                          setPage(Math.max(1, page - 1));
+                          if (page > 1) setPage(page - 1);
                         }}
+                        className={
+                          page <= 1 ? "pointer-events-none opacity-50" : ""
+                        }
                       />
                     </PaginationItem>
-                    <PaginationItem>
-                      <span className="px-3 text-sm text-gray-600">
-                        페이지 {page} /{" "}
-                        {Math.max(1, Math.ceil((totalCount ?? 0) / size))}
-                      </span>
-                    </PaginationItem>
+
+                    {(() => {
+                      const totalPages = Math.max(
+                        1,
+                        Math.ceil((totalCount ?? 0) / size)
+                      );
+                      const pages = [];
+
+                      // 페이지 번호 생성 로직
+                      const startPage = Math.max(1, page - 2);
+                      const endPage = Math.min(totalPages, page + 2);
+
+                      // 첫 페이지 (항상 표시)
+                      if (startPage > 1) {
+                        pages.push(
+                          <PaginationItem key="1">
+                            <PaginationLink
+                              href="#"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                setPage(1);
+                              }}
+                              isActive={page === 1}
+                            >
+                              1
+                            </PaginationLink>
+                          </PaginationItem>
+                        );
+
+                        if (startPage > 2) {
+                          pages.push(
+                            <PaginationItem key="ellipsis1">
+                              <PaginationEllipsis />
+                            </PaginationItem>
+                          );
+                        }
+                      }
+
+                      // 현재 페이지 주변 번호들
+                      for (let i = startPage; i <= endPage; i++) {
+                        pages.push(
+                          <PaginationItem key={i}>
+                            <PaginationLink
+                              href="#"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                setPage(i);
+                              }}
+                              isActive={page === i}
+                            >
+                              {i}
+                            </PaginationLink>
+                          </PaginationItem>
+                        );
+                      }
+
+                      // 마지막 페이지 (필요시 표시)
+                      if (endPage < totalPages) {
+                        if (endPage < totalPages - 1) {
+                          pages.push(
+                            <PaginationItem key="ellipsis2">
+                              <PaginationEllipsis />
+                            </PaginationItem>
+                          );
+                        }
+
+                        pages.push(
+                          <PaginationItem key={totalPages}>
+                            <PaginationLink
+                              href="#"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                setPage(totalPages);
+                              }}
+                              isActive={page === totalPages}
+                            >
+                              {totalPages}
+                            </PaginationLink>
+                          </PaginationItem>
+                        );
+                      }
+
+                      return pages;
+                    })()}
+
+                    {/* 다음 페이지 */}
                     <PaginationItem>
                       <PaginationNext
                         href="#"
@@ -211,8 +365,14 @@ export default function AnalysisPage() {
                             1,
                             Math.ceil((totalCount ?? 0) / size)
                           );
-                          setPage(Math.min(totalPages, page + 1));
+                          if (page < totalPages) setPage(page + 1);
                         }}
+                        className={
+                          page >=
+                          Math.max(1, Math.ceil((totalCount ?? 0) / size))
+                            ? "pointer-events-none opacity-50"
+                            : ""
+                        }
                       />
                     </PaginationItem>
                   </PaginationContent>

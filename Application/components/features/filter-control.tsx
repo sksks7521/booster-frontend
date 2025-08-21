@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/select";
 import { useFilterStore } from "@/store/filterStore";
 import { useLocationsSimple } from "@/hooks/useLocations";
+import { useItems } from "@/hooks/useItems";
 import {
   ChevronDown,
   ChevronUp,
@@ -35,6 +36,8 @@ import {
   CheckCircle,
   Eye,
   AlertTriangle,
+  Home,
+  Mountain,
 } from "lucide-react";
 
 // ✅ 백엔드 API로부터 주소 데이터 로드 (SAMPLE_ADDRESSES 대체)
@@ -108,11 +111,49 @@ export default function FilterControl({
     usingFallback: locationsUsingFallback,
   } = useLocationsSimple();
 
+  // 🏢 동적 필터 옵션 생성을 위한 데이터 (지역 선택 시에만 로드)
+  const { usageValues } = useItems();
+
+  // 🎯 실제 데이터 기반 동적 건물 유형 옵션 생성
+  const buildingTypeOptions = [
+    { value: "all", label: "전체" },
+    ...usageValues.map((usage) => ({
+      value: usage,
+      label: usage,
+    })),
+  ];
+
+  // 🔍 검색 필드 선택 옵션
+  const searchFieldOptions = [
+    {
+      value: "all",
+      label: "전체",
+      icon: "🔍",
+      description: "모든 필드에서 검색",
+    },
+    {
+      value: "case_number",
+      label: "사건번호",
+      icon: "📋",
+      description: "사건번호로 검색",
+    },
+    {
+      value: "road_address",
+      label: "도로명주소",
+      icon: "🏠",
+      description: "도로명주소로 검색",
+    },
+  ];
+
+  // 🔍 검색 필드 선택 상태
+  const [searchField, setSearchField] = useState<string>("all");
+
   // 스토어 상태
   const filters = useFilterStore((state) => state);
   const setFilter = useFilterStore((state) => state.setFilter);
   const setRangeFilter = useFilterStore((state) => state.setRangeFilter);
   const resetFilters = useFilterStore((state) => state.resetFilters);
+  const setPage = useFilterStore((state) => state.setPage); // 🚨 페이지 리셋을 위해 추가
 
   // ✅ 지역 선택 상태 (이름 기반으로 유지, 코드는 내부적으로 관리)
   const [selectedProvince, setSelectedProvince] = useState<string>("");
@@ -121,22 +162,27 @@ export default function FilterControl({
   const [availableCities, setAvailableCities] = useState<string[]>([]);
   const [availableDistricts, setAvailableDistricts] = useState<string[]>([]);
 
-  // 범위 입력 모드 (slider vs input)
+  // 범위 입력 모드 (slider vs input) - 초기값을 슬라이더로 설정
   const [priceInputMode, setPriceInputMode] = useState<"slider" | "input">(
-    "input"
+    "slider"
   );
   const [areaInputMode, setAreaInputMode] = useState<"slider" | "input">(
-    "input"
+    "slider"
   );
+  const [buildingAreaInputMode, setBuildingAreaInputMode] = useState<
+    "slider" | "input"
+  >("slider");
+  const [landAreaInputMode, setLandAreaInputMode] = useState<
+    "slider" | "input"
+  >("slider");
   const [buildYearInputMode, setBuildYearInputMode] = useState<
     "slider" | "input"
-  >("input");
+  >("slider");
 
   // 필터 프리셋 상태
   const [savedPresets, setSavedPresets] =
     useState<FilterPreset[]>(SAMPLE_PRESETS);
   const [showPresets, setShowPresets] = useState<boolean>(false);
-  const [estimatedResults, setEstimatedResults] = useState<number>(4321); // 모킹된 결과 개수
 
   // 현재 날짜 기반 기본값 설정
   const today = new Date();
@@ -169,29 +215,37 @@ export default function FilterControl({
     if (filters.priceRange[0] > 0 || filters.priceRange[1] < 500000) count++;
     if (filters.areaRange[0] > 0 || filters.areaRange[1] < 200) count++;
     if (filters.buildYear[0] > 1980 || filters.buildYear[1] < 2024) count++;
-    if (filters.floor && filters.floor !== "all") count++;
-    if ((filters as any).hasElevator && (filters as any).hasElevator !== "all")
-      count++;
+
+    // 🔍 층확인 필터 디버깅
+    const floorConfirmationActive =
+      (filters as any).floorConfirmation &&
+      (filters as any).floorConfirmation !== "all";
+    console.log(
+      "🔍 [Debug] floorConfirmation 상태:",
+      (filters as any).floorConfirmation
+    );
+    console.log(
+      "🔍 [Debug] floorConfirmation 활성화:",
+      floorConfirmationActive
+    );
+    if (floorConfirmationActive) count++;
+
+    // ❌ filters.floor 대신 floorConfirmation 사용
+    // if (filters.floor && filters.floor !== "all") count++;
+    // ✅ floorConfirmation은 위에서 이미 처리됨
+
+    // 🔍 엘리베이터 필터 디버깅
+    const elevatorActive =
+      (filters as any).hasElevator && (filters as any).hasElevator !== "all";
+    console.log("🔍 [Debug] hasElevator 상태:", (filters as any).hasElevator);
+    console.log("🔍 [Debug] hasElevator 활성화:", elevatorActive);
+    if (elevatorActive) count++;
+
     if ((filters as any).auctionDateFrom || (filters as any).auctionDateTo)
       count++;
+
+    console.log("🔍 [Debug] 총 활성 필터 수:", count);
     return count;
-  };
-
-  // 필터 미리보기 업데이트
-  const updateEstimatedResults = () => {
-    // 실제로는 API 호출로 결과 개수를 가져옴
-    const baseCount = 4321;
-    let multiplier = 1;
-
-    if (selectedProvince) multiplier *= 0.3;
-    if (selectedCity) multiplier *= 0.5;
-    if (filters.buildingType && filters.buildingType !== "all")
-      multiplier *= 0.4;
-    if (filters.priceRange[0] > 0 || filters.priceRange[1] < 500000)
-      multiplier *= 0.6;
-
-    const estimated = Math.floor(baseCount * multiplier);
-    setEstimatedResults(estimated);
   };
 
   // 프리셋 저장 기능
@@ -309,7 +363,6 @@ export default function FilterControl({
       setAvailableDistricts([]);
       setFilter("province", "");
     }
-    updateEstimatedResults();
   }, [selectedProvince, selectedCity, locations]);
 
   useEffect(() => {
@@ -327,7 +380,6 @@ export default function FilterControl({
       setSelectedDistrict("");
       setFilter("cityDistrict", "");
     }
-    updateEstimatedResults();
   }, [selectedCity, selectedDistrict, locations]);
 
   // ✅ 읍면동 선택 시 필터 설정
@@ -338,11 +390,6 @@ export default function FilterControl({
       setFilter("town", "");
     }
   }, [selectedDistrict]);
-
-  // 필터 변경 시 미리보기 업데이트
-  useEffect(() => {
-    updateEstimatedResults();
-  }, [filters]);
 
   // 저장된 프리셋 로드
   useEffect(() => {
@@ -383,7 +430,7 @@ export default function FilterControl({
                 <p className="text-base text-gray-600 mt-1">
                   {!isLocationSelected
                     ? "원하는 지역을 먼저 선택하면 상세 필터를 사용할 수 있어요"
-                    : `예상 결과: 약 ${estimatedResults.toLocaleString()}개 매물`}
+                    : "아래 상세 필터들로 더 정확한 매물을 찾을 수 있어요"}
                 </p>
               </div>
               {isLocationSelected && (
@@ -731,17 +778,10 @@ export default function FilterControl({
                     <Label className="text-xl font-bold">건물 유형</Label>
                   </div>
                   <ButtonGroup
-                    options={[
-                      { value: "all", label: "전체" },
-                      { value: "아파트", label: "아파트" },
-                      { value: "빌라", label: "빌라" },
-                      { value: "단독주택", label: "단독" },
-                      { value: "오피스텔", label: "오피스텔" },
-                      { value: "상가", label: "상가" },
-                    ]}
+                    options={buildingTypeOptions}
                     value={filters.buildingType || "all"}
                     onChange={(value) => setFilter("buildingType", value)}
-                    disabled={!isLocationSelected}
+                    disabled={buildingTypeOptions.length <= 1} // 데이터가 없거나 '전체'만 있으면 비활성화
                   />
                 </div>
 
@@ -765,7 +805,7 @@ export default function FilterControl({
                         onChange={(e) =>
                           setFilter("auctionDateFrom", e.target.value)
                         }
-                        disabled={!isLocationSelected}
+                        disabled={false}
                         className="h-12 text-base font-semibold"
                       />
                     </div>
@@ -782,308 +822,424 @@ export default function FilterControl({
                         onChange={(e) =>
                           setFilter("auctionDateTo", e.target.value)
                         }
-                        disabled={!isLocationSelected}
+                        disabled={false}
                         className="h-12 text-base font-semibold"
                       />
                     </div>
                   </div>
                 </div>
 
-                {/* 3. 가격범위 / 면적범위 - 한 줄에 배치 */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                  {/* 가격 범위 */}
-                  <div>
-                    <div className="flex items-center justify-between mb-4">
-                      <div className="flex items-center space-x-3">
-                        <DollarSign className="w-7 h-7 text-green-600" />
-                        <Label className="text-xl font-bold">가격 범위</Label>
-                      </div>
-                      <RangeToggle
-                        mode={priceInputMode}
-                        onToggle={() =>
-                          setPriceInputMode(
-                            priceInputMode === "slider" ? "input" : "slider"
-                          )
-                        }
-                      />
-                    </div>
-
-                    {priceInputMode === "slider" ? (
-                      <div className="space-y-6">
-                        <div className="px-4 py-3 bg-gray-50 rounded-lg">
-                          <Slider
-                            value={filters.priceRange}
-                            onValueChange={(value) =>
-                              setRangeFilter(
-                                "priceRange",
-                                value as [number, number]
-                              )
-                            }
-                            max={500000}
-                            min={0}
-                            step={1000}
-                            disabled={!isLocationSelected}
-                            className="w-full h-3"
-                          />
+                {/* 3. 범위 필터들 - 2줄 레이아웃 */}
+                <div className="space-y-8">
+                  {/* 첫 번째 줄: 가격범위 + 건축년도 */}
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    {/* 가격 범위 */}
+                    <div>
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center space-x-3">
+                          <DollarSign className="w-7 h-7 text-green-600" />
+                          <Label className="text-xl font-bold">가격 범위</Label>
                         </div>
-                        <div className="flex items-center justify-between text-xl font-bold text-green-700">
-                          <span className="bg-green-100 px-4 py-2 rounded-lg">
-                            {formatPrice(filters.priceRange[0])}
-                          </span>
-                          <span className="text-gray-400">~</span>
-                          <span className="bg-green-100 px-4 py-2 rounded-lg">
-                            {formatPrice(filters.priceRange[1])}
-                          </span>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="grid grid-cols-2 gap-6">
-                        <div>
-                          <Label className="text-lg font-medium mb-3 block">
-                            최소 (만원)
-                          </Label>
-                          <Input
-                            type="number"
-                            value={filters.priceRange[0]}
-                            onChange={(e) => {
-                              const value =
-                                Number.parseInt(e.target.value) || 0;
-                              setRangeFilter("priceRange", [
-                                value,
-                                filters.priceRange[1],
-                              ]);
-                            }}
-                            disabled={!isLocationSelected}
-                            className="h-14 text-lg font-semibold"
-                            placeholder="0"
-                          />
-                        </div>
-                        <div>
-                          <Label className="text-lg font-medium mb-3 block">
-                            최대 (만원)
-                          </Label>
-                          <Input
-                            type="number"
-                            value={filters.priceRange[1]}
-                            onChange={(e) => {
-                              const value =
-                                Number.parseInt(e.target.value) || 500000;
-                              setRangeFilter("priceRange", [
-                                filters.priceRange[0],
-                                value,
-                              ]);
-                            }}
-                            disabled={!isLocationSelected}
-                            className="h-14 text-lg font-semibold"
-                            placeholder="500000"
-                          />
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* 면적 범위 */}
-                  <div>
-                    <div className="flex items-center justify-between mb-4">
-                      <div className="flex items-center space-x-3">
-                        <Ruler className="w-7 h-7 text-blue-600" />
-                        <Label className="text-xl font-bold">면적 범위</Label>
-                      </div>
-                      <RangeToggle
-                        mode={areaInputMode}
-                        onToggle={() =>
-                          setAreaInputMode(
-                            areaInputMode === "slider" ? "input" : "slider"
-                          )
-                        }
-                      />
-                    </div>
-
-                    {areaInputMode === "slider" ? (
-                      <div className="space-y-6">
-                        <div className="px-4 py-3 bg-gray-50 rounded-lg">
-                          <Slider
-                            value={filters.areaRange}
-                            onValueChange={(value) =>
-                              setRangeFilter(
-                                "areaRange",
-                                value as [number, number]
-                              )
-                            }
-                            max={200}
-                            min={0}
-                            step={1}
-                            disabled={!isLocationSelected}
-                            className="w-full h-3"
-                          />
-                        </div>
-                        <div className="flex items-center justify-between text-lg font-bold text-blue-700">
-                          <span className="bg-blue-100 px-3 py-2 rounded-lg">
-                            {filters.areaRange[0]}㎡
-                          </span>
-                          <span className="text-gray-400">~</span>
-                          <span className="bg-blue-100 px-3 py-2 rounded-lg">
-                            {filters.areaRange[1]}㎡
-                          </span>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <Label className="text-lg font-medium mb-3 block">
-                            최소 (㎡)
-                          </Label>
-                          <Input
-                            type="number"
-                            value={filters.areaRange[0]}
-                            onChange={(e) => {
-                              const value =
-                                Number.parseInt(e.target.value) || 0;
-                              setRangeFilter("areaRange", [
-                                value,
-                                filters.areaRange[1],
-                              ]);
-                            }}
-                            disabled={!isLocationSelected}
-                            className="h-14 text-lg font-semibold"
-                            placeholder="0"
-                          />
-                        </div>
-                        <div>
-                          <Label className="text-lg font-medium mb-3 block">
-                            최대 (㎡)
-                          </Label>
-                          <Input
-                            type="number"
-                            value={filters.areaRange[1]}
-                            onChange={(e) => {
-                              const value =
-                                Number.parseInt(e.target.value) || 200;
-                              setRangeFilter("areaRange", [
-                                filters.areaRange[0],
-                                value,
-                              ]);
-                            }}
-                            disabled={!isLocationSelected}
-                            className="h-14 text-lg font-semibold"
-                            placeholder="200"
-                          />
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* 4. 건축년도 */}
-                <div>
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center space-x-3">
-                      <Calendar className="w-7 h-7 text-purple-600" />
-                      <Label className="text-xl font-bold">건축년도</Label>
-                    </div>
-                    <RangeToggle
-                      mode={buildYearInputMode}
-                      onToggle={() =>
-                        setBuildYearInputMode(
-                          buildYearInputMode === "slider" ? "input" : "slider"
-                        )
-                      }
-                    />
-                  </div>
-
-                  {buildYearInputMode === "slider" ? (
-                    <div className="space-y-6">
-                      <div className="px-4 py-3 bg-gray-50 rounded-lg">
-                        <Slider
-                          value={filters.buildYear}
-                          onValueChange={(value) =>
-                            setRangeFilter(
-                              "buildYear",
-                              value as [number, number]
+                        <RangeToggle
+                          mode={priceInputMode}
+                          onToggle={() =>
+                            setPriceInputMode(
+                              priceInputMode === "slider" ? "input" : "slider"
                             )
                           }
-                          max={2024}
-                          min={1980}
-                          step={1}
-                          disabled={!isLocationSelected}
-                          className="w-full h-3"
                         />
                       </div>
-                      <div className="flex items-center justify-between text-lg font-bold text-purple-700">
-                        <span className="bg-purple-100 px-3 py-2 rounded-lg">
-                          {filters.buildYear[0]}년
-                        </span>
-                        <span className="text-gray-400">~</span>
-                        <span className="bg-purple-100 px-3 py-2 rounded-lg">
-                          {filters.buildYear[1]}년
-                        </span>
-                      </div>
+
+                      {priceInputMode === "slider" ? (
+                        <div className="space-y-6">
+                          <div className="px-4 py-3 bg-gray-50 rounded-lg">
+                            <Slider
+                              value={filters.priceRange}
+                              onValueChange={(value) =>
+                                setRangeFilter(
+                                  "priceRange",
+                                  value as [number, number]
+                                )
+                              }
+                              max={500000}
+                              min={0}
+                              step={1000}
+                              disabled={false}
+                              className="w-full h-3"
+                            />
+                          </div>
+                          <div className="flex items-center justify-between text-xl font-bold text-gray-700">
+                            <span className="bg-gray-100 px-4 py-2 rounded-lg border">
+                              {formatPrice(filters.priceRange[0])}
+                            </span>
+                            <span className="text-gray-400">~</span>
+                            <span className="bg-gray-100 px-4 py-2 rounded-lg border">
+                              {formatPrice(filters.priceRange[1])}
+                            </span>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <Label className="text-sm font-medium mb-2 block">
+                              최소 (만원)
+                            </Label>
+                            <Input
+                              type="number"
+                              value={filters.priceRange[0]}
+                              onChange={(e) => {
+                                const value =
+                                  Number.parseInt(e.target.value) || 0;
+                                setRangeFilter("priceRange", [
+                                  value,
+                                  filters.priceRange[1],
+                                ]);
+                              }}
+                              disabled={false}
+                              className="h-12 text-base font-semibold"
+                              placeholder="0"
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-sm font-medium mb-2 block">
+                              최대 (만원)
+                            </Label>
+                            <Input
+                              type="number"
+                              value={filters.priceRange[1]}
+                              onChange={(e) => {
+                                const value =
+                                  Number.parseInt(e.target.value) || 500000;
+                                setRangeFilter("priceRange", [
+                                  filters.priceRange[0],
+                                  value,
+                                ]);
+                              }}
+                              disabled={false}
+                              className="h-12 text-base font-semibold"
+                              placeholder="500000"
+                            />
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  ) : (
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <Label className="text-base font-medium mb-2 block">
-                          시작년도
-                        </Label>
-                        <Input
-                          type="number"
-                          value={filters.buildYear[0]}
-                          onChange={(e) => {
-                            const value =
-                              Number.parseInt(e.target.value) || 1980;
-                            setRangeFilter("buildYear", [
-                              value,
-                              filters.buildYear[1],
-                            ]);
-                          }}
-                          disabled={!isLocationSelected}
-                          className="h-12 text-base font-semibold"
+
+                    {/* 건축년도 */}
+                    <div>
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center space-x-3">
+                          <Calendar className="w-7 h-7 text-purple-600" />
+                          <Label className="text-xl font-bold">건축년도</Label>
+                        </div>
+                        <RangeToggle
+                          mode={buildYearInputMode}
+                          onToggle={() =>
+                            setBuildYearInputMode(
+                              buildYearInputMode === "slider"
+                                ? "input"
+                                : "slider"
+                            )
+                          }
                         />
                       </div>
-                      <div>
-                        <Label className="text-base font-medium mb-2 block">
-                          종료년도
-                        </Label>
-                        <Input
-                          type="number"
-                          value={filters.buildYear[1]}
-                          onChange={(e) => {
-                            const value =
-                              Number.parseInt(e.target.value) || 2024;
-                            setRangeFilter("buildYear", [
-                              filters.buildYear[0],
-                              value,
-                            ]);
-                          }}
-                          disabled={!isLocationSelected}
-                          className="h-12 text-base font-semibold"
-                        />
-                      </div>
+
+                      {buildYearInputMode === "slider" ? (
+                        <div className="space-y-6">
+                          <div className="px-4 py-3 bg-gray-50 rounded-lg">
+                            <Slider
+                              value={filters.buildYear}
+                              onValueChange={(value) =>
+                                setRangeFilter(
+                                  "buildYear",
+                                  value as [number, number]
+                                )
+                              }
+                              max={2024}
+                              min={1980}
+                              step={1}
+                              disabled={false}
+                              className="w-full h-3"
+                            />
+                          </div>
+                          <div className="flex items-center justify-between text-lg font-bold text-gray-700">
+                            <span className="bg-gray-100 px-3 py-2 rounded-lg border">
+                              {filters.buildYear[0]}년
+                            </span>
+                            <span className="text-gray-400">~</span>
+                            <span className="bg-gray-100 px-3 py-2 rounded-lg border">
+                              {filters.buildYear[1]}년
+                            </span>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <Label className="text-sm font-medium mb-2 block">
+                              시작년도
+                            </Label>
+                            <Input
+                              type="number"
+                              value={filters.buildYear[0]}
+                              onChange={(e) => {
+                                const value =
+                                  Number.parseInt(e.target.value) || 1980;
+                                setRangeFilter("buildYear", [
+                                  value,
+                                  filters.buildYear[1],
+                                ]);
+                              }}
+                              disabled={false}
+                              className="h-12 text-base font-semibold"
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-sm font-medium mb-2 block">
+                              종료년도
+                            </Label>
+                            <Input
+                              type="number"
+                              value={filters.buildYear[1]}
+                              onChange={(e) => {
+                                const value =
+                                  Number.parseInt(e.target.value) || 2024;
+                                setRangeFilter("buildYear", [
+                                  filters.buildYear[0],
+                                  value,
+                                ]);
+                              }}
+                              disabled={false}
+                              className="h-12 text-base font-semibold"
+                            />
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  )}
+                  </div>
+
+                  {/* 두 번째 줄: 건축면적범위 + 토지면적범위 */}
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    {/* 건축면적 범위 */}
+                    <div>
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center space-x-3">
+                          <Home className="w-7 h-7 text-blue-600" />
+                          <Label className="text-xl font-bold">
+                            건축면적 범위
+                          </Label>
+                        </div>
+                        <RangeToggle
+                          mode={buildingAreaInputMode}
+                          onToggle={() =>
+                            setBuildingAreaInputMode(
+                              buildingAreaInputMode === "slider"
+                                ? "input"
+                                : "slider"
+                            )
+                          }
+                        />
+                      </div>
+
+                      {buildingAreaInputMode === "slider" ? (
+                        <div className="space-y-6">
+                          <div className="px-4 py-3 bg-gray-50 rounded-lg">
+                            <Slider
+                              value={filters.buildingAreaRange}
+                              onValueChange={(value) =>
+                                setRangeFilter(
+                                  "buildingAreaRange",
+                                  value as [number, number]
+                                )
+                              }
+                              max={100}
+                              min={0}
+                              step={1}
+                              disabled={false}
+                              className="w-full h-3"
+                            />
+                          </div>
+                          <div className="flex items-center justify-between text-lg font-bold text-gray-700">
+                            <span className="bg-gray-100 px-3 py-2 rounded-lg border">
+                              {filters.buildingAreaRange[0]}평
+                            </span>
+                            <span className="text-gray-400">~</span>
+                            <span className="bg-gray-100 px-3 py-2 rounded-lg border">
+                              {filters.buildingAreaRange[1]}평
+                            </span>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <Label className="text-sm font-medium mb-2 block">
+                              최소 (평)
+                            </Label>
+                            <Input
+                              type="number"
+                              value={filters.buildingAreaRange[0]}
+                              onChange={(e) => {
+                                const value =
+                                  Number.parseInt(e.target.value) || 0;
+                                setRangeFilter("buildingAreaRange", [
+                                  value,
+                                  filters.buildingAreaRange[1],
+                                ]);
+                              }}
+                              disabled={false}
+                              className="h-12 text-base font-semibold"
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-sm font-medium mb-2 block">
+                              최대 (평)
+                            </Label>
+                            <Input
+                              type="number"
+                              value={filters.buildingAreaRange[1]}
+                              onChange={(e) => {
+                                const value =
+                                  Number.parseInt(e.target.value) || 100;
+                                setRangeFilter("buildingAreaRange", [
+                                  filters.buildingAreaRange[0],
+                                  value,
+                                ]);
+                              }}
+                              disabled={false}
+                              className="h-12 text-base font-semibold"
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* 토지면적 범위 */}
+                    <div>
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center space-x-3">
+                          <Mountain className="w-7 h-7 text-amber-600" />
+                          <Label className="text-xl font-bold">
+                            토지면적 범위
+                          </Label>
+                        </div>
+                        <RangeToggle
+                          mode={landAreaInputMode}
+                          onToggle={() =>
+                            setLandAreaInputMode(
+                              landAreaInputMode === "slider"
+                                ? "input"
+                                : "slider"
+                            )
+                          }
+                        />
+                      </div>
+
+                      {landAreaInputMode === "slider" ? (
+                        <div className="space-y-6">
+                          <div className="px-4 py-3 bg-gray-50 rounded-lg">
+                            <Slider
+                              value={filters.landAreaRange}
+                              onValueChange={(value) =>
+                                setRangeFilter(
+                                  "landAreaRange",
+                                  value as [number, number]
+                                )
+                              }
+                              max={200}
+                              min={0}
+                              step={1}
+                              disabled={false}
+                              className="w-full h-3"
+                            />
+                          </div>
+                          <div className="flex items-center justify-between text-lg font-bold text-gray-700">
+                            <span className="bg-gray-100 px-3 py-2 rounded-lg border">
+                              {filters.landAreaRange[0]}평
+                            </span>
+                            <span className="text-gray-400">~</span>
+                            <span className="bg-gray-100 px-3 py-2 rounded-lg border">
+                              {filters.landAreaRange[1]}평
+                            </span>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <Label className="text-sm font-medium mb-2 block">
+                              최소 (평)
+                            </Label>
+                            <Input
+                              type="number"
+                              value={filters.landAreaRange[0]}
+                              onChange={(e) => {
+                                const value =
+                                  Number.parseInt(e.target.value) || 0;
+                                setRangeFilter("landAreaRange", [
+                                  value,
+                                  filters.landAreaRange[1],
+                                ]);
+                              }}
+                              disabled={false}
+                              className="h-12 text-base font-semibold"
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-sm font-medium mb-2 block">
+                              최대 (평)
+                            </Label>
+                            <Input
+                              type="number"
+                              value={filters.landAreaRange[1]}
+                              onChange={(e) => {
+                                const value =
+                                  Number.parseInt(e.target.value) || 200;
+                                setRangeFilter("landAreaRange", [
+                                  filters.landAreaRange[0],
+                                  value,
+                                ]);
+                              }}
+                              disabled={false}
+                              className="h-12 text-base font-semibold"
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
 
                 {/* 5. 층수, 엘리베이터 - 한 줄에 배치 */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                  {/* 층수 */}
+                  {/* 층확인 */}
                   <div>
                     <div className="flex items-center justify-between mb-4">
-                      <Label className="text-xl font-bold">층수</Label>
-                      {/* 경고 배지 제거 - 이제 완전 지원! */}
+                      <div className="flex items-center space-x-3">
+                        <Layers className="w-7 h-7 text-orange-600" />
+                        <Label className="text-xl font-bold">층확인</Label>
+                      </div>
                     </div>
                     <ButtonGroup
                       options={[
                         { value: "all", label: "전체" },
-                        { value: "1-2", label: "1-2층" },
-                        { value: "3-4", label: "3-4층" },
-                        { value: "5+", label: "5층 이상" },
-                        { value: "지하", label: "지하" },
+                        { value: "탑층", label: "탑층" },
+                        { value: "일반층", label: "일반층" },
+                        { value: "1층", label: "1층" },
+                        { value: "반지하", label: "반지하" },
                       ]}
-                      value={filters.floor || "all"}
-                      onChange={(value) => setFilter("floor", value)}
-                      disabled={!isLocationSelected}
+                      value={filters.floorConfirmation || "all"}
+                      onChange={(value) => {
+                        console.log("🔍 [Debug] 층확인 필터 변경:", value);
+                        console.log(
+                          "🔍 [Debug] 변경 전 상태:",
+                          filters.floorConfirmation
+                        );
+                        setFilter("floorConfirmation", value);
+                        // 🚨 강제로 API 재호출을 위한 페이지 리셋
+                        setPage(1);
+                        console.log(
+                          "🔍 [Debug] setFilter 호출 완료, 페이지 1로 리셋"
+                        );
+                      }}
+                      disabled={false}
                     />
-                    {/* 경고 메시지 제거 - 백엔드에서 완전 지원 확인! */}
                   </div>
 
                   {/* 엘리베이터 */}
@@ -1100,8 +1256,20 @@ export default function FilterControl({
                         // "모름" 옵션 제거 (실제 데이터에는 O/null만 있음)
                       ]}
                       value={(filters as any).hasElevator || "all"}
-                      onChange={(value) => setFilter("hasElevator", value)}
-                      disabled={!isLocationSelected}
+                      onChange={(value) => {
+                        console.log("🔍 [Debug] 엘리베이터 필터 변경:", value);
+                        console.log(
+                          "🔍 [Debug] 변경 전 상태:",
+                          (filters as any).hasElevator
+                        );
+                        setFilter("hasElevator", value);
+                        // 🚨 강제로 API 재호출을 위한 페이지 리셋
+                        setPage(1);
+                        console.log(
+                          "🔍 [Debug] setFilter 호출 완료, 페이지 1로 리셋"
+                        );
+                      }}
+                      disabled={false}
                     />
                   </div>
                 </div>
@@ -1117,42 +1285,77 @@ export default function FilterControl({
                       선택사항
                     </Badge>
                   </div>
-                  <div className="flex items-center space-x-4">
-                    <div className="flex-1 relative">
-                      <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-6 h-6" />
-                      <input
-                        type="text"
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        placeholder="주소, 법원, 사건번호로 검색해보세요..."
-                        disabled={!isLocationSelected}
-                        className="w-full h-16 pl-14 pr-6 text-lg border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:outline-none transition-all duration-200 disabled:bg-gray-100 disabled:cursor-not-allowed"
-                        onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-                      />
+                  <div className="space-y-4">
+                    {/* 검색 필드 선택 */}
+                    <div>
+                      <Label className="text-sm font-medium text-gray-700 mb-2 block">
+                        검색 필드 선택
+                      </Label>
+                      <div className="grid grid-cols-3 gap-3">
+                        {searchFieldOptions.map((option) => (
+                          <button
+                            key={option.value}
+                            type="button"
+                            onClick={() => {
+                              setSearchField(option.value);
+                              setFilter("searchField", option.value);
+                            }}
+                            className={`p-4 rounded-lg border-2 text-center transition-all duration-200 ${
+                              searchField === option.value
+                                ? "border-blue-500 bg-blue-50 text-blue-800"
+                                : "border-gray-200 hover:border-gray-300 text-gray-700"
+                            }`}
+                          >
+                            <div className="text-2xl mb-1">{option.icon}</div>
+                            <div className="font-medium">{option.label}</div>
+                            <div className="text-xs text-gray-500 mt-1">
+                              {option.description}
+                            </div>
+                          </button>
+                        ))}
+                      </div>
                     </div>
-                    <Button
-                      onClick={handleSearch}
-                      disabled={!isLocationSelected}
-                      className="h-16 px-8 text-lg font-bold bg-green-600 hover:bg-green-700"
-                    >
-                      <Search className="w-5 h-5 mr-2" />
-                      검색하기
-                    </Button>
+
+                    {/* 검색 입력 */}
+                    <div className="flex items-center space-x-4">
+                      <div className="flex-1 relative">
+                        <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-6 h-6" />
+                        <input
+                          type="text"
+                          value={searchQuery}
+                          onChange={(e) => setSearchQuery(e.target.value)}
+                          placeholder={
+                            searchField === "case_number"
+                              ? "예: 2024타경1234"
+                              : searchField === "road_address"
+                              ? "예: 경기도 고양시 덕양구"
+                              : "주소, 법원, 사건번호로 검색해보세요..."
+                          }
+                          disabled={false}
+                          className="w-full h-16 pl-14 pr-6 text-lg border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:outline-none transition-all duration-200 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              setFilter("searchField", searchField);
+                              handleSearch();
+                            }
+                          }}
+                        />
+                      </div>
+                      <Button
+                        onClick={() => {
+                          setFilter("searchField", searchField);
+                          handleSearch();
+                        }}
+                        disabled={false}
+                        className="h-16 px-8 text-lg font-bold bg-green-600 hover:bg-green-700"
+                      >
+                        <Search className="w-5 h-5 mr-2" />
+                        검색하기
+                      </Button>
+                    </div>
                   </div>
 
                   {/* 미리보기 */}
-                  {isLocationSelected && (
-                    <div className="flex items-center justify-center space-x-4 p-4 bg-blue-50 rounded-xl border-2 border-blue-200">
-                      <Eye className="w-6 h-6 text-blue-600" />
-                      <span className="text-lg font-semibold text-blue-800">
-                        현재 조건으로 약{" "}
-                        <span className="text-2xl font-bold">
-                          {estimatedResults.toLocaleString()}
-                        </span>
-                        개의 매물이 검색됩니다
-                      </span>
-                    </div>
-                  )}
                 </div>
               </div>
             )}
