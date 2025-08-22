@@ -387,5 +387,5 @@ python run_server.py
 ---
 
 **개발팀**: Frontend Team  
-**마지막 업데이트**: 2025-08-19  
-**버전**: MVP v1.1 (백엔드 API 연동 완료)
+**마지막 업데이트**: 2025-08-20  
+**버전**: MVP v1.2 (Analysis 페이지 UI/UX 개선 완료)
