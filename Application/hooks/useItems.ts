@@ -100,6 +100,7 @@ export interface UseItemsResult {
   isLoading: boolean;
   error: any;
   totalCount?: number;
+  baseTotalCount?: number;
   usageValues: string[]; // 🏢 동적 건물 유형 필터 옵션 생성용
   floorValues: string[]; // 🏢 동적 층확인 필터 옵션 생성용
   refetch: () => void;
@@ -112,14 +113,20 @@ function buildQueryParamsFromFilters(
   const params: Record<string, any> = {};
 
   // 🚨 핵심 수정: 클라이언트 처리가 필요한 모든 경우 통합
+  const isLandAreaFiltered = Array.isArray(filters.landAreaRange)
+    ? filters.landAreaRange[0] > 0 || filters.landAreaRange[1] < 200
+    : false;
+
   const needsClientProcessing =
     (filters.floorConfirmation && filters.floorConfirmation !== "all") ||
     (filters.hasElevator && filters.hasElevator !== "all") ||
-    (filters.sortBy && filters.sortOrder); // 🎯 정렬도 클라이언트 처리에 포함
+    (filters.sortBy && filters.sortOrder) ||
+    isLandAreaFiltered; // 🌍 토지면적은 서버 미지원 → 클라 처리
 
   if (needsClientProcessing) {
     // 클라이언트 처리가 필요하면 전체 데이터를 가져온다
     params.limit = 1000; // 백엔드가 지원하는 범위로 조정
+    params.size = 1000; // page/size 방식 API 호환
     params.page = 1;
     console.log(
       "🚨 [Debug] 클라이언트 처리 감지 (필터링/정렬) - 전체 데이터 로드 모드"
@@ -127,6 +134,7 @@ function buildQueryParamsFromFilters(
   } else {
     // 일반적인 페이지네이션
     params.limit = filters.size ?? 20;
+    params.size = filters.size ?? 20; // page/size 방식 API 호환
     params.page = filters.page ?? 1;
   }
 
@@ -145,7 +153,11 @@ function buildQueryParamsFromFilters(
 
   // ✅ 건물 유형 (백엔드 가이드: buildingType → usage)
   if (filters.buildingType && filters.buildingType !== "all") {
-    params.usage = filters.buildingType;
+    if (Array.isArray(filters.buildingType)) {
+      params.usage = filters.buildingType.join(",");
+    } else {
+      params.usage = filters.buildingType;
+    }
   }
 
   // ❌ 편의시설 (백엔드에서 실제 필터링이 작동하지 않아 클라이언트 사이드로 변경)
@@ -166,7 +178,7 @@ function buildQueryParamsFromFilters(
   }
 
   // 🔍 키워드 검색 (검색 필드 선택 지원)
-  if (filters.searchQuery && filters.searchQuery.trim()) {
+  if (typeof filters.searchQuery === "string" && filters.searchQuery.trim()) {
     const searchQuery = filters.searchQuery.trim();
     const searchField = filters.searchField || "all";
 
@@ -207,31 +219,34 @@ function buildQueryParamsFromFilters(
   if (minPrice && minPrice > 0) params.minPrice = minPrice;
   if (maxPrice && maxPrice < 500000) params.maxPrice = maxPrice;
 
-  // ✅ 면적 범위 (하위호환용) - deprecated, 새로운 분리된 면적 필터 사용 권장
-  const [minArea, maxArea] = filters.areaRange;
-  if (minArea && minArea > 0) params.minArea = minArea;
-  if (maxArea && maxArea < 200) params.maxArea = maxArea;
-
-  // 🏗️ 건축면적 범위 (평 단위)
+  // 🏗️ 건축면적 범위 (서버: minArea/maxArea 사용)
   const [minBuildingArea, maxBuildingArea] = filters.buildingAreaRange;
-  if (minBuildingArea && minBuildingArea > 0)
-    params.minBuildingArea = minBuildingArea;
-  if (maxBuildingArea && maxBuildingArea < 100)
-    params.maxBuildingArea = maxBuildingArea;
+  if (minBuildingArea && minBuildingArea > 0) params.minArea = minBuildingArea;
+  if (maxBuildingArea && maxBuildingArea > 0) params.maxArea = maxBuildingArea;
 
-  // 🌍 토지면적 범위 (평 단위)
+  // 🌍 토지면적 범위 (서버 미지원) → 클라이언트 처리만 수행
   const [minLandArea, maxLandArea] = filters.landAreaRange;
-  if (minLandArea && minLandArea > 0) params.minLandArea = minLandArea;
-  if (maxLandArea && maxLandArea < 200) params.maxLandArea = maxLandArea;
 
-  // ✅ 건축년도 (백엔드 가이드: minBuildYear/maxBuildYear → minYearBuilt/maxYearBuilt)
+  // ✅ 건축년도 (서버 호환: minYearBuilt / maxYearBuilt, minBuildYear / maxBuildYear 동시 전송)
   const [minYear, maxYear] = filters.buildYear;
-  if (minYear && minYear > 1980) params.minYearBuilt = minYear;
-  if (maxYear && maxYear < 2024) params.maxYearBuilt = maxYear;
+  if (minYear && minYear > 0) {
+    params.minYearBuilt = minYear;
+    params.minBuildYear = minYear;
+  }
+  if (maxYear && maxYear > 0) {
+    params.maxYearBuilt = maxYear;
+    params.maxBuildYear = maxYear;
+  }
 
-  // ✅ 매각기일 (백엔드 가이드 3-1)
-  if (filters.auctionDateFrom) params.auctionDateFrom = filters.auctionDateFrom;
-  if (filters.auctionDateTo) params.auctionDateTo = filters.auctionDateTo;
+  // ✅ 매각기일 (서버 호환: auctionDateFrom/To, saleDateFrom/To 동시 전송)
+  if (filters.auctionDateFrom) {
+    params.auctionDateFrom = filters.auctionDateFrom;
+    params.saleDateFrom = filters.auctionDateFrom;
+  }
+  if (filters.auctionDateTo) {
+    params.auctionDateTo = filters.auctionDateTo;
+    params.saleDateTo = filters.auctionDateTo;
+  }
 
   // 하위호환 (기존 코드)
   if (filters.auctionMonth) params.auction_month = filters.auctionMonth;
@@ -270,13 +285,48 @@ export function useItems(): UseItemsResult {
     "under_100million",
     "construction_year",
     "elevator_available",
+    // 🆕 상태/특수조건 및 불리언 플래그들(서버가 지원하면 응답 포함)
+    "current_status",
+    "tenant_with_opposing_power",
+    "hug_acquisition_condition_change",
+    "senior_lease_right",
+    "resale",
+    "partial_sale",
+    "joint_collateral",
+    "separate_registration",
+    "lien",
+    "illegal_building",
+    "lease_right_sale",
+    "land_right_unregistered",
   ].join(",");
 
-  // 🚨 핵심 수정: 클라이언트 처리 활성화 여부 확인 (필터링 + 정렬)
+  // 🚨 핵심 수정: 클라이언트 처리 활성화 여부 확인 (필터링 + 정렬 + 토지면적)
+  const isLandAreaFilteredInUseItems = Array.isArray(filters.landAreaRange)
+    ? filters.landAreaRange[0] > 0 || filters.landAreaRange[1] < 200
+    : false;
+
+  const isAuctionDateFilteredInUseItems = Boolean(
+    (filters as any).auctionDateFrom || (filters as any).auctionDateTo
+  );
+
   const needsClientProcessing =
     (filters.floorConfirmation && filters.floorConfirmation !== "all") ||
     (filters.hasElevator && filters.hasElevator !== "all") ||
-    (filters.sortBy && filters.sortOrder);
+    (filters.sortBy && filters.sortOrder) ||
+    isLandAreaFilteredInUseItems ||
+    isAuctionDateFilteredInUseItems ||
+    // 🆕 현재상태/특수조건 필터 활성화 시 클라이언트 처리
+    ((filters as any).currentStatus && (filters as any).currentStatus !== "all"
+      ? Array.isArray((filters as any).currentStatus)
+        ? ((filters as any).currentStatus as string[]).length > 0
+        : true
+      : false) ||
+    (Array.isArray((filters as any).specialBooleanFlags)
+      ? ((filters as any).specialBooleanFlags as string[]).length > 0
+      : false) ||
+    (Array.isArray((filters as any).specialConditions)
+      ? ((filters as any).specialConditions as string[]).length > 0
+      : false);
 
   const allParams = {
     ...buildQueryParamsFromFilters(filters),
@@ -290,11 +340,12 @@ export function useItems(): UseItemsResult {
           "/api/v1/items/custom",
           {
             ...allParams,
-            page: 1, // 페이지는 1로 고정하여 전체 데이터 로드
-            limit: 1000, // 전체 데이터 로드
+            page: 1, // 전체 데이터 로드
+            limit: 1000,
+            size: 1000,
           },
         ]
-      : ["/api/v1/items/custom", allParams] // 일반 모드: 서버 페이지네이션
+      : ["/api/v1/items/custom", allParams]
     : null;
 
   // 🔍 디버깅 로그 - 페이지네이션 및 SWR 키 확인
@@ -334,6 +385,26 @@ export function useItems(): UseItemsResult {
 
   // 🔍 실제 데이터 구조 확인 및 클라이언트 사이드 필터링
   let items = (data as any)?.items ?? (data as any) ?? [];
+  // 🔎 클라이언트 보정: contains 검색 (case_number, road_address)
+  if (
+    typeof filters.searchQuery === "string" &&
+    filters.searchQuery.trim() &&
+    items.length > 0
+  ) {
+    const q = filters.searchQuery.trim().toLowerCase();
+    const field = filters.searchField || "all";
+    items = items.filter((it: any) => {
+      const inCase = String(it.case_number || "")
+        .toLowerCase()
+        .includes(q);
+      const inAddr = String(it.road_address || "")
+        .toLowerCase()
+        .includes(q);
+      if (field === "case_number") return inCase;
+      if (field === "road_address") return inAddr;
+      return inCase || inAddr;
+    });
+  }
   let originalTotalCount =
     (data as any)?.total_items ??
     (data as any)?.totalItems ??
@@ -353,15 +424,16 @@ export function useItems(): UseItemsResult {
     );
     console.log("🔍 [Debug] 필터링 전 아이템 수:", items.length);
 
+    const wanted = Array.isArray(filters.floorConfirmation)
+      ? new Set(filters.floorConfirmation)
+      : new Set([filters.floorConfirmation]);
     items = items.filter((item: any) => {
-      const floorValue = item.floor_confirmation;
-      console.log(
-        "🔍 [Debug] 아이템 층확인 값:",
-        floorValue,
-        "vs 필터:",
-        filters.floorConfirmation
-      );
-      return floorValue === filters.floorConfirmation;
+      const v = item.floor_confirmation;
+      // 값 누락/확인불가는 항상 포함
+      if (v === undefined || v === null || String(v).trim() === "") {
+        return true;
+      }
+      return wanted.has(v);
     });
 
     console.log("🔍 [Debug] 필터링 후 아이템 수:", items.length);
@@ -379,24 +451,22 @@ export function useItems(): UseItemsResult {
     );
     console.log("🔍 [Debug] 필터링 전 아이템 수:", items.length);
 
+    const prefs = Array.isArray(filters.hasElevator)
+      ? filters.hasElevator
+      : [filters.hasElevator];
+    const wantYes = prefs.some((p) => p === "있음" || p === "Y");
+    const wantNo = prefs.some((p) => p === "없음" || p === "N");
+
     items = items.filter((item: any) => {
       const elevatorValue = item.elevator_available;
       const hasElevator = elevatorValue === "O" || elevatorValue === "Y";
-
-      console.log(
-        "🔍 [Debug] 아이템 엘리베이터 값:",
-        elevatorValue,
-        "→",
-        hasElevator ? "있음" : "없음",
-        "vs 필터:",
-        filters.hasElevator
-      );
-
-      if (filters.hasElevator === "있음") {
-        return hasElevator;
-      } else if (filters.hasElevator === "없음") {
-        return !hasElevator;
-      }
+      const noElevator = elevatorValue === "X" || elevatorValue === "N";
+      // 확인불가/누락 데이터는 항상 포함 (배제하지 않음)
+      const unknown = !hasElevator && !noElevator;
+      if (unknown) return true;
+      if (wantYes && wantNo) return true; // 둘 다 선택 시 모두 허용
+      if (wantYes) return hasElevator;
+      if (wantNo) return noElevator;
       return true;
     });
 
@@ -416,12 +486,133 @@ export function useItems(): UseItemsResult {
   }
 
   // 🏢 데이터 분석: usage 및 층확인 컬럼의 모든 unique 값들 확인 (동적 필터 옵션 생성용)
-  const usageValues =
-    items.length > 0 ? [...new Set(items.map((item: any) => item.usage))] : [];
-  const floorValues =
+  const usageValues: string[] =
     items.length > 0
-      ? [...new Set(items.map((item: any) => item.floor_confirmation))]
+      ? Array.from(new Set(items.map((item: any) => String(item.usage || ""))))
       : [];
+  const floorValues: string[] =
+    items.length > 0
+      ? Array.from(
+          new Set(
+            items.map((item: any) => String(item.floor_confirmation || ""))
+          )
+        )
+      : [];
+
+  // 🌍 토지면적(land_area_pyeong) 클라이언트 사이드 필터링
+  if (isLandAreaFilteredInUseItems && items.length > 0) {
+    const [minLand, maxLand] = filters.landAreaRange;
+    items = items.filter((item: any) => {
+      const v = parseFloat(item.land_area_pyeong) || 0;
+      const geMin = minLand ? v >= minLand : true;
+      const leMax = maxLand ? v <= maxLand : true;
+      return geMin && leMax;
+    });
+  }
+
+  // 📅 매각기일 클라이언트 사이드 필터링 (sale_date 또는 sale_month 기반)
+  if (isAuctionDateFilteredInUseItems && items.length > 0) {
+    const fromStr: string | undefined = (filters as any).auctionDateFrom;
+    const toStr: string | undefined = (filters as any).auctionDateTo;
+    const fromTs = fromStr ? new Date(fromStr).getTime() : undefined;
+    const toTs = toStr ? new Date(toStr).getTime() : undefined;
+
+    items = items.filter((item: any) => {
+      let dateTs: number | undefined;
+      const saleDate = item.sale_date as string | undefined;
+      const saleMonth = item.sale_month as string | undefined; // YYYY-MM
+
+      if (saleDate) {
+        const ts = new Date(saleDate).getTime();
+        dateTs = isNaN(ts) ? undefined : ts;
+      } else if (saleMonth) {
+        const ts = new Date(`${saleMonth}-01`).getTime();
+        dateTs = isNaN(ts) ? undefined : ts;
+      }
+
+      if (dateTs === undefined) return false; // 날짜 없는 항목 제외
+      const geFrom = fromTs !== undefined ? dateTs >= fromTs : true;
+      const leTo = toTs !== undefined ? dateTs <= toTs : true;
+      return geFrom && leTo;
+    });
+  }
+
+  // 🆕 현재상태 클라이언트 필터링 ("all"은 필터 미적용)
+  if (items.length > 0) {
+    const cs = (filters as any).currentStatus as string | string[] | undefined;
+    if (cs) {
+      const selectedRaw = Array.isArray(cs) ? cs : [cs];
+      const selected = selectedRaw.filter(
+        (s) => String(s).toLowerCase() !== "all"
+      );
+      if (selected.length > 0) {
+        const lowerSelected = selected.map((s) => String(s).toLowerCase());
+        console.log("🔎 [StatusFilter] 선택 상태:", selected);
+        items = items.filter((it: any) => {
+          const v = String(it.current_status || "").toLowerCase();
+          // "유찰" 선택 시 "유찰(2회)" 등 부분일치 허용
+          return lowerSelected.some((sel) =>
+            sel === "유찰" ? v.startsWith("유찰") : v.includes(sel)
+          );
+        });
+        console.log("🔎 [StatusFilter] 적용 후 개수:", items.length);
+      }
+    }
+  }
+
+  // 🆕 특수조건(불리언 플래그) 클라이언트 필터링 - AND 조건
+  //     백엔드 불리언 컬럼이 없을 경우 special_rights 문자열로도 OR 매칭하여 보완
+  if (items.length > 0) {
+    const flags = (filters as any).specialBooleanFlags as string[] | undefined;
+    if (Array.isArray(flags) && flags.length > 0) {
+      const keyToKo: Record<string, string> = {
+        tenant_with_opposing_power: "대항력있는임차인",
+        hug_acquisition_condition_change: "hug인수조건변경",
+        senior_lease_right: "선순위임차권",
+        resale: "재매각",
+        partial_sale: "지분매각",
+        joint_collateral: "공동담보",
+        separate_registration: "별도등기",
+        lien: "유치권",
+        illegal_building: "위반건축물",
+        lease_right_sale: "전세권매각",
+        land_right_unregistered: "대지권미등기",
+      };
+
+      items = items.filter((it: any) => {
+        const text = String(it.special_rights || "").toLowerCase();
+        return flags.every((key) => {
+          const val = (it as any)[key];
+          let booleanMatched = false;
+          if (typeof val === "boolean") {
+            booleanMatched = val === true;
+          } else if (val !== undefined && val !== null) {
+            const s = String(val).toUpperCase();
+            booleanMatched =
+              s === "Y" || s === "O" || s === "TRUE" || s === "1";
+          }
+
+          const token = (keyToKo[key] || "").toLowerCase();
+          const textMatched = token ? text.includes(token) : false;
+
+          // 불리언 true이거나, 문자열에 해당 토큰이 포함되어 있으면 통과
+          return booleanMatched || textMatched;
+        });
+      });
+    }
+  }
+
+  // 🆕 특수조건(문자열 any-match) 클라이언트 필터링
+  if (items.length > 0) {
+    const conds = (filters as any).specialConditions as string[] | undefined;
+    if (Array.isArray(conds) && conds.length > 0) {
+      const tokens = conds.map((c) => String(c).toLowerCase());
+      items = items.filter((it: any) => {
+        const text = String(it.special_rights || "").toLowerCase();
+        return tokens.some((t) => text.includes(t));
+      });
+    }
+  }
 
   if (items.length > 0) {
     console.log("🔍 [Debug] 실제 데이터 구조:", items[0]);
@@ -484,6 +675,7 @@ export function useItems(): UseItemsResult {
     isLoading,
     error,
     totalCount: actualTotalCount,
+    baseTotalCount: originalTotalCount,
     usageValues, // 🏢 동적 건물 유형 필터 옵션 생성용
     floorValues, // 🏢 동적 층확인 필터 옵션 생성용
     refetch: () => {

@@ -61,6 +61,20 @@ export interface Item {
   elevator_available?: string;
   hasElevator?: boolean;
   buildYear?: number; // 호환성을 위한 별칭
+  // 🆕 상태/특수조건 및 불리언 특수조건 플래그들
+  current_status?: string;
+  special_rights?: string;
+  tenant_with_opposing_power?: boolean;
+  hug_acquisition_condition_change?: boolean;
+  senior_lease_right?: boolean;
+  resale?: boolean;
+  partial_sale?: boolean;
+  joint_collateral?: boolean;
+  separate_registration?: boolean;
+  lien?: boolean;
+  illegal_building?: boolean;
+  lease_right_sale?: boolean;
+  land_right_unregistered?: boolean;
 }
 
 // 새로운 API 응답 타입들

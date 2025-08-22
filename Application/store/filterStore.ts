@@ -18,17 +18,21 @@ interface FilterState {
   searchField: string; // 검색 필드 선택 (all, case_number, road_address)
 
   // ✅ 건물/편의시설 필터
-  buildingType: string;
+  buildingType: string | string[];
   priceRange: [number, number];
   areaRange: [number, number]; // 하위호환용 (deprecated)
   buildingAreaRange: [number, number]; // 건축면적 범위 (평)
   landAreaRange: [number, number]; // 토지면적 범위 (평)
   buildYear: [number, number];
   floor: string; // 기존 층수 필터 (하위호환)
-  floorConfirmation: string; // 새로운 층확인 필터 (탑층, 일반층, 1층, 반지하)
-  hasElevator: string; // boolean → string ("있음"/"없음"/"모름"/"all")
+  floorConfirmation: string | string[]; // 멀티선택 지원
+  hasElevator: string | string[]; // 멀티선택 지원 ("Y"/"N" 또는 한글)
   hasParking?: boolean; // ❌ 백엔드 데이터 없음 (optional로 변경)
   auctionStatus: string;
+  // 🆕 현재상태/특수조건(문자열 any-match)/불리언 특수조건
+  currentStatus?: string | string[];
+  specialConditions?: string[];
+  specialBooleanFlags?: string[]; // 예: ["separate_registration","lien"]
 
   // ✅ 경매 일정 (백엔드 가이드 3-1)
   auctionDateFrom?: string; // YYYY-MM-DD (optional)
@@ -81,17 +85,20 @@ const initialState: FilterState = {
   searchField: "all", // 기본값: 전체 검색
 
   // 기존 필터들
-  buildingType: "all", // 기본값을 "all"로 설정
+  buildingType: "all", // 단일 또는 배열
   priceRange: [0, 500000],
   areaRange: [0, 200], // 하위호환용 (deprecated)
   buildingAreaRange: [0, 100], // 건축면적 범위 (평) - 일반적인 빌라 크기
   landAreaRange: [0, 200], // 토지면적 범위 (평) - 일반적인 토지 크기
   buildYear: [1980, 2024],
   floor: "all", // 기존 층수 필터 (하위호환)
-  floorConfirmation: "all", // 새로운 층확인 필터 기본값
-  hasElevator: "all", // boolean → string ("all" 기본값)
+  floorConfirmation: "all",
+  hasElevator: "all",
   hasParking: undefined, // optional
   auctionStatus: "all", // 기본값을 "all"로 설정
+  currentStatus: "all",
+  specialConditions: [],
+  specialBooleanFlags: [],
 
   // ✅ 경매 일정 (optional)
   auctionDateFrom: undefined,

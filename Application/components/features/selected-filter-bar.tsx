@@ -5,17 +5,33 @@ import { Badge } from "@/components/ui/badge";
 import { useFilterStore } from "@/store/filterStore";
 import { X } from "lucide-react";
 
-type SelectedFilterBarProps = Record<string, never>;
+type SelectedFilterBarProps = {
+  detailsCollapsed: boolean;
+  onToggleDetailsCollapse: () => void;
+};
 
-export default function SelectedFilterBar({}: SelectedFilterBarProps) {
+export default function SelectedFilterBar({
+  detailsCollapsed,
+  onToggleDetailsCollapse,
+}: SelectedFilterBarProps) {
   // 스토어에서 직접 상태와 액션을 가져옵니다.
   const filters = useFilterStore((state) => state);
   const setFilter = useFilterStore((state) => state.setFilter);
   const setRangeFilter = useFilterStore((state) => state.setRangeFilter);
   const resetFilters = useFilterStore((state) => state.resetFilters);
+  const setSortConfig = useFilterStore((state) => state.setSortConfig);
 
   // 'x' 버튼 클릭 시 호출되는 함수를 수정합니다.
   const handleRemove = (key: string) => {
+    if (
+      key === "search_case" ||
+      key === "search_road" ||
+      key === "search_all"
+    ) {
+      setFilter("searchQuery" as any, "");
+      setFilter("searchField" as any, "all");
+      return;
+    }
     if (key === "hasElevator") {
       setFilter(key as any, "all"); // ✅ string 방식으로 수정
     } else if (key === "floorConfirmation") {
@@ -46,6 +62,29 @@ export default function SelectedFilterBar({}: SelectedFilterBarProps) {
 
   const getSelectedFilters = () => {
     const selected = [];
+    // 🔎 키워드 검색(주소/사건번호)
+    if (filters.searchQuery && filters.searchQuery.trim()) {
+      const q = filters.searchQuery.trim();
+      if (filters.searchField === "road_address") {
+        selected.push({
+          key: "search_road",
+          label: `주소: "${q}"`,
+          value: q,
+        });
+      } else if (filters.searchField === "case_number") {
+        selected.push({
+          key: "search_case",
+          label: `사건번호: "${q}"`,
+          value: q,
+        });
+      } else {
+        selected.push({
+          key: "search_all",
+          label: `검색: "${q}"`,
+          value: q,
+        });
+      }
+    }
 
     if (filters.region) {
       selected.push({
@@ -115,6 +154,48 @@ export default function SelectedFilterBar({}: SelectedFilterBarProps) {
       });
     }
 
+    // 🆕 현재상태
+    if (
+      (filters as any).currentStatus &&
+      (filters as any).currentStatus !== "all"
+    ) {
+      const cs = (filters as any).currentStatus as string | string[];
+      const label = Array.isArray(cs) ? cs.join(", ") : cs;
+      selected.push({
+        key: "currentStatus",
+        label: `현재상태: ${label}`,
+        value: cs,
+      });
+    }
+
+    // 🆕 특수조건(불리언)
+    if (
+      Array.isArray((filters as any).specialBooleanFlags) &&
+      (filters as any).specialBooleanFlags.length > 0
+    ) {
+      selected.push({
+        key: "specialBooleanFlags",
+        label: `특수조건(불리언): ${(
+          (filters as any).specialBooleanFlags as string[]
+        ).join(", ")}`,
+        value: (filters as any).specialBooleanFlags,
+      });
+    }
+
+    // 🆕 특수조건(문자열 any-match)
+    if (
+      Array.isArray((filters as any).specialConditions) &&
+      (filters as any).specialConditions.length > 0
+    ) {
+      selected.push({
+        key: "specialConditions",
+        label: `특수조건: ${(
+          (filters as any).specialConditions as string[]
+        ).join(", ")}`,
+        value: (filters as any).specialConditions,
+      });
+    }
+
     if (filters.hasParking) {
       selected.push({
         key: "hasParking",
@@ -171,15 +252,52 @@ export default function SelectedFilterBar({}: SelectedFilterBarProps) {
         </Badge>
       ))}
 
-      {/* '전체 해제' 버튼 클릭 시 resetFilters 액션을 호출합니다. */}
+      {/* '전체 해제'는 지역은 유지하고 상세 조건만 초기화 */}
       <Button
         variant="ghost"
         size="sm"
-        onClick={resetFilters}
+        onClick={() => {
+          // 범위 초기화
+          setRangeFilter("priceRange", [0, 500000]);
+          setRangeFilter("areaRange", [0, 200]); // deprecated 유지 초기화
+          setRangeFilter("buildingAreaRange", [0, 100]);
+          setRangeFilter("landAreaRange", [0, 200]);
+          setRangeFilter("buildYear", [1980, 2024]);
+
+          // 단일값 초기화 (지역 관련 필드는 보존)
+          setFilter("buildingType", "all" as any);
+          setFilter("floor", "all" as any);
+          setFilter("floorConfirmation", "all" as any);
+          setFilter("hasElevator", "all" as any);
+          setFilter("hasParking", undefined as any);
+          setFilter("auctionStatus", "all" as any);
+          setFilter("under100", false as any);
+          setFilter("auctionDateFrom", undefined as any);
+          setFilter("auctionDateTo", undefined as any);
+          setFilter("currentStatus" as any, undefined);
+          setFilter("specialBooleanFlags" as any, []);
+          setFilter("specialConditions" as any, []);
+          setSortConfig(undefined, undefined);
+        }}
         className="text-xs text-gray-500 hover:text-gray-700 ml-2"
       >
         전체 해제
       </Button>
+
+      {/* 우측 정렬: 필터 패널 접기/펼치기 */}
+      <div className="ml-auto">
+        <Button
+          onClick={onToggleDetailsCollapse}
+          size="sm"
+          className={
+            detailsCollapsed
+              ? "h-8 px-3 text-xs bg-blue-600 hover:bg-blue-700 text-white"
+              : "h-8 px-3 text-xs bg-amber-600 hover:bg-amber-700 text-white"
+          }
+        >
+          {detailsCollapsed ? "✨ 필터 펼치기" : "📁 필터 접어두기"}
+        </Button>
+      </div>
     </div>
   );
 }

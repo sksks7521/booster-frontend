@@ -138,20 +138,28 @@ export default function FilterControl({
   const [caseNumberSearch, setCaseNumberSearch] = useState<string>("");
 
   // 검색 핸들러
+  const setPageStore = useFilterStore((s) => s.setPage);
+
   const handleAddressSearch = () => {
-    console.log("주소 검색:", addressSearch);
-    // 실제 주소 검색 로직 구현
-    if (addressSearch.trim()) {
-      handleSearch(); // 기존 검색 함수 호출
-    }
+    const q = addressSearch.trim();
+    setFilter("searchField", q ? ("road_address" as any) : ("all" as any));
+    setFilter("searchQuery", q);
+    setPageStore(1);
   };
 
   const handleCaseNumberSearch = () => {
-    console.log("사건번호 검색:", caseNumberSearch);
-    // 실제 사건번호 검색 로직 구현
-    if (caseNumberSearch.trim()) {
-      handleSearch(); // 기존 검색 함수 호출
-    }
+    const q = caseNumberSearch.trim();
+    setFilter("searchField", q ? ("case_number" as any) : ("all" as any));
+    setFilter("searchQuery", q);
+    setPageStore(1);
+  };
+
+  const handleClearSearch = () => {
+    setAddressSearch("");
+    setCaseNumberSearch("");
+    setFilter("searchField", "all" as any);
+    setFilter("searchQuery", "");
+    setPageStore(1);
   };
 
   // 필터 프리셋 상태
@@ -173,6 +181,7 @@ export default function FilterControl({
 
   // ✅ FilterStore 연동
   const setFilter = useFilterStore((state) => state.setFilter);
+  const setSortConfig = useFilterStore((state) => state.setSortConfig);
 
   // 현재 날짜 기반 기본값 설정
   const today = new Date();
@@ -181,10 +190,12 @@ export default function FilterControl({
 
   const formatDate = (date: Date) => date.toISOString().split("T")[0];
 
-  // 지역 필수 선택 여부 및 진행률 (FilterStore 기반으로 체크)
-  const isLocationSelected =
+  // 지역 선택 여부: 데이터 로딩 제어용
+  const isLocationSelectedForData =
     (filters.province && filters.cityDistrict) ||
     (selectedProvince && selectedCity);
+  // UI 표시용: 상세 필터를 항상 활성화하기 위해 true로 설정
+  const isLocationSelected = true;
   const getProgress = () => {
     let progress = 0;
     if (selectedProvince) progress += 40;
@@ -217,6 +228,30 @@ export default function FilterControl({
     if ((filters as any).auctionDateFrom || (filters as any).auctionDateTo)
       count++;
     return count;
+  };
+
+  // 상세 조건만 초기화 (지역은 유지)
+  const resetDetailFilters = () => {
+    setRangeFilter("priceRange", [0, 500000]);
+    setRangeFilter("areaRange", [0, 200]); // deprecated 유지 초기화
+    setRangeFilter("buildingAreaRange", [0, 100]);
+    setRangeFilter("landAreaRange", [0, 200]);
+    setRangeFilter("buildYear", [1980, 2024]);
+
+    setFilter("buildingType", "all" as any);
+    setFilter("floor", "all" as any);
+    setFilter("floorConfirmation", "all" as any);
+    setFilter("hasElevator", "all" as any);
+    setFilter("hasParking", undefined as any);
+    setFilter("auctionStatus", "all" as any);
+    setFilter("under100", false as any);
+    setFilter("auctionDateFrom", undefined as any);
+    setFilter("auctionDateTo", undefined as any);
+    // 🆕 상태/특수조건 초기화
+    setFilter("currentStatus" as any, "all");
+    setFilter("specialConditions" as any, []);
+    setFilter("specialBooleanFlags" as any, []);
+    setSortConfig(undefined, undefined);
   };
 
   // 필터 미리보기 업데이트
@@ -411,6 +446,7 @@ export default function FilterControl({
 
   return (
     <Card className="w-full shadow-lg border-2">
+      {/* 
       <CardHeader className="pb-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
@@ -492,7 +528,6 @@ export default function FilterControl({
           </div>
         </div>
 
-        {/* 진행률 표시 */}
         {!isCollapsed && !showDetailsOnly && (
           <div className="mt-6">
             <div className="flex justify-between text-sm text-gray-600 mb-2">
@@ -508,6 +543,7 @@ export default function FilterControl({
           </div>
         )}
       </CardHeader>
+      */}
 
       {!isCollapsed && (
         <CardContent className="space-y-8">
@@ -542,31 +578,25 @@ export default function FilterControl({
 
           {/* 1. 지역 선택 (필수) */}
           {!showDetailsOnly && (
-            <div
-              className={`p-8 border-3 rounded-xl transition-all duration-300 ${
-                !isLocationSelected
-                  ? "border-blue-400 bg-blue-50 shadow-lg"
-                  : "border-green-400 bg-green-50"
-              }`}
-            >
+            <div className="p-8 rounded-xl transition-all duration-300">
               <div className="flex items-center space-x-4 mb-6">
                 <div
                   className={`w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-xl ${
                     !isLocationSelected ? "bg-blue-500" : "bg-green-500"
                   }`}
                 >
-                  {!isLocationSelected ? "1" : "✓"}
+                  {!isLocationSelectedForData ? "1" : "✓"}
                 </div>
                 <div>
                   <h3 className="text-lg font-bold">
-                    {!isLocationSelected
+                    {!isLocationSelectedForData
                       ? "🏘️ 지역을 선택해주세요"
                       : "✅ 선택된 지역"}
                   </h3>
                   <p className="text-sm text-gray-700 mt-1">
-                    {!isLocationSelected
+                    {!isLocationSelectedForData
                       ? "원하는 지역을 선택하면 상세 필터를 사용할 수 있어요"
-                      : `${selectedProvince} ${selectedCity}${
+                      : `${selectedCity}${
                           selectedDistrict ? ` ${selectedDistrict}` : ""
                         }`}
                   </p>
@@ -577,7 +607,13 @@ export default function FilterControl({
                 {/* ✅ 지역 선택 (한 줄로 배치된 드롭다운) */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   {/* 시도명 */}
-                  <div>
+                  <div
+                    className={`rounded-lg p-3 transition-colors ${
+                      selectedProvince
+                        ? "bg-white border border-gray-200"
+                        : "bg-blue-50 border border-blue-300"
+                    }`}
+                  >
                     <Label className="text-lg font-bold mb-3 block text-gray-800">
                       시도명
                       <Badge variant="outline" className="ml-2 text-sm">
@@ -596,7 +632,11 @@ export default function FilterControl({
                         setFilter("town", "");
                       }}
                     >
-                      <SelectTrigger className="w-full h-12 text-base">
+                      <SelectTrigger
+                        className={`w-full h-12 text-base ${
+                          selectedProvince ? "" : "border-blue-400"
+                        }`}
+                      >
                         <SelectValue placeholder="시도 선택" />
                       </SelectTrigger>
                       <SelectContent>
@@ -614,7 +654,13 @@ export default function FilterControl({
                   </div>
 
                   {/* 시군구 */}
-                  <div>
+                  <div
+                    className={`rounded-lg p-3 transition-colors ${
+                      selectedCity
+                        ? "bg-white border border-gray-200"
+                        : "bg-blue-50 border border-blue-300"
+                    }`}
+                  >
                     <Label className="text-lg font-bold mb-3 block text-gray-800">
                       시군구
                       <Badge variant="outline" className="ml-2 text-sm">
@@ -632,7 +678,11 @@ export default function FilterControl({
                       }}
                       disabled={!selectedProvince}
                     >
-                      <SelectTrigger className="w-full h-12 text-base">
+                      <SelectTrigger
+                        className={`w-full h-12 text-base ${
+                          selectedCity ? "" : "border-blue-400"
+                        }`}
+                      >
                         <SelectValue placeholder="시군구 선택" />
                       </SelectTrigger>
                       <SelectContent>
@@ -724,89 +774,88 @@ export default function FilterControl({
             </div>
           )}
 
-          {/* 경고 또는 성공 메시지 */}
-          {!locationsError && !locationsLoading && !isLocationSelected ? (
-            <div className="p-6 bg-yellow-50 border-2 border-yellow-300 rounded-xl">
-              <div className="flex items-center space-x-3">
-                <div className="w-8 h-8 bg-yellow-400 rounded-full flex items-center justify-center">
-                  <AlertTriangle className="w-5 h-5 text-white" />
-                </div>
-                <div>
-                  <p className="text-lg font-semibold text-yellow-800">
-                    ⚠️ 지역을 먼저 선택해주세요
-                  </p>
-                  <p className="text-base text-yellow-700">
-                    지역을 선택하면 아래의 상세 필터들을 사용할 수 있어요
-                  </p>
-                </div>
-              </div>
-            </div>
-          ) : (
-            isLocationSelected &&
-            !showDetailsOnly && (
-              <div className="p-6 bg-green-50 border-2 border-green-300 rounded-xl">
-                <div className="flex items-center space-x-3">
-                  <CheckCircle className="w-8 h-8 text-green-600" />
-                  <div>
-                    <p className="text-base font-semibold text-green-800">
-                      ✅ 훌륭해요! 이제 상세 조건을 설정해보세요
-                    </p>
-                    <p className="text-sm text-green-700">
-                      아래 필터들로 더 정확한 매물을 찾을 수 있어요
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )
-          )}
+          {/* 경고 또는 성공 메시지 제거: 상세 필터를 처음부터 노출 */}
 
-          {/* 🔧 상세 조건 섹션 */}
-          {!showLocationOnly && isLocationSelected && (
+          {/* 🔧 상세 조건 섹션: 항상 표시 (데이터 로딩은 별도 제어) */}
+          {!showLocationOnly && (
             <div className="space-y-4 animate-fadeIn">
-              <div className="flex items-center space-x-2 mb-4">
-                <div className="w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center text-white font-medium text-xs">
-                  2
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center space-x-2">
+                  <div className="w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center text-white font-medium text-xs">
+                    2
+                  </div>
+                  <h3 className="text-base font-medium text-gray-900">
+                    상세 조건 설정
+                  </h3>
                 </div>
-                <h3 className="text-base font-medium text-gray-900">
-                  상세 조건 설정
-                </h3>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={resetDetailFilters}
+                    className="h-8 px-2 text-xs"
+                  >
+                    설정 초기화
+                  </Button>
+                </div>
               </div>
 
               {/* 1. 건물 유형 */}
               <div>
                 <div className="flex items-center space-x-2 mb-3">
                   <Label className="text-sm font-medium">건물 유형</Label>
-                  {usageValues.length > 0 && (
-                    <Badge variant="outline" className="text-xs px-1 py-0">
-                      {usageValues.length}개
-                    </Badge>
-                  )}
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {[
                     { value: "all", label: "전체" },
-                    ...usageValues.map((usage) => ({
-                      value: usage,
-                      label: usage || "미분류",
-                    })),
-                  ].map((option) => (
-                    <button
-                      key={option.value}
-                      onClick={() => setFilter("buildingType", option.value)}
-                      disabled={!isLocationSelected}
-                      className={`px-2 py-1 text-xs rounded-md border transition-colors ${
-                        (filters.buildingType || "all") === option.value
-                          ? "bg-blue-500 text-white border-blue-500"
-                          : "bg-white text-gray-700 border-gray-300 hover:border-blue-300 hover:bg-blue-50"
-                      } ${
-                        !isLocationSelected
-                          ? "opacity-50 cursor-not-allowed"
-                          : ""
-                      }`}
-                    >
-                      {option.label}
-                    </button>
-                  ))}
+                    { value: "다세대(빌라)", label: "다세대(빌라)" },
+                  ].map((option) => {
+                    const current = filters.buildingType;
+                    const isAll = option.value === "all";
+                    const isActive = Array.isArray(current)
+                      ? current.includes(option.value)
+                      : current === option.value;
+                    return (
+                      <button
+                        key={option.value}
+                        onClick={() => {
+                          if (isAll) {
+                            setFilter("buildingType", "all" as any);
+                            return;
+                          }
+                          const prev = filters.buildingType;
+                          if (Array.isArray(prev)) {
+                            const next = isActive
+                              ? prev.filter((v) => v !== option.value)
+                              : [...prev, option.value];
+                            setFilter(
+                              "buildingType",
+                              next.length === 0 ? "all" : (next as any)
+                            );
+                          } else {
+                            setFilter(
+                              "buildingType",
+                              prev === "all"
+                                ? ([option.value] as any)
+                                : [prev, option.value]
+                            );
+                          }
+                        }}
+                        disabled={!isLocationSelected}
+                        className={`px-2 py-1 text-xs rounded-md border transition-colors ${
+                          isActive
+                            ? "bg-blue-500 text-white border-blue-500"
+                            : "bg-white text-gray-700 border-gray-300 hover:border-blue-300 hover:bg-blue-50"
+                        } ${
+                          !isLocationSelected
+                            ? "opacity-50 cursor-not-allowed"
+                            : ""
+                        }`}
+                      >
+                        {option.label}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
@@ -961,11 +1010,11 @@ export default function FilterControl({
                   <div className="space-y-6">
                     <div className="px-4 py-3 bg-gray-50 rounded-lg">
                       <Slider
-                        value={filters.areaRange}
+                        value={filters.buildingAreaRange}
                         onValueChange={(value: number[]) =>
-                          setRangeFilter("areaRange", [
+                          setRangeFilter("buildingAreaRange", [
                             value[0] || 0,
-                            value[1] || 200,
+                            value[1] || 100,
                           ])
                         }
                         min={0}
@@ -977,11 +1026,11 @@ export default function FilterControl({
                     </div>
                     <div className="flex items-center justify-between text-sm font-medium text-gray-700">
                       <span className="px-2 py-1 rounded-md text-xs border">
-                        {filters.areaRange[0]}평
+                        {filters.buildingAreaRange[0]}평
                       </span>
                       <span className="text-gray-400">~</span>
                       <span className="px-2 py-1 rounded-md text-xs border">
-                        {filters.areaRange[1]}평
+                        {filters.buildingAreaRange[1]}평
                       </span>
                     </div>
                   </div>
@@ -993,12 +1042,12 @@ export default function FilterControl({
                       </Label>
                       <Input
                         type="number"
-                        value={filters.areaRange[0]}
+                        value={filters.buildingAreaRange[0]}
                         onChange={(e) => {
                           const value = Number.parseInt(e.target.value) || 0;
-                          setRangeFilter("areaRange", [
+                          setRangeFilter("buildingAreaRange", [
                             value,
-                            filters.areaRange[1],
+                            filters.buildingAreaRange[1],
                           ]);
                         }}
                         disabled={!isLocationSelected}
@@ -1012,17 +1061,17 @@ export default function FilterControl({
                       </Label>
                       <Input
                         type="number"
-                        value={filters.areaRange[1]}
+                        value={filters.buildingAreaRange[1]}
                         onChange={(e) => {
-                          const value = Number.parseInt(e.target.value) || 200;
-                          setRangeFilter("areaRange", [
-                            filters.areaRange[0],
+                          const value = Number.parseInt(e.target.value) || 100;
+                          setRangeFilter("buildingAreaRange", [
+                            filters.buildingAreaRange[0],
                             value,
                           ]);
                         }}
                         disabled={!isLocationSelected}
                         className="h-9 text-sm"
-                        placeholder="200"
+                        placeholder="100"
                       />
                     </div>
                   </div>
@@ -1207,39 +1256,61 @@ export default function FilterControl({
               <div>
                 <div className="flex items-center space-x-2 mb-3">
                   <Label className="text-sm font-medium">층확인</Label>
-                  {floorValues.length > 0 && (
-                    <Badge variant="outline" className="text-xs px-1 py-0">
-                      {floorValues.length}개
-                    </Badge>
-                  )}
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {[
                     { value: "all", label: "전체" },
-                    ...floorValues.map((floor) => ({
-                      value: floor,
-                      label: floor || "미분류",
-                    })),
-                  ].map((option) => (
-                    <button
-                      key={option.value}
-                      onClick={() =>
-                        setFilter("floorConfirmation", option.value)
-                      }
-                      disabled={!isLocationSelected}
-                      className={`px-2 py-1 text-xs rounded-md border transition-colors ${
-                        (filters.floorConfirmation || "all") === option.value
-                          ? "bg-blue-500 text-white border-blue-500"
-                          : "bg-white text-gray-700 border-gray-300 hover:border-blue-300 hover:bg-blue-50"
-                      } ${
-                        !isLocationSelected
-                          ? "opacity-50 cursor-not-allowed"
-                          : ""
-                      }`}
-                    >
-                      {option.label}
-                    </button>
-                  ))}
+                    { value: "반지하", label: "반지하" },
+                    { value: "1층", label: "1층" },
+                    { value: "일반층", label: "일반층" },
+                    { value: "탑층", label: "탑층" },
+                  ].map((option) => {
+                    const current = filters.floorConfirmation;
+                    const isAll = option.value === "all";
+                    const isActive = Array.isArray(current)
+                      ? current.includes(option.value)
+                      : current === option.value;
+                    return (
+                      <button
+                        key={option.value}
+                        onClick={() => {
+                          if (isAll) {
+                            setFilter("floorConfirmation", "all" as any);
+                            return;
+                          }
+                          const prev = filters.floorConfirmation;
+                          if (Array.isArray(prev)) {
+                            const next = isActive
+                              ? prev.filter((v) => v !== option.value)
+                              : [...prev, option.value];
+                            setFilter(
+                              "floorConfirmation",
+                              next.length === 0 ? "all" : (next as any)
+                            );
+                          } else {
+                            setFilter(
+                              "floorConfirmation",
+                              prev === "all"
+                                ? ([option.value] as any)
+                                : [prev, option.value]
+                            );
+                          }
+                        }}
+                        disabled={!isLocationSelected}
+                        className={`px-2 py-1 text-xs rounded-md border transition-colors ${
+                          isActive
+                            ? "bg-blue-500 text-white border-blue-500"
+                            : "bg-white text-gray-700 border-gray-300 hover:border-blue-300 hover:bg-blue-50"
+                        } ${
+                          !isLocationSelected
+                            ? "opacity-50 cursor-not-allowed"
+                            : ""
+                        }`}
+                      >
+                        {option.label}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
@@ -1253,24 +1324,187 @@ export default function FilterControl({
                     { value: "all", label: "전체" },
                     { value: "Y", label: "있음" },
                     { value: "N", label: "없음" },
-                  ].map((option) => (
-                    <button
-                      key={option.value}
-                      onClick={() => setFilter("hasElevator", option.value)}
-                      disabled={!isLocationSelected}
-                      className={`px-2 py-1 text-xs rounded-md border transition-colors ${
-                        (filters.hasElevator || "all") === option.value
-                          ? "bg-blue-500 text-white border-blue-500"
-                          : "bg-white text-gray-700 border-gray-300 hover:border-blue-300 hover:bg-blue-50"
-                      } ${
-                        !isLocationSelected
-                          ? "opacity-50 cursor-not-allowed"
-                          : ""
-                      }`}
-                    >
-                      {option.label}
-                    </button>
-                  ))}
+                  ].map((option) => {
+                    const current = filters.hasElevator;
+                    const isAll = option.value === "all";
+                    const isActive = Array.isArray(current)
+                      ? current.includes(option.value)
+                      : current === option.value;
+                    return (
+                      <button
+                        key={option.value}
+                        onClick={() => {
+                          if (isAll) {
+                            setFilter("hasElevator", "all" as any);
+                            return;
+                          }
+                          const prev = filters.hasElevator;
+                          if (Array.isArray(prev)) {
+                            const next = isActive
+                              ? prev.filter((v) => v !== option.value)
+                              : [...prev, option.value];
+                            setFilter(
+                              "hasElevator",
+                              next.length === 0 ? "all" : (next as any)
+                            );
+                          } else {
+                            setFilter(
+                              "hasElevator",
+                              prev === "all"
+                                ? ([option.value] as any)
+                                : [prev, option.value]
+                            );
+                          }
+                        }}
+                        disabled={!isLocationSelected}
+                        className={`px-2 py-1 text-xs rounded-md border transition-colors ${
+                          isActive
+                            ? "bg-blue-500 text-white border-blue-500"
+                            : "bg-white text-gray-700 border-gray-300 hover:border-blue-300 hover:bg-blue-50"
+                        } ${
+                          !isLocationSelected
+                            ? "opacity-50 cursor-not-allowed"
+                            : ""
+                        }`}
+                      >
+                        {option.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* 현재상태 */}
+              <div>
+                <div className="flex items-center space-x-2 mb-3">
+                  <Label className="text-sm font-medium">현재상태</Label>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    { value: "all", label: "전체" },
+                    { value: "신건", label: "신건" },
+                    { value: "유찰", label: "유찰" },
+                    { value: "재진행", label: "재진행" },
+                    { value: "변경", label: "변경" },
+                    { value: "재매각", label: "재매각" },
+                    { value: "취하", label: "취하" },
+                    { value: "낙찰", label: "낙찰" },
+                  ].map((option) => {
+                    const current = (filters as any).currentStatus as
+                      | string
+                      | string[]
+                      | undefined;
+                    const isAll = option.value === "all";
+                    const isActive = Array.isArray(current)
+                      ? current.includes(option.value)
+                      : current === option.value;
+                    return (
+                      <button
+                        key={option.value}
+                        onClick={() => {
+                          if (isAll) {
+                            setFilter("currentStatus" as any, "all");
+                            return;
+                          }
+                          const prev = (filters as any).currentStatus;
+                          if (Array.isArray(prev)) {
+                            const next = isActive
+                              ? prev.filter((v) => v !== option.value)
+                              : [...prev, option.value];
+                            setFilter(
+                              "currentStatus" as any,
+                              next.length === 0 ? ("all" as any) : (next as any)
+                            );
+                          } else if (!prev || prev === "all") {
+                            setFilter(
+                              "currentStatus" as any,
+                              [option.value] as any
+                            );
+                          } else {
+                            setFilter(
+                              "currentStatus" as any,
+                              [prev, option.value] as any
+                            );
+                          }
+                        }}
+                        disabled={!isLocationSelected}
+                        className={`px-2 py-1 text-xs rounded-md border transition-colors ${
+                          isActive
+                            ? "bg-blue-500 text-white border-blue-500"
+                            : "bg-white text-gray-700 border-gray-300 hover:border-blue-300 hover:bg-blue-50"
+                        } ${
+                          !isLocationSelected
+                            ? "opacity-50 cursor-not-allowed"
+                            : ""
+                        }`}
+                      >
+                        {option.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* 특수조건 (불리언) */}
+              <div>
+                <div className="flex items-center space-x-2 mb-3">
+                  <Label className="text-sm font-medium">특수조건</Label>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    {
+                      ko: "대항력있는임차인",
+                      key: "tenant_with_opposing_power",
+                    },
+                    {
+                      ko: "HUG인수조건변경",
+                      key: "hug_acquisition_condition_change",
+                    },
+                    { ko: "선순위임차권", key: "senior_lease_right" },
+                    { ko: "재매각", key: "resale" },
+                    { ko: "지분매각", key: "partial_sale" },
+                    { ko: "공동담보", key: "joint_collateral" },
+                    { ko: "별도등기", key: "separate_registration" },
+                    { ko: "유치권", key: "lien" },
+                    { ko: "위반건축물", key: "illegal_building" },
+                    { ko: "전세권매각", key: "lease_right_sale" },
+                    { ko: "대지권미등기", key: "land_right_unregistered" },
+                  ].map((opt) => {
+                    const current = (filters as any).specialBooleanFlags as
+                      | string[]
+                      | undefined;
+                    const isActive = Array.isArray(current)
+                      ? current.includes(opt.key)
+                      : false;
+                    return (
+                      <button
+                        key={opt.key}
+                        onClick={() => {
+                          const prev = (filters as any).specialBooleanFlags as
+                            | string[]
+                            | undefined;
+                          const next = Array.isArray(prev)
+                            ? isActive
+                              ? prev.filter((v) => v !== opt.key)
+                              : [...prev, opt.key]
+                            : [opt.key];
+                          setFilter("specialBooleanFlags" as any, next as any);
+                        }}
+                        disabled={!isLocationSelected}
+                        className={`px-2 py-1 text-xs rounded-md border transition-colors ${
+                          isActive
+                            ? "bg-blue-500 text-white border-blue-500"
+                            : "bg-white text-gray-700 border-gray-300 hover:border-blue-300 hover:bg-blue-50"
+                        } ${
+                          !isLocationSelected
+                            ? "opacity-50 cursor-not-allowed"
+                            : ""
+                        }`}
+                      >
+                        {opt.ko}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
@@ -1300,15 +1534,23 @@ export default function FilterControl({
                           disabled={!isLocationSelected}
                         />
                       </div>
-                      <div className="flex justify-end">
+                      <div className="flex justify-start gap-2">
                         <Button
                           onClick={handleAddressSearch}
                           size="sm"
+                          variant="outline"
                           disabled={!isLocationSelected}
-                          className="h-9 px-4 text-sm font-medium bg-blue-600 hover:bg-blue-700"
+                          className="h-8 px-3 text-xs"
                         >
-                          <Search className="w-4 h-4 mr-2" />
                           검색
+                        </Button>
+                        <Button
+                          onClick={handleClearSearch}
+                          variant="outline"
+                          size="sm"
+                          className="h-8 px-3 text-xs"
+                        >
+                          검색 해제
                         </Button>
                       </div>
                     </div>
@@ -1339,15 +1581,23 @@ export default function FilterControl({
                           disabled={!isLocationSelected}
                         />
                       </div>
-                      <div className="flex justify-end">
+                      <div className="flex justify-start gap-2">
                         <Button
                           onClick={handleCaseNumberSearch}
                           size="sm"
+                          variant="outline"
                           disabled={!isLocationSelected}
-                          className="h-9 px-4 text-sm font-medium bg-green-600 hover:bg-green-700"
+                          className="h-8 px-3 text-xs"
                         >
-                          <Search className="w-4 h-4 mr-2" />
                           검색
+                        </Button>
+                        <Button
+                          onClick={handleClearSearch}
+                          variant="outline"
+                          size="sm"
+                          className="h-8 px-3 text-xs"
+                        >
+                          검색 해제
                         </Button>
                       </div>
                     </div>
