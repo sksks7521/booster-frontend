@@ -132,6 +132,10 @@ NEXT_PUBLIC_KAKAO_APP_KEY=your_kakao_js_app_key
 
 자세한 개발 로드맵은 [`PROJECT_FRONTEND_ROADMAP.md`](./PROJECT_FRONTEND_ROADMAP.md)를 참고해주세요.
 
+### 📚 런북/구축 가이드
+
+- 분석/목록 페이지 확장을 위한 표준 런북: [`Doc/LearnBook/Analysispage.md`](./Doc/LearnBook/Analysispage.md)
+
 ## 🏗 아키텍처 원칙
 
 ### State Management Strategy

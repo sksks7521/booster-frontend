@@ -8,7 +8,10 @@ import Header from "@/components/layout/header";
 import Footer from "@/components/layout/footer";
 import FilterControl from "@/components/features/filter-control";
 import SelectedFilterBar from "@/components/features/selected-filter-bar";
-import ItemTable from "@/components/features/item-table";
+import dynamic from "next/dynamic";
+const ItemTable = dynamic(() => import("@/components/features/item-table"), {
+  ssr: false,
+});
 import MapView from "@/components/features/map-view";
 import { useFilterStore } from "@/store/filterStore";
 import { useItems } from "@/hooks/useItems";
