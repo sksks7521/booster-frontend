@@ -85,6 +85,12 @@ function getSortValue(item: any, sortBy: string): any {
     return parseFloat(value) || 0;
   }
 
+  // 날짜형 컬럼들 (sale_date)
+  if (["sale_date"].includes(sortBy)) {
+    const dateValue = new Date(value || 0);
+    return dateValue.getTime();
+  }
+
   // 문자형 컬럼들
   return String(value || "").toLowerCase();
 }
@@ -249,6 +255,7 @@ export function useItems(): UseItemsResult {
     "id",
     "usage",
     "case_number",
+    "case_year",
     "road_address",
     "building_area_pyeong",
     "land_area_pyeong",
@@ -256,6 +263,7 @@ export function useItems(): UseItemsResult {
     "minimum_bid_price",
     "bid_to_appraised_ratio",
     "public_price",
+    "sale_date",
     "sale_month",
     "special_rights",
     "floor_confirmation",

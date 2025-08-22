@@ -118,268 +118,284 @@ export default function AnalysisPage() {
           </div>
         </div>
 
-        <div className="space-y-6">
-          {/* 필터 컨트롤 (전체 너비) */}
+        {/* 🎯 1단계: 상단 지역 선택 (전체 너비) */}
+        <div className="space-y-6 mb-8">
           <FilterControl
             isCollapsed={isFilterCollapsed}
             onToggleCollapse={() => setIsFilterCollapsed(!isFilterCollapsed)}
             searchQuery={searchQuery}
             setSearchQuery={setSearchQuery}
             handleSearch={handleSearch}
+            showLocationOnly={true}
           />
-
-          {/* 선택된 필터 표시 */}
           <SelectedFilterBar />
+        </div>
 
-          {/* 뷰 전환 및 결과 요약 */}
-          <Card>
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-lg">
-                  검색 결과{" "}
-                  {isLoading
-                    ? "로딩 중..."
-                    : (totalCount ?? items?.length ?? 0) + "건"}
-                </CardTitle>
-                <Tabs
-                  value={activeView}
-                  onValueChange={(value) =>
-                    setActiveView(value as "table" | "map" | "both")
-                  }
-                >
-                  <TabsList>
-                    <TabsTrigger
-                      value="table"
-                      className="flex items-center space-x-2"
-                    >
-                      <List className="w-4 h-4" />
-                      <span>목록</span>
-                    </TabsTrigger>
-                    <TabsTrigger
-                      value="map"
-                      className="flex items-center space-x-2"
-                    >
-                      <Map className="w-4 h-4" />
-                      <span>지도</span>
-                    </TabsTrigger>
-                    <TabsTrigger
-                      value="both"
-                      className="flex items-center space-x-2"
-                    >
-                      <List className="w-4 h-4" />
-                      <Map className="w-4 h-4" />
-                      <span>통합</span>
-                    </TabsTrigger>
-                  </TabsList>
-                </Tabs>
-              </div>
-            </CardHeader>
-            <CardContent>
-              {activeView === "table" && (
-                <ItemTable
-                  items={items}
-                  isLoading={isLoading}
-                  error={error}
-                  onRetry={refetch}
-                  sortBy={sortBy}
-                  sortOrder={sortOrder}
-                  onSort={handleSort}
-                />
-              )}
-              {activeView === "map" && (
-                <MapView
-                  items={items}
-                  isLoading={isLoading}
-                  error={error}
-                  onRetry={refetch}
-                />
-              )}
-              {activeView === "both" && (
-                <div className="space-y-6">
-                  <div>
-                    <h3 className="text-lg font-semibold mb-3">지도</h3>
-                    <MapView
-                      items={items}
-                      isLoading={isLoading}
-                      error={error}
-                      onRetry={refetch}
-                    />
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-semibold mb-3">목록</h3>
-                    <ItemTable
-                      items={items}
-                      isLoading={isLoading}
-                      error={error}
-                      onRetry={refetch}
-                      sortBy={sortBy}
-                      sortOrder={sortOrder}
-                      onSort={handleSort}
-                    />
-                  </div>
-                </div>
-              )}
+        {/* 🔀 2단계: 좌우 분할 레이아웃 */}
+        <div className="flex gap-8">
+          {/* 📋 좌측: 상세 조건 설정 (고정 너비) */}
+          <div className="w-96 flex-shrink-0">
+            <FilterControl
+              isCollapsed={false} // 상세 조건은 항상 펼침 상태
+              onToggleCollapse={() => {}} // 빈 함수
+              searchQuery={searchQuery}
+              setSearchQuery={setSearchQuery}
+              handleSearch={handleSearch}
+              showDetailsOnly={true}
+            />
+          </div>
 
-              {/* 🚀 완전한 페이지네이션 시스템 */}
-              <div className="mt-6 space-y-4">
-                {/* 페이지 크기 선택과 정보 표시 */}
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                  <div className="flex items-center gap-4">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm text-gray-600">페이지당</span>
-                      <Select
-                        value={size.toString()}
-                        onValueChange={(value) => {
-                          setSize(parseInt(value));
-                          setPage(1); // 페이지 크기 변경시 첫 페이지로
-                        }}
+          {/* 📊 우측: 결과 뷰 (나머지 공간) */}
+          <div className="flex-1">
+            <Card>
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-lg">
+                    검색 결과{" "}
+                    {isLoading
+                      ? "로딩 중..."
+                      : (totalCount ?? items?.length ?? 0) + "건"}
+                  </CardTitle>
+                  <Tabs
+                    value={activeView}
+                    onValueChange={(value) =>
+                      setActiveView(value as "table" | "map" | "both")
+                    }
+                  >
+                    <TabsList>
+                      <TabsTrigger
+                        value="table"
+                        className="flex items-center space-x-2"
                       >
-                        <SelectTrigger className="w-20">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="20">20</SelectItem>
-                          <SelectItem value="50">50</SelectItem>
-                          <SelectItem value="100">100</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <span className="text-sm text-gray-600">개</span>
+                        <List className="w-4 h-4" />
+                        <span>목록</span>
+                      </TabsTrigger>
+                      <TabsTrigger
+                        value="map"
+                        className="flex items-center space-x-2"
+                      >
+                        <Map className="w-4 h-4" />
+                        <span>지도</span>
+                      </TabsTrigger>
+                      <TabsTrigger
+                        value="both"
+                        className="flex items-center space-x-2"
+                      >
+                        <List className="w-4 h-4" />
+                        <Map className="w-4 h-4" />
+                        <span>통합</span>
+                      </TabsTrigger>
+                    </TabsList>
+                  </Tabs>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {activeView === "table" && (
+                  <ItemTable
+                    items={items}
+                    isLoading={isLoading}
+                    error={error}
+                    onRetry={refetch}
+                    sortBy={sortBy}
+                    sortOrder={sortOrder}
+                    onSort={handleSort}
+                  />
+                )}
+                {activeView === "map" && (
+                  <MapView
+                    items={items}
+                    isLoading={isLoading}
+                    error={error}
+                    onRetry={refetch}
+                  />
+                )}
+                {activeView === "both" && (
+                  <div className="space-y-6">
+                    <div>
+                      <h3 className="text-lg font-semibold mb-3">지도</h3>
+                      <MapView
+                        items={items}
+                        isLoading={isLoading}
+                        error={error}
+                        onRetry={refetch}
+                      />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-semibold mb-3">목록</h3>
+                      <ItemTable
+                        items={items}
+                        isLoading={isLoading}
+                        error={error}
+                        onRetry={refetch}
+                        sortBy={sortBy}
+                        sortOrder={sortOrder}
+                        onSort={handleSort}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* 🚀 완전한 페이지네이션 시스템 */}
+                <div className="mt-6 space-y-4">
+                  {/* 페이지 크기 선택과 정보 표시 */}
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                    <div className="flex items-center gap-4">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm text-gray-600">페이지당</span>
+                        <Select
+                          value={size.toString()}
+                          onValueChange={(value) => {
+                            setSize(parseInt(value));
+                            setPage(1); // 페이지 크기 변경시 첫 페이지로
+                          }}
+                        >
+                          <SelectTrigger className="w-20">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="20">20</SelectItem>
+                            <SelectItem value="50">50</SelectItem>
+                            <SelectItem value="100">100</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <span className="text-sm text-gray-600">개</span>
+                      </div>
+                    </div>
+
+                    <div className="text-sm text-gray-600">
+                      전체 {(totalCount ?? 0).toLocaleString()}건 중{" "}
+                      {Math.min(size * (page - 1) + 1, totalCount ?? 0)}-
+                      {Math.min(size * page, totalCount ?? 0)}건 표시
                     </div>
                   </div>
 
-                  <div className="text-sm text-gray-600">
-                    전체 {(totalCount ?? 0).toLocaleString()}건 중{" "}
-                    {Math.min(size * (page - 1) + 1, totalCount ?? 0)}-
-                    {Math.min(size * page, totalCount ?? 0)}건 표시
-                  </div>
+                  {/* 페이지 번호 네비게이션 */}
+                  <Pagination>
+                    <PaginationContent>
+                      {/* 이전 페이지 */}
+                      <PaginationItem>
+                        <PaginationPrevious
+                          href="#"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            if (page > 1) setPage(page - 1);
+                          }}
+                          className={
+                            page <= 1 ? "pointer-events-none opacity-50" : ""
+                          }
+                        />
+                      </PaginationItem>
+
+                      {(() => {
+                        const totalPages = Math.max(
+                          1,
+                          Math.ceil((totalCount ?? 0) / size)
+                        );
+                        const pages = [];
+
+                        // 페이지 번호 생성 로직
+                        const startPage = Math.max(1, page - 2);
+                        const endPage = Math.min(totalPages, page + 2);
+
+                        // 첫 페이지 (항상 표시)
+                        if (startPage > 1) {
+                          pages.push(
+                            <PaginationItem key="1">
+                              <PaginationLink
+                                href="#"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  setPage(1);
+                                }}
+                                isActive={page === 1}
+                              >
+                                1
+                              </PaginationLink>
+                            </PaginationItem>
+                          );
+
+                          if (startPage > 2) {
+                            pages.push(
+                              <PaginationItem key="ellipsis1">
+                                <PaginationEllipsis />
+                              </PaginationItem>
+                            );
+                          }
+                        }
+
+                        // 현재 페이지 주변 번호들
+                        for (let i = startPage; i <= endPage; i++) {
+                          pages.push(
+                            <PaginationItem key={i}>
+                              <PaginationLink
+                                href="#"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  setPage(i);
+                                }}
+                                isActive={page === i}
+                              >
+                                {i}
+                              </PaginationLink>
+                            </PaginationItem>
+                          );
+                        }
+
+                        // 마지막 페이지 (필요시 표시)
+                        if (endPage < totalPages) {
+                          if (endPage < totalPages - 1) {
+                            pages.push(
+                              <PaginationItem key="ellipsis2">
+                                <PaginationEllipsis />
+                              </PaginationItem>
+                            );
+                          }
+
+                          pages.push(
+                            <PaginationItem key={totalPages}>
+                              <PaginationLink
+                                href="#"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  setPage(totalPages);
+                                }}
+                                isActive={page === totalPages}
+                              >
+                                {totalPages}
+                              </PaginationLink>
+                            </PaginationItem>
+                          );
+                        }
+
+                        return pages;
+                      })()}
+
+                      {/* 다음 페이지 */}
+                      <PaginationItem>
+                        <PaginationNext
+                          href="#"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            const totalPages = Math.max(
+                              1,
+                              Math.ceil((totalCount ?? 0) / size)
+                            );
+                            if (page < totalPages) setPage(page + 1);
+                          }}
+                          className={
+                            page >=
+                            Math.max(1, Math.ceil((totalCount ?? 0) / size))
+                              ? "pointer-events-none opacity-50"
+                              : ""
+                          }
+                        />
+                      </PaginationItem>
+                    </PaginationContent>
+                  </Pagination>
                 </div>
-
-                {/* 페이지 번호 네비게이션 */}
-                <Pagination>
-                  <PaginationContent>
-                    {/* 이전 페이지 */}
-                    <PaginationItem>
-                      <PaginationPrevious
-                        href="#"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          if (page > 1) setPage(page - 1);
-                        }}
-                        className={
-                          page <= 1 ? "pointer-events-none opacity-50" : ""
-                        }
-                      />
-                    </PaginationItem>
-
-                    {(() => {
-                      const totalPages = Math.max(
-                        1,
-                        Math.ceil((totalCount ?? 0) / size)
-                      );
-                      const pages = [];
-
-                      // 페이지 번호 생성 로직
-                      const startPage = Math.max(1, page - 2);
-                      const endPage = Math.min(totalPages, page + 2);
-
-                      // 첫 페이지 (항상 표시)
-                      if (startPage > 1) {
-                        pages.push(
-                          <PaginationItem key="1">
-                            <PaginationLink
-                              href="#"
-                              onClick={(e) => {
-                                e.preventDefault();
-                                setPage(1);
-                              }}
-                              isActive={page === 1}
-                            >
-                              1
-                            </PaginationLink>
-                          </PaginationItem>
-                        );
-
-                        if (startPage > 2) {
-                          pages.push(
-                            <PaginationItem key="ellipsis1">
-                              <PaginationEllipsis />
-                            </PaginationItem>
-                          );
-                        }
-                      }
-
-                      // 현재 페이지 주변 번호들
-                      for (let i = startPage; i <= endPage; i++) {
-                        pages.push(
-                          <PaginationItem key={i}>
-                            <PaginationLink
-                              href="#"
-                              onClick={(e) => {
-                                e.preventDefault();
-                                setPage(i);
-                              }}
-                              isActive={page === i}
-                            >
-                              {i}
-                            </PaginationLink>
-                          </PaginationItem>
-                        );
-                      }
-
-                      // 마지막 페이지 (필요시 표시)
-                      if (endPage < totalPages) {
-                        if (endPage < totalPages - 1) {
-                          pages.push(
-                            <PaginationItem key="ellipsis2">
-                              <PaginationEllipsis />
-                            </PaginationItem>
-                          );
-                        }
-
-                        pages.push(
-                          <PaginationItem key={totalPages}>
-                            <PaginationLink
-                              href="#"
-                              onClick={(e) => {
-                                e.preventDefault();
-                                setPage(totalPages);
-                              }}
-                              isActive={page === totalPages}
-                            >
-                              {totalPages}
-                            </PaginationLink>
-                          </PaginationItem>
-                        );
-                      }
-
-                      return pages;
-                    })()}
-
-                    {/* 다음 페이지 */}
-                    <PaginationItem>
-                      <PaginationNext
-                        href="#"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          const totalPages = Math.max(
-                            1,
-                            Math.ceil((totalCount ?? 0) / size)
-                          );
-                          if (page < totalPages) setPage(page + 1);
-                        }}
-                        className={
-                          page >=
-                          Math.max(1, Math.ceil((totalCount ?? 0) / size))
-                            ? "pointer-events-none opacity-50"
-                            : ""
-                        }
-                      />
-                    </PaginationItem>
-                  </PaginationContent>
-                </Pagination>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          </div>
         </div>
       </div>
 

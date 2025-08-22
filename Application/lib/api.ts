@@ -50,7 +50,9 @@ export interface Item {
   minimum_bid_price?: number;
   bid_to_appraised_ratio?: string;
   calculated_ratio?: number;
-  sale_month?: string;
+  sale_date?: string;
+  sale_month?: number;
+  case_year?: number;
   special_rights?: string;
   floor_confirmation?: string;
   public_price?: number;

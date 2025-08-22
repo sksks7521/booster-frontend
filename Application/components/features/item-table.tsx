@@ -78,7 +78,7 @@ const DEFAULT_COLUMN_ORDER = [
   "minimum_bid_price",
   "bid_to_appraised_ratio",
   "calculated_ratio",
-  "sale_month",
+  "sale_date",
   "special_rights",
   "floor_confirmation",
   "public_price",
@@ -119,9 +119,11 @@ const createColumns = (
     {
       id: "usage",
       title: (
-        <span style={{ cursor: "pointer", userSelect: "none" }}>
-          용도{getSortIcon("usage")}
-        </span>
+        <DraggableHeader id="usage">
+          <span style={{ cursor: "pointer", userSelect: "none" }}>
+            용도{getSortIcon("usage")}
+          </span>
+        </DraggableHeader>
       ),
       dataIndex: "usage",
       key: "usage",
@@ -135,9 +137,11 @@ const createColumns = (
     {
       id: "case_number",
       title: (
-        <span style={{ cursor: "pointer", userSelect: "none" }}>
-          사건{getSortIcon("case_number")}
-        </span>
+        <DraggableHeader id="case_number">
+          <span style={{ cursor: "pointer", userSelect: "none" }}>
+            사건{getSortIcon("case_number")}
+          </span>
+        </DraggableHeader>
       ),
       dataIndex: "case_number",
       key: "case_number",
@@ -151,19 +155,17 @@ const createColumns = (
     {
       id: "road_address",
       title: (
-        <span style={{ cursor: "pointer", userSelect: "none" }}>
-          도로명주소{getSortIcon("road_address")}
-        </span>
+        <DraggableHeader id="road_address">
+          <span style={{ cursor: "pointer", userSelect: "none" }}>
+            도로명주소{getSortIcon("road_address")}
+          </span>
+        </DraggableHeader>
       ),
       dataIndex: "road_address",
       key: "road_address",
       width: 250,
       render: (text: string, record: Item) => (
-        <Link
-          href="#"
-          onClick={(e) => e.preventDefault()}
-          style={{ color: "#1890ff" }}
-        >
+        <Link href="#" onClick={(e) => e.preventDefault()}>
           {text || record.address || "-"}
         </Link>
       ),
@@ -175,9 +177,11 @@ const createColumns = (
     {
       id: "building_area_pyeong",
       title: (
-        <span style={{ cursor: "pointer", userSelect: "none" }}>
-          건물평형{getSortIcon("building_area_pyeong")}
-        </span>
+        <DraggableHeader id="building_area_pyeong">
+          <span style={{ cursor: "pointer", userSelect: "none" }}>
+            건물평형{getSortIcon("building_area_pyeong")}
+          </span>
+        </DraggableHeader>
       ),
       dataIndex: "building_area_pyeong",
       key: "building_area_pyeong",
@@ -192,9 +196,11 @@ const createColumns = (
     {
       id: "land_area_pyeong",
       title: (
-        <span style={{ cursor: "pointer", userSelect: "none" }}>
-          토지평형{getSortIcon("land_area_pyeong")}
-        </span>
+        <DraggableHeader id="land_area_pyeong">
+          <span style={{ cursor: "pointer", userSelect: "none" }}>
+            토지평형{getSortIcon("land_area_pyeong")}
+          </span>
+        </DraggableHeader>
       ),
       dataIndex: "land_area_pyeong",
       key: "land_area_pyeong",
@@ -209,9 +215,11 @@ const createColumns = (
     {
       id: "appraised_value",
       title: (
-        <span style={{ cursor: "pointer", userSelect: "none" }}>
-          감정가(만원){getSortIcon("appraised_value")}
-        </span>
+        <DraggableHeader id="appraised_value">
+          <span style={{ cursor: "pointer", userSelect: "none" }}>
+            감정가(만원){getSortIcon("appraised_value")}
+          </span>
+        </DraggableHeader>
       ),
       dataIndex: "appraised_value",
       key: "appraised_value",
@@ -226,9 +234,11 @@ const createColumns = (
     {
       id: "minimum_bid_price",
       title: (
-        <span style={{ cursor: "pointer", userSelect: "none" }}>
-          최저가(만원){getSortIcon("minimum_bid_price")}
-        </span>
+        <DraggableHeader id="minimum_bid_price">
+          <span style={{ cursor: "pointer", userSelect: "none" }}>
+            최저가(만원){getSortIcon("minimum_bid_price")}
+          </span>
+        </DraggableHeader>
       ),
       dataIndex: "minimum_bid_price",
       key: "minimum_bid_price",
@@ -244,9 +254,11 @@ const createColumns = (
     {
       id: "bid_to_appraised_ratio",
       title: (
-        <span style={{ cursor: "pointer", userSelect: "none" }}>
-          최저가/감정가(%){getSortIcon("bid_to_appraised_ratio")}
-        </span>
+        <DraggableHeader id="bid_to_appraised_ratio">
+          <span style={{ cursor: "pointer", userSelect: "none" }}>
+            최저가/감정가(%){getSortIcon("bid_to_appraised_ratio")}
+          </span>
+        </DraggableHeader>
       ),
       dataIndex: "bid_to_appraised_ratio",
       key: "bid_to_appraised_ratio",
@@ -261,9 +273,11 @@ const createColumns = (
     {
       id: "calculated_ratio",
       title: (
-        <span style={{ cursor: "pointer", userSelect: "none" }}>
-          최저가/공시가격{getSortIcon("calculated_ratio")}
-        </span>
+        <DraggableHeader id="calculated_ratio">
+          <span style={{ cursor: "pointer", userSelect: "none" }}>
+            최저가/공시가격{getSortIcon("calculated_ratio")}
+          </span>
+        </DraggableHeader>
       ),
       key: "calculated_ratio",
       width: 150,
@@ -288,12 +302,6 @@ const createColumns = (
         return (
           <span
             style={{
-              color:
-                numRatio < 1
-                  ? "#52c41a"
-                  : numRatio > 1.5
-                  ? "#ff4d4f"
-                  : "#1890ff",
               fontWeight: "bold",
             }}
           >
@@ -307,27 +315,67 @@ const createColumns = (
       }),
     },
     {
-      id: "sale_month",
+      id: "sale_date",
       title: (
-        <span style={{ cursor: "pointer", userSelect: "none" }}>
-          매각기일{getSortIcon("sale_month")}
-        </span>
+        <DraggableHeader id="sale_date">
+          <span style={{ cursor: "pointer", userSelect: "none" }}>
+            매각기일{getSortIcon("sale_date")}
+          </span>
+        </DraggableHeader>
       ),
-      dataIndex: "sale_month",
-      key: "sale_month",
-      width: 120,
-      render: (text: string) => text || "-",
+      dataIndex: "sale_date",
+      key: "sale_date",
+      width: 150,
+      render: (saleDate: string) => {
+        if (!saleDate) return "-";
+
+        try {
+          // "2025-08-22" → "2025년 8월 22일" 변환
+          const date = new Date(saleDate);
+          const year = date.getFullYear();
+          const month = date.getMonth() + 1;
+          const day = date.getDate();
+
+          // D-Day 계산
+          const today = new Date();
+          const diffTime = date.getTime() - today.getTime();
+          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+          return (
+            <div>
+              <span style={{ color: "#1890ff", fontWeight: 500 }}>
+                {year}년 {month}월 {day}일
+              </span>
+              {diffDays > 0 && diffDays <= 7 && (
+                <div
+                  style={{
+                    color: "#ff4d4f",
+                    fontSize: "12px",
+                    marginTop: "2px",
+                  }}
+                >
+                  D-{diffDays}
+                </div>
+              )}
+            </div>
+          );
+        } catch (error) {
+          return saleDate || "-";
+        }
+      },
       onHeaderCell: () => ({
-        onClick: () => getNextSortState("sale_month"),
+        onClick: () => getNextSortState("sale_date"),
         style: { cursor: "pointer" },
       }),
     },
     {
       id: "special_rights",
       title: (
-        <span style={{ cursor: "pointer", userSelect: "none" }}>
-          특수권리{getSortIcon("special_rights")}
-        </span>
+        <DraggableHeader id="special_rights">
+          <span style={{ cursor: "pointer", userSelect: "none" }}>
+            특수권리{getSortIcon("special_rights")}
+          </span>
+        </DraggableHeader>
       ),
       dataIndex: "special_rights",
       key: "special_rights",
@@ -341,9 +389,11 @@ const createColumns = (
     {
       id: "floor_confirmation",
       title: (
-        <span style={{ cursor: "pointer", userSelect: "none" }}>
-          층확인{getSortIcon("floor_confirmation")}
-        </span>
+        <DraggableHeader id="floor_confirmation">
+          <span style={{ cursor: "pointer", userSelect: "none" }}>
+            층확인{getSortIcon("floor_confirmation")}
+          </span>
+        </DraggableHeader>
       ),
       dataIndex: "floor_confirmation",
       key: "floor_confirmation",
@@ -357,9 +407,11 @@ const createColumns = (
     {
       id: "public_price",
       title: (
-        <span style={{ cursor: "pointer", userSelect: "none" }}>
-          공시가격(만원){getSortIcon("public_price")}
-        </span>
+        <DraggableHeader id="public_price">
+          <span style={{ cursor: "pointer", userSelect: "none" }}>
+            공시가격(만원){getSortIcon("public_price")}
+          </span>
+        </DraggableHeader>
       ),
       dataIndex: "public_price",
       key: "public_price",
@@ -374,9 +426,11 @@ const createColumns = (
     {
       id: "under_100million",
       title: (
-        <span style={{ cursor: "pointer", userSelect: "none" }}>
-          1억 이하 여부{getSortIcon("under_100million")}
-        </span>
+        <DraggableHeader id="under_100million">
+          <span style={{ cursor: "pointer", userSelect: "none" }}>
+            1억 이하 여부{getSortIcon("under_100million")}
+          </span>
+        </DraggableHeader>
       ),
       dataIndex: "under_100million",
       key: "under_100million",
@@ -397,9 +451,11 @@ const createColumns = (
     {
       id: "construction_year",
       title: (
-        <span style={{ cursor: "pointer", userSelect: "none" }}>
-          건축연도{getSortIcon("construction_year")}
-        </span>
+        <DraggableHeader id="construction_year">
+          <span style={{ cursor: "pointer", userSelect: "none" }}>
+            건축연도{getSortIcon("construction_year")}
+          </span>
+        </DraggableHeader>
       ),
       dataIndex: "construction_year",
       key: "construction_year",
@@ -415,9 +471,11 @@ const createColumns = (
     {
       id: "elevator_available",
       title: (
-        <span style={{ cursor: "pointer", userSelect: "none" }}>
-          Elevator여부{getSortIcon("elevator_available")}
-        </span>
+        <DraggableHeader id="elevator_available">
+          <span style={{ cursor: "pointer", userSelect: "none" }}>
+            Elevator여부{getSortIcon("elevator_available")}
+          </span>
+        </DraggableHeader>
       ),
       dataIndex: "elevator_available",
       key: "elevator_available",
@@ -572,6 +630,16 @@ const ItemTable: React.FC<ItemTableProps> = ({
 
   return (
     <div style={{ background: "#fff", borderRadius: "8px" }}>
+      <style jsx global>{`
+        .no-wrap-table .ant-table-tbody > tr > td {
+          white-space: nowrap !important;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+        .no-wrap-table .ant-table-thead > tr > th {
+          white-space: nowrap !important;
+        }
+      `}</style>
       <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
         <SortableContext
           items={columnOrder}
@@ -604,6 +672,8 @@ const ItemTable: React.FC<ItemTableProps> = ({
             scroll={{ x: 1500, y: 600 }}
             size="middle"
             bordered
+            // 🚫 줄바꿈 방지 설정
+            className="no-wrap-table"
             // 🖱️ 행 이벤트
             onRow={handleRowClick}
             // 🎯 빈 상태 처리
