@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -59,6 +59,17 @@ export default function AnalysisPage() {
       expiresAt: "2024-12-31",
     },
   };
+
+  // 팝업에서 지도 열기 이벤트를 수신해 지도 탭으로 전환
+  useEffect(() => {
+    const handler = () => setActiveView("map");
+    window.addEventListener("property:openOnMap", handler as EventListener);
+    return () =>
+      window.removeEventListener(
+        "property:openOnMap",
+        handler as EventListener
+      );
+  }, []);
 
   // useItems 훅이 필터 상태를 키로 사용하여 자동 재검증함
 
@@ -178,15 +189,6 @@ export default function AnalysisPage() {
                     )}
                   </div>
                   <div className="flex items-center gap-2">
-                    {detailsCollapsed && (
-                      <Button
-                        size="sm"
-                        onClick={() => setDetailsCollapsed(false)}
-                        className="h-8 px-3 text-xs bg-blue-600 hover:bg-blue-700 text-white"
-                      >
-                        ✨ 필터 펼치기
-                      </Button>
-                    )}
                     <Tabs
                       value={activeView}
                       onValueChange={(value) =>
@@ -328,7 +330,7 @@ export default function AnalysisPage() {
                             1,
                             Math.ceil((totalCount ?? 0) / size)
                           );
-                          const pages = [];
+                          const pages = [] as JSX.Element[];
 
                           // 페이지 번호 생성 로직
                           const startPage = Math.max(1, page - 2);

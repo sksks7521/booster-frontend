@@ -1,6 +1,8 @@
 "use client";
 
-import React from "react";
+import React, { useEffect } from "react";
+import useSWR, { mutate as globalMutate } from "swr";
+import { itemApi } from "@/lib/api";
 import { Table, Space, Tag, Typography, Tooltip } from "antd";
 import {
   HomeOutlined,
@@ -24,6 +26,7 @@ import {
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import type { Item } from "@/lib/api";
+import PropertyDetailDialog from "@/components/features/property-detail/PropertyDetailDialog";
 
 // const { Link } = Typography; // 링크 색상(파랑) 제거를 위해 사용 안 함
 
@@ -150,7 +153,8 @@ const createColumns = (
   sortOrder?: "asc" | "desc",
   onSort?: (column?: string, direction?: "asc" | "desc") => void,
   getWidth?: (id: string) => number | undefined,
-  onResizeColumn?: (id: string, deltaX: number) => void
+  onResizeColumn?: (id: string, deltaX: number) => void,
+  onAddressClick?: (item: Item) => void
 ): ColumnWithId[] => {
   // 🔄 3단계 순환 정렬 로직
   const getNextSortState = (column: string) => {
@@ -283,9 +287,60 @@ const createColumns = (
       dataIndex: "road_address",
       key: "road_address",
       width: getWidth?.("road_address") ?? Math.round(250 * 1.3),
-      render: (text: string, record: Item) => (
-        <span>{text || record.address || "-"}</span>
-      ),
+      render: (text: string, record: Item) => {
+        const display = text || (record as any).address || "-";
+        const handleClick: React.MouseEventHandler<HTMLSpanElement> = (e) => {
+          e.stopPropagation();
+          e.preventDefault();
+          onAddressClick?.(record);
+        };
+        // Phase 5: 주소 셀 호버 프리패치 (디바운스/디듀프)
+        const prefetch = (() => {
+          let timer: number | undefined;
+          let lastRun = 0;
+          const DEBOUNCE_MS = 200;
+          const MIN_INTERVAL_MS = 1200; // 1.2s 내 중복 금지
+          return () => {
+            const now = Date.now();
+            if (now - lastRun < MIN_INTERVAL_MS) return;
+            if (timer) window.clearTimeout(timer);
+            timer = window.setTimeout(async () => {
+              try {
+                const id = (record as any)?.id as number | undefined;
+                if (!id) return;
+                const key = ["/api/v1/items/", id, "detail"] as const;
+                await globalMutate(key, itemApi.getItem(id), {
+                  revalidate: false,
+                });
+                lastRun = Date.now();
+              } catch {}
+            }, DEBOUNCE_MS);
+          };
+        })();
+        return (
+          <span
+            onClick={handleClick}
+            onMouseDown={(e) => e.stopPropagation()}
+            onMouseEnter={() => prefetch()}
+            role="link"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                handleClick(e as unknown as React.MouseEvent<HTMLSpanElement>);
+              }
+            }}
+            style={{
+              color: "#1d4ed8",
+              textDecoration: "underline",
+              cursor: "pointer",
+            }}
+            title={display}
+          >
+            {display}
+          </span>
+        );
+      },
       onHeaderCell: () => ({
         onClick: () => safeHeaderClick("road_address"),
         style: { cursor: "pointer" },
@@ -694,6 +749,35 @@ const ItemTable: React.FC<ItemTableProps> = ({
   const [columnOrder, setColumnOrder] =
     React.useState<string[]>(DEFAULT_COLUMN_ORDER);
 
+  // 🔍 도로명주소 팝업 상태
+  const [addressDialogOpen, setAddressDialogOpen] = React.useState(false);
+  const [addressDialogItem, setAddressDialogItem] = React.useState<Item | null>(
+    null
+  );
+
+  // 지도 마커 클릭 → 상세 열기
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail as
+        | { id?: string; lat?: number; lng?: number }
+        | undefined;
+      if (!detail?.id) return;
+      const found = items.find(
+        (it: any) => String(it?.id) === String(detail.id)
+      );
+      if (found) {
+        setAddressDialogItem(found as Item);
+        setAddressDialogOpen(true);
+      }
+    };
+    window.addEventListener("property:openDetail", handler as EventListener);
+    return () =>
+      window.removeEventListener(
+        "property:openDetail",
+        handler as EventListener
+      );
+  }, [items]);
+
   // 🎯 드래그앤드롭 센서 설정
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -752,12 +836,18 @@ const ItemTable: React.FC<ItemTableProps> = ({
     });
   };
 
+  const handleAddressClick = (item: Item) => {
+    setAddressDialogItem(item);
+    setAddressDialogOpen(true);
+  };
+
   const baseColumns = createColumns(
     sortBy,
     sortOrder,
     onSort,
     getWidth,
-    onResizeColumn
+    onResizeColumn,
+    handleAddressClick
   );
   const orderedColumns = React.useMemo(() => {
     return columnOrder
@@ -778,6 +868,13 @@ const ItemTable: React.FC<ItemTableProps> = ({
     },
     fixed: true as const,
   };
+
+  // Drag 선택으로 내부 상태가 변한 경우 부모에 비동기 알림(렌더 중 상위 업데이트 경고 방지)
+  React.useEffect(() => {
+    if (!controlledSelectedKeys && onSelectionChange) {
+      Promise.resolve().then(() => onSelectionChange(selectedRowKeysState));
+    }
+  }, [selectedRowKeysState, controlledSelectedKeys, onSelectionChange]);
 
   // 🖱️ 드래그로 여러 행 체크 선택 지원
   const [isSelecting, setIsSelecting] = React.useState(false);
@@ -811,7 +908,6 @@ const ItemTable: React.FC<ItemTableProps> = ({
           rangeKeys.forEach((k) => set.delete(k));
         }
         const next = Array.from(set);
-        onSelectionChange?.(next);
         return next;
       });
     },
@@ -965,6 +1061,12 @@ const ItemTable: React.FC<ItemTableProps> = ({
                 </div>
               ),
             }}
+          />
+          {/* 도로명주소 팝업 */}
+          <PropertyDetailDialog
+            open={addressDialogOpen}
+            onOpenChange={setAddressDialogOpen}
+            rowItem={addressDialogItem}
           />
         </SortableContext>
       </DndContext>
