@@ -285,6 +285,9 @@ export function useItems(): UseItemsResult {
     "under_100million",
     "construction_year",
     "elevator_available",
+    // 지도 렌더링을 위한 좌표 필드
+    "latitude",
+    "longitude",
     // 🆕 상태/특수조건 및 불리언 플래그들(서버가 지원하면 응답 포함)
     "current_status",
     "tenant_with_opposing_power",

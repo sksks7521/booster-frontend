@@ -47,6 +47,17 @@ interface FilterState {
   under100: boolean; // 1억 이하 여부
   page: number;
   size: number;
+  // 지도 Threshold (최저가 만원 구간)
+  thresholds: number[]; // 1..5 supported
+  // 지도 색상 팔레트(마커/범례 공통)
+  palette: {
+    blue: string;
+    green: string;
+    pink: string;
+    orange: string;
+    red: string;
+  };
+  // (삭제 예정)이었던 팝업 고정 상태 제거
 }
 
 // 필터 상태를 변경하는 액션(Action)의 타입을 정의합니다.
@@ -65,6 +76,15 @@ interface FilterActions {
   setSize: (size: number) => void;
   setSortConfig: (sortBy?: string, sortOrder?: "asc" | "desc") => void; // 정렬 설정
   resetFilters: () => void;
+  setThresholds: (t: number[]) => void;
+  setPalette: (p: {
+    blue: string;
+    green: string;
+    pink: string;
+    orange: string;
+    red: string;
+  }) => void;
+  // (삭제) setPopupLocked 제거
 }
 
 // 필터의 초기 상태 값입니다.
@@ -109,6 +129,16 @@ const initialState: FilterState = {
   under100: false,
   page: 1,
   size: 20, // 서버 사이드 페이지네이션 (20/50/100개 선택 가능)
+  // 기본 Threshold: t1=6000, t2=8000, t3=10000, t4=13000 (만원)
+  thresholds: [6000, 8000, 10000, 13000],
+  // 기본 팔레트
+  palette: {
+    blue: "#2563eb",
+    green: "#16a34a",
+    pink: "#ec4899",
+    orange: "#f59e0b",
+    red: "#ef4444",
+  },
 };
 
 // Zustand 스토어를 생성합니다.
@@ -135,4 +165,28 @@ export const useFilterStore = create<FilterState & FilterActions>((set) => ({
 
   // 모든 필터를 초기 상태로 되돌리는 액션
   resetFilters: () => set(initialState),
+
+  // Threshold 업데이트(비내림차순 검증 후 저장)
+  setThresholds: (t) =>
+    set((state) => {
+      const capped = Array.isArray(t)
+        ? t.slice(0, 5).filter((n) => typeof n === "number" && n >= 0)
+        : [];
+      const sorted = [...capped].sort((a, b) => a - b);
+      const next: number[] = sorted.length === 0 ? state.thresholds : sorted;
+      return { ...state, thresholds: next } as any;
+    }),
+
+  // 팔레트 업데이트(간단 검증: 문자열 형태만)
+  setPalette: (p) =>
+    set((state) => ({
+      ...state,
+      palette: {
+        blue: p.blue || state.palette.blue,
+        green: p.green || state.palette.green,
+        pink: p.pink || state.palette.pink,
+        orange: p.orange || state.palette.orange,
+        red: p.red || state.palette.red,
+      },
+    })),
 }));
