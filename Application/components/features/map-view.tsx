@@ -19,6 +19,8 @@ interface MapViewProps {
   isLoading?: boolean;
   error?: any;
   onRetry?: () => void;
+  // 지역/읍면동 키: 변경 시 내부 초기화/relayout 트리거
+  locationKey?: string;
 }
 
 function MapView({
@@ -27,6 +29,7 @@ function MapView({
   isLoading,
   error,
   onRetry,
+  locationKey,
 }: MapViewProps) {
   const mapRef = useRef<HTMLDivElement | null>(null);
   const [mapReady, setMapReady] = useState(false);
@@ -51,10 +54,22 @@ function MapView({
     (useFilterStore as any)?.((s: any) => s.thresholds) ?? DEFAULT_THRESHOLDS;
   // 외부 연동을 위한 마지막 중심 좌표 저장
   const lastCenterRef = useRef<{ lat: number; lng: number } | null>(null);
+  // 최초 1회만 영역 맞춤(fitBounds) 수행하여, 이후 필터 변경 시 중심 유지
+  const didInitialFitRef = useRef<boolean>(false);
+  // 지역 전환 직후, 새 데이터 로드 완료 후에만 1회 fitBounds 하도록 보류 플래그
+  const pendingFitRef = useRef<boolean>(false);
+  // 좌표 표시용 상태 (지도 중심/마우스 포인터)
+  const [centerCoord, setCenterCoord] = useState<{
+    lat: number;
+    lng: number;
+  } | null>(null);
+  const [mouseCoord, setMouseCoord] = useState<{
+    lat: number;
+    lng: number;
+  } | null>(null);
 
-  const providerEnv = (
-    process.env.NEXT_PUBLIC_MAP_PROVIDER || "vworld"
-  ).toLowerCase();
+  // 지도 제공자: 안정화를 위해 Kakao를 강제 사용
+  const providerEnv = "kakao";
   const kakaoKey = process.env.NEXT_PUBLIC_KAKAO_APP_KEY;
   const vworldKeyEnv = process.env.NEXT_PUBLIC_VWORLD_API_KEY;
   // 사용자가 제공한 기본 키를 폴백으로 사용 (환경변수 미설정 시 즉시 표시)
@@ -62,8 +77,32 @@ function MapView({
     vworldKeyEnv && vworldKeyEnv.trim().length > 0
       ? vworldKeyEnv
       : "276AABBA-2990-3BAE-B46A-82A7FE6BE021";
-  const provider =
-    providerEnv === "kakao" && !kakaoKey ? "vworld" : providerEnv;
+  const provider: "kakao" | "vworld" = kakaoKey ? "kakao" : "vworld";
+
+  // 지역 키가 바뀌었을 때 내부 마커/클러스터 정리 및 초기 fitBounds 1회 재허용
+  useEffect(() => {
+    if (!mapReady) return;
+    try {
+      if (clustererRef.current) clustererRef.current.clear();
+      markersRef.current.forEach((m) => m.setMap(null));
+    } catch {}
+    markersRef.current = [];
+    didInitialFitRef.current = false;
+    // 팝업도 초기화
+    try {
+      if (popupOverlayRef.current) popupOverlayRef.current.setMap(null);
+    } catch {}
+    setMobilePopupItem(null);
+    // Kakao: relayout 후 현재 중심 유지
+    if (provider === "kakao" && kakaoMapRef.current) {
+      try {
+        const map = kakaoMapRef.current;
+        const c = map.getCenter?.();
+        if (typeof map.relayout === "function") map.relayout();
+        if (c && typeof map.setCenter === "function") map.setCenter(c);
+      } catch {}
+    }
+  }, [locationKey, mapReady, provider]);
 
   useEffect(() => {
     if (!mapRef.current) return;
@@ -243,31 +282,19 @@ function MapView({
           lastCenterRef.current = { lat: detail.lat, lng: detail.lng };
 
           try {
-            if (!focusMarkerRef.current) {
-              focusMarkerRef.current = new w.kakao.maps.Marker({
-                position: latlng,
-                zIndex: 9999,
-              });
-            } else {
-              focusMarkerRef.current.setPosition(latlng);
+            // 클릭 포커스용 기본 파란 마커 제거
+            if (focusMarkerRef.current) {
+              try {
+                focusMarkerRef.current.setMap(null);
+              } catch {}
+              focusMarkerRef.current = null as any;
             }
-            focusMarkerRef.current.setMap(kakaoMapRef.current);
-
             if (focusCircleRef.current) {
-              focusCircleRef.current.setMap(null);
+              try {
+                focusCircleRef.current.setMap(null);
+              } catch {}
+              focusCircleRef.current = null as any;
             }
-            focusCircleRef.current = new w.kakao.maps.Circle({
-              center: latlng,
-              radius: 80,
-              strokeWeight: 3,
-              strokeColor: "#3b82f6",
-              strokeOpacity: 0.9,
-              strokeStyle: "solid",
-              fillColor: "#3b82f6",
-              fillOpacity: 0.2,
-              zIndex: 9998,
-            });
-            focusCircleRef.current.setMap(kakaoMapRef.current);
           } catch {}
         } else if (
           mapControllerRef.current &&
@@ -347,7 +374,7 @@ function MapView({
 
     const formatMoney = (n?: number | string | null) => {
       const v = typeof n === "string" ? parseFloat(n) : n ?? 0;
-      if (!isFinite(v as number)) return "—";
+      if (!isFinite(v as number)) return "-";
       return `${Number(v).toLocaleString()}만원`;
     };
 
@@ -388,27 +415,27 @@ function MapView({
           <tr><td style="padding:2px 0;color:#6b7280">최저가/감정가</td><td style="text-align:right" aria-label="최저가 대비 감정가 비율 ${
             it?.bid_to_appraised_ratio != null
               ? `${it.bid_to_appraised_ratio}%`
-              : "—"
+              : "-"
           }">${
         it?.bid_to_appraised_ratio != null
           ? `${it.bid_to_appraised_ratio}%`
-          : "—"
+          : "-"
       }</td></tr>
           <tr><td style="padding:2px 0;color:#6b7280">현재상태</td><td style="text-align:right">${
             it?.current_status ?? ""
           }</td></tr>
           <tr><td style="padding:2px 0;color:#6b7280">매각기일</td><td style="text-align:right" aria-label="매각기일 ${
-            it?.sale_date ?? "—"
-          }">${it?.sale_date ?? "—"}</td></tr>
+            it?.sale_date ?? "-"
+          }">${it?.sale_date ?? "-"}</td></tr>
           <tr><td style="padding:2px 0;color:#6b7280">공시가격</td><td style="text-align:right" aria-label="공시가격 ${formatMoney(
             it?.public_price
           )}">${formatMoney(it?.public_price)}</td></tr>
           <tr><td style="padding:2px 0;color:#6b7280">최저가/공시가격</td><td style="text-align:right">${(function () {
             const minV = parseFloat(it?.minimum_bid_price ?? "") || 0;
             const pubV = parseFloat(it?.public_price ?? "") || 0;
-            if (!pubV) return "—";
+            if (!pubV) return "-";
             const r = (minV / pubV) * 100;
-            if (!isFinite(r)) return "—";
+            if (!isFinite(r)) return "-";
             return `${r.toFixed(1)}%`;
           })()}</td></tr>
           <tr><td style="padding:2px 0;color:#6b7280">건물평형</td><td style="text-align:right">${
@@ -713,9 +740,11 @@ function MapView({
     const slice = items.slice(0, MAX);
     const toAdd: any[] = [];
     slice.forEach((it: any) => {
-      const lat = typeof it?.lat === "number" ? it.lat : it?.latitude;
-      const lng = typeof it?.lng === "number" ? it.lng : it?.longitude;
-      if (typeof lat !== "number" || typeof lng !== "number") return;
+      const latRaw = it?.lat ?? it?.latitude;
+      const lngRaw = it?.lng ?? it?.longitude;
+      const lat = typeof latRaw === "number" ? latRaw : parseFloat(latRaw);
+      const lng = typeof lngRaw === "number" ? lngRaw : parseFloat(lngRaw);
+      if (!isFinite(lat) || !isFinite(lng)) return;
       try {
         const pos = new w.kakao.maps.LatLng(lat, lng);
         // 색상: 최저가(만원), 텍스트: 비율 10% 버킷
@@ -728,7 +757,9 @@ function MapView({
         const marker = new w.kakao.maps.Marker({
           position: pos,
           image,
-          title: `최저가 ${parseFloat(price || 0) || 0}만원, 비율 ${label}%`,
+          title: `최저가 ${Number(
+            parseFloat(price || 0) || 0
+          ).toLocaleString()}만원, 비율 ${label === "--" ? "-" : `${label}%`}`,
         });
         // 클러스터 사용 시 setMap은 클러스터러가 담당
         if (!clustererRef.current) marker.setMap(map);
@@ -786,28 +817,18 @@ function MapView({
               } catch {}
             }
             lastCenterRef.current = { lat, lng };
-            if (!focusMarkerRef.current) {
-              focusMarkerRef.current = new w.kakao.maps.Marker({
-                position: pos,
-                zIndex: 9999,
-              });
-            } else {
-              focusMarkerRef.current.setPosition(pos);
+            if (focusMarkerRef.current) {
+              try {
+                focusMarkerRef.current.setMap(null);
+              } catch {}
+              focusMarkerRef.current = null as any;
             }
-            focusMarkerRef.current.setMap(map);
-            if (focusCircleRef.current) focusCircleRef.current.setMap(null);
-            focusCircleRef.current = new w.kakao.maps.Circle({
-              center: pos,
-              radius: 80,
-              strokeWeight: 3,
-              strokeColor: "#3b82f6",
-              strokeOpacity: 0.9,
-              strokeStyle: "solid",
-              fillColor: "#3b82f6",
-              fillOpacity: 0.2,
-              zIndex: 9998,
-            });
-            focusCircleRef.current.setMap(map);
+            if (focusCircleRef.current) {
+              try {
+                focusCircleRef.current.setMap(null);
+              } catch {}
+              focusCircleRef.current = null as any;
+            }
             // 팝업 열기
             openPopup(it, pos);
           } catch {}
@@ -840,30 +861,55 @@ function MapView({
     // 초기 가시성: 아이템 위치로 자동 센터/줌 조정 (fitBounds)
     try {
       if (toAdd.length > 0) {
-        const bounds = new w.kakao.maps.LatLngBounds();
-        toAdd.forEach((mk: any) => {
-          const pos = mk.getPosition?.();
-          if (pos) bounds.extend(pos);
-        });
-        if (!bounds.isEmpty?.()) {
-          // 여백 포함하여 영역 맞춤
-          if (typeof map.setBounds === "function") {
-            // 마진은 kakao setBounds(top, right, bottom, left) 지원
-            try {
-              (map as any).setBounds(bounds, 40, 40, 40, 40);
-            } catch {
-              map.setBounds(bounds);
+        if (!didInitialFitRef.current) {
+          // 지역 전환 직후에는 새로운 데이터 로드 완료 시점에만 1회 fit
+          if (!pendingFitRef.current || !isLoading) {
+            const bounds = new w.kakao.maps.LatLngBounds();
+            toAdd.forEach((mk: any) => {
+              const pos = mk.getPosition?.();
+              if (pos) bounds.extend(pos);
+            });
+            if (!bounds.isEmpty?.()) {
+              // 여백 포함하여 영역 맞춤 (최초 1회만)
+              if (typeof map.setBounds === "function") {
+                try {
+                  (map as any).setBounds(bounds, 40, 40, 40, 40);
+                } catch {
+                  map.setBounds(bounds);
+                }
+              }
+              // 너무 멀게 잡히면 기본 확대 레벨로 보정
+              const lv = map.getLevel?.();
+              if (
+                typeof lv === "number" &&
+                lv > 6 &&
+                typeof map.setLevel === "function"
+              ) {
+                map.setLevel(6);
+              }
             }
+            didInitialFitRef.current = true;
+            pendingFitRef.current = false;
           }
-          // 너무 멀게 잡히면 기본 확대 레벨로 보정
-          const lv = map.getLevel?.();
-          if (
-            typeof lv === "number" &&
-            lv > 6 &&
-            typeof map.setLevel === "function"
-          ) {
-            map.setLevel(6);
-          }
+        } else {
+          // 필터 변경으로 아이템이 갱신되더라도 현재 중심을 유지
+          try {
+            const c = map.getCenter?.();
+            if (typeof (map as any).relayout === "function")
+              (map as any).relayout();
+            if (c && typeof map.setCenter === "function") map.setCenter(c);
+          } catch {}
+        }
+      } else {
+        // 아이템 0건 폴백: 레이아웃 재계산만 수행하고 현재 중심/레벨 유지
+        const kmap = kakaoMapRef.current;
+        if (kmap) {
+          try {
+            const current = kmap.getCenter?.();
+            if (typeof kmap.relayout === "function") kmap.relayout();
+            if (current && typeof kmap.setCenter === "function")
+              kmap.setCenter(current);
+          } catch {}
         }
       }
     } catch {}
@@ -878,7 +924,92 @@ function MapView({
         markersRef.current = [];
       } catch {}
     };
+  }, [items, isLoading, mapReady, provider]);
+
+  // vworld: 아이템 0건 시 기본 중심 유지 폴백
+  useEffect(() => {
+    if (provider === "kakao") return;
+    if (!mapReady || !items) return;
+    try {
+      const ctrl = mapControllerRef.current;
+      if (!ctrl || typeof ctrl.setCenter !== "function") return;
+      if (items.length === 0) {
+        const last = lastCenterRef.current || { lat: 37.5665, lng: 126.978 };
+        ctrl.setCenter({ x: last.lng, y: last.lat });
+      }
+    } catch {}
   }, [items, mapReady, provider]);
+
+  // Kakao: mapReady 후 즉시 relayout 보정(초기 타일 공백 방지)
+  useEffect(() => {
+    if (provider !== "kakao") return;
+    if (!mapReady) return;
+    try {
+      const kmap = kakaoMapRef.current;
+      if (kmap && typeof kmap.relayout === "function") {
+        setTimeout(() => {
+          try {
+            const center = kmap.getCenter?.();
+            kmap.relayout();
+            if (center && typeof kmap.setCenter === "function") {
+              kmap.setCenter(center);
+            }
+          } catch {}
+        }, 60);
+      }
+    } catch {}
+  }, [mapReady, provider]);
+
+  // Kakao: 중심/마우스 좌표 업데이트 (쓰로틀 적용)
+  useEffect(() => {
+    if (provider !== "kakao") return;
+    if (!mapReady || !kakaoMapRef.current) return;
+    try {
+      const w = window as any;
+      const map = kakaoMapRef.current;
+      // 초기 중심 세팅
+      try {
+        const c = map.getCenter?.();
+        if (c) setCenterCoord({ lat: c.getLat(), lng: c.getLng() });
+      } catch {}
+
+      const onIdle = () => {
+        try {
+          const c = map.getCenter?.();
+          if (c) setCenterCoord({ lat: c.getLat(), lng: c.getLng() });
+        } catch {}
+      };
+
+      let last = 0;
+      const onMouseMove = (mouseEvent: any) => {
+        const now = Date.now();
+        if (now - last < 16) return; // ~60fps
+        last = now;
+        try {
+          const latlng = mouseEvent?.latLng;
+          if (latlng)
+            setMouseCoord({ lat: latlng.getLat(), lng: latlng.getLng() });
+        } catch {}
+      };
+
+      w.kakao.maps.event.addListener(map, "idle", onIdle);
+      w.kakao.maps.event.addListener(map, "mousemove", onMouseMove);
+
+      return () => {
+        try {
+          w.kakao.maps.event.removeListener(map, "idle", onIdle);
+          w.kakao.maps.event.removeListener(map, "mousemove", onMouseMove);
+        } catch {}
+      };
+    } catch {}
+  }, [mapReady, provider]);
+
+  // mapReady 시 마지막 중심 좌표로 초기 표시 (provider 무관)
+  useEffect(() => {
+    if (!mapReady) return;
+    const last = lastCenterRef.current;
+    if (last) setCenterCoord({ lat: last.lat, lng: last.lng });
+  }, [mapReady]);
 
   // vworld 2D/3D 모드 전환 처리
   useEffect(() => {
@@ -914,33 +1045,13 @@ function MapView({
     } catch {}
   }, [isFullscreen]);
 
-  if (isLoading) {
-    return (
-      <div className="p-6">
-        <div className="text-sm text-gray-600">지도를 불러오는 중...</div>
-      </div>
-    );
-  }
-  if (error) {
-    return (
-      <div className="p-6">
-        <div className="text-sm text-red-600 mb-2">
-          지도를 불러오는 중 오류가 발생했습니다.
-        </div>
-        {onRetry && (
-          <button className="text-sm text-blue-600 underline" onClick={onRetry}>
-            다시 시도
-          </button>
-        )}
-      </div>
-    );
-  }
+  // 로딩/에러 시에도 지도 컨테이너는 유지하고, 오버레이로만 상태 표시
   // 아이템이 없어도 기본 지도는 렌더링되도록 유지
   const handleItemClick = (item: any) => onItemSelect?.(item);
 
   const formatMoneyText = (n?: number | string | null) => {
     const v = typeof n === "string" ? parseFloat(n) : n ?? 0;
-    if (!isFinite(v as number)) return "—";
+    if (!isFinite(v as number)) return "-";
     return `${Number(v).toLocaleString()}만원`;
   };
 
@@ -951,6 +1062,24 @@ function MapView({
   return (
     <div className={containerClass}>
       <div ref={mapRef} className="absolute inset-0 bg-gray-100" />
+      {isLoading && (
+        <div className="absolute top-2 right-2 rounded bg-white/90 px-2 py-1 text-xs text-gray-600 shadow z-20">
+          지도를 불러오는 중...
+        </div>
+      )}
+      {!!error && (
+        <div className="absolute top-2 left-1/2 -translate-x-1/2 rounded bg-red-50 px-3 py-2 text-xs text-red-700 shadow z-20 flex items-center gap-2">
+          <span>지도 로딩 오류</span>
+          {onRetry && (
+            <button
+              className="rounded border border-red-200 bg-white/80 px-2 py-0.5 text-red-700"
+              onClick={onRetry}
+            >
+              다시 시도
+            </button>
+          )}
+        </div>
+      )}
       {/* 지도 중앙 크로스헤어 */}
       <div
         aria-hidden
@@ -983,7 +1112,7 @@ function MapView({
 
       {!mapReady && (
         <div className="absolute top-2 right-2 rounded bg-white/90 px-2 py-1 text-xs text-gray-600 shadow">
-          vworld 초기화 대기중
+          지도 초기화 중...
         </div>
       )}
       {/* 전체화면 토글 버튼 */}
@@ -1023,6 +1152,32 @@ function MapView({
       {/* 임시: 우상단에 아이템 개수/선택 안내 */}
       <div className="absolute bottom-2 right-2 rounded bg-white/90 px-2 py-1 text-xs text-gray-700 shadow">
         항목 {items.length}개
+      </div>
+      {/* 좌측하단: 중심/마우스 좌표 표시 (provider 무관 표시, 스타일 개선) */}
+      <div className="absolute left-2 bottom-[21px] z-10">
+        <div className="rounded-lg border border-gray-200/80 bg-white/95 px-3 py-2 text-xs text-gray-800 shadow-sm">
+          <div className="mb-1 flex items-center gap-2">
+            <span className="text-[11px] font-semibold text-gray-700">
+              좌표
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] text-gray-500">중앙</span>
+            <span className="font-mono">
+              {centerCoord
+                ? `${centerCoord.lat.toFixed(6)}, ${centerCoord.lng.toFixed(6)}`
+                : "-"}
+            </span>
+          </div>
+          <div className="mt-1 flex items-center gap-2">
+            <span className="text-[11px] text-gray-500">마우스</span>
+            <span className="font-mono">
+              {mouseCoord
+                ? `${mouseCoord.lat.toFixed(6)}, ${mouseCoord.lng.toFixed(6)}`
+                : "-"}
+            </span>
+          </div>
+        </div>
       </div>
       {/* 임시: 목록을 오버레이로 노출하여 선택 가능하도록 제공 */}
       <div className="absolute left-2 top-2 max-h-[380px] w-60 overflow-auto rounded bg-white/95 p-2 text-xs shadow">
@@ -1077,7 +1232,7 @@ function MapView({
                 <dd className="text-right">
                   {mobilePopupItem?.bid_to_appraised_ratio != null
                     ? `${mobilePopupItem?.bid_to_appraised_ratio}%`
-                    : "—"}
+                    : "-"}
                 </dd>
                 <dt className="text-gray-500">현재상태</dt>
                 <dd className="text-right">
@@ -1085,7 +1240,7 @@ function MapView({
                 </dd>
                 <dt className="text-gray-500">매각기일</dt>
                 <dd className="text-right">
-                  {mobilePopupItem?.sale_date ?? "—"}
+                  {mobilePopupItem?.sale_date ?? "-"}
                 </dd>
                 <dt className="text-gray-500">공시가격</dt>
                 <dd className="text-right">
@@ -1098,9 +1253,9 @@ function MapView({
                       parseFloat(mobilePopupItem?.minimum_bid_price ?? "") || 0;
                     const pubV =
                       parseFloat(mobilePopupItem?.public_price ?? "") || 0;
-                    if (!pubV) return "—";
+                    if (!pubV) return "-";
                     const r = (minV / pubV) * 100;
-                    return isFinite(r) ? `${r.toFixed(1)}%` : "—";
+                    return isFinite(r) ? `${r.toFixed(1)}%` : "-";
                   })()}
                 </dd>
                 <dt className="text-gray-500">건물평형</dt>

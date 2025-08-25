@@ -101,6 +101,8 @@ export interface UseItemsResult {
   error: any;
   totalCount?: number;
   baseTotalCount?: number;
+  // 지도 전용: 클라이언트 필터/정렬이 적용된 전체 아이템(페이지 슬라이싱 전)
+  mapItems?: Item[] | undefined;
   usageValues: string[]; // 🏢 동적 건물 유형 필터 옵션 생성용
   floorValues: string[]; // 🏢 동적 층확인 필터 옵션 생성용
   refetch: () => void;
@@ -369,7 +371,17 @@ export function useItems(): UseItemsResult {
   // 🎯 지역 선택된 경우에만 API 호출 (성능 최적화)
   const { data, error, isLoading, isValidating, mutate } = useSWR(
     swrKey,
-    fetcher
+    fetcher,
+    {
+      keepPreviousData: true,
+      dedupingInterval: 1500,
+      revalidateOnFocus: false,
+      revalidateOnReconnect: false,
+      focusThrottleInterval: 1500,
+      loadingTimeout: 8000,
+      errorRetryCount: 1,
+      errorRetryInterval: 1500,
+    }
   );
 
   // 🚨 지역 미선택 시 빈 데이터 반환 (성능 최적화)
@@ -388,6 +400,8 @@ export function useItems(): UseItemsResult {
 
   // 🔍 실제 데이터 구조 확인 및 클라이언트 사이드 필터링
   let items = (data as any)?.items ?? (data as any) ?? [];
+  // 지도 표시용 전체 결과(슬라이스 전)
+  let mapItems: any[] | undefined = undefined;
   // 🔎 클라이언트 보정: contains 검색 (case_number, road_address)
   if (
     typeof filters.searchQuery === "string" &&
@@ -645,6 +659,8 @@ export function useItems(): UseItemsResult {
   if (needsClientProcessing) {
     // 클라이언트 처리가 적용된 경우, 실제 처리된 개수로 업데이트
     actualTotalCount = items.length;
+    // 지도에는 페이지 슬라이싱 전 전체를 사용 (상한 2000)
+    mapItems = items.slice(0, 2000);
     console.log(
       `🔄 [Client] 클라이언트 처리 적용됨 - 총 개수 업데이트: ${originalTotalCount} → ${actualTotalCount}`
     );
@@ -663,6 +679,8 @@ export function useItems(): UseItemsResult {
 
     items = items.slice(startIndex, endIndex);
   }
+  // 서버 처리 모드에서는 지도도 현재 페이지 데이터를 그대로 사용
+  if (!mapItems) mapItems = items;
 
   // 🔍 페이지네이션 관련 서버 응답 로그
   console.log(
@@ -679,6 +697,7 @@ export function useItems(): UseItemsResult {
     error,
     totalCount: actualTotalCount,
     baseTotalCount: originalTotalCount,
+    mapItems,
     usageValues, // 🏢 동적 건물 유형 필터 옵션 생성용
     floorValues, // 🏢 동적 층확인 필터 옵션 생성용
     refetch: () => {

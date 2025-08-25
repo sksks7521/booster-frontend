@@ -41,8 +41,15 @@ export default function AnalysisPage() {
   const [activeView, setActiveView] = useState<"table" | "map" | "both">(
     "table"
   );
-  const { items, isLoading, error, totalCount, baseTotalCount, refetch } =
-    useItems();
+  const {
+    items,
+    mapItems,
+    isLoading,
+    error,
+    totalCount,
+    baseTotalCount,
+    refetch,
+  } = useItems();
   const setPage = useFilterStore((s) => s.setPage);
   const setSize = useFilterStore((s) => s.setSize);
   const page = useFilterStore((s) => s.page);
@@ -239,7 +246,13 @@ export default function AnalysisPage() {
                 )}
                 {activeView === "map" && (
                   <MapView
-                    items={items}
+                    key={`${filters.sido_code || filters.province}-${
+                      filters.city_code || filters.cityDistrict
+                    }-${filters.town_code || filters.town || ""}`}
+                    locationKey={`${filters.sido_code || filters.province}-${
+                      filters.city_code || filters.cityDistrict
+                    }-${filters.town_code || filters.town || ""}`}
+                    items={mapItems || items}
                     isLoading={isLoading}
                     error={error}
                     onRetry={refetch}
@@ -250,7 +263,15 @@ export default function AnalysisPage() {
                     <div>
                       <h3 className="text-lg font-semibold mb-3">지도</h3>
                       <MapView
-                        items={items}
+                        key={`${filters.sido_code || filters.province}-${
+                          filters.city_code || filters.cityDistrict
+                        }-${filters.town_code || filters.town || ""}-both`}
+                        locationKey={`${
+                          filters.sido_code || filters.province
+                        }-${filters.city_code || filters.cityDistrict}-${
+                          filters.town_code || filters.town || ""
+                        }`}
+                        items={mapItems || items}
                         isLoading={isLoading}
                         error={error}
                         onRetry={refetch}
