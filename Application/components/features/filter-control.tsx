@@ -232,6 +232,12 @@ export default function FilterControl({
 
   // 상세 조건만 초기화 (지역은 유지)
   const resetDetailFilters = () => {
+    // 오늘과 +1개월 기본 매각기일 설정으로 UI/데이터 정합성 유지
+    const today = new Date();
+    const plus30 = new Date(today);
+    plus30.setDate(plus30.getDate() + 31);
+    const fmt = (d: Date) => d.toISOString().slice(0, 10);
+
     setRangeFilter("priceRange", [0, 500000]);
     setRangeFilter("areaRange", [0, 200]); // deprecated 유지 초기화
     setRangeFilter("buildingAreaRange", [0, 100]);
@@ -245,8 +251,8 @@ export default function FilterControl({
     setFilter("hasParking", undefined as any);
     setFilter("auctionStatus", "all" as any);
     setFilter("under100", false as any);
-    setFilter("auctionDateFrom", undefined as any);
-    setFilter("auctionDateTo", undefined as any);
+    setFilter("auctionDateFrom", fmt(today) as any);
+    setFilter("auctionDateTo", fmt(plus30) as any);
     // 🆕 상태/특수조건 초기화
     setFilter("currentStatus" as any, "all");
     setFilter("specialConditions" as any, []);

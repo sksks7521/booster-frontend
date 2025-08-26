@@ -67,6 +67,7 @@ function MapView({
     lat: number;
     lng: number;
   } | null>(null);
+  const [zoomLevel, setZoomLevel] = useState<number | null>(null);
 
   // 지도 제공자: 안정화를 위해 Kakao를 강제 사용
   const providerEnv = "kakao";
@@ -88,6 +89,8 @@ function MapView({
     } catch {}
     markersRef.current = [];
     didInitialFitRef.current = false;
+    // 지역 전환 직후 데이터 로드 완료 시점에 맞춰 1회 fitBounds 수행을 보장
+    pendingFitRef.current = true;
     // 팝업도 초기화
     try {
       if (popupOverlayRef.current) popupOverlayRef.current.setMap(null);
@@ -97,9 +100,7 @@ function MapView({
     if (provider === "kakao" && kakaoMapRef.current) {
       try {
         const map = kakaoMapRef.current;
-        const c = map.getCenter?.();
         if (typeof map.relayout === "function") map.relayout();
-        if (c && typeof map.setCenter === "function") map.setCenter(c);
       } catch {}
     }
   }, [locationKey, mapReady, provider]);
@@ -114,7 +115,7 @@ function MapView({
           const w = window as any;
           const map = new w.kakao.maps.Map(mapRef.current, {
             center: new w.kakao.maps.LatLng(37.5665, 126.978),
-            level: 4,
+            level: 8,
           });
           kakaoMapRef.current = map;
           try {
@@ -184,7 +185,7 @@ function MapView({
                     // eslint-disable-next-line @typescript-eslint/no-unused-vars
                     const kmap = new kk.maps.Map(mapRef.current, {
                       center: new kk.maps.LatLng(37.5665, 126.978),
-                      level: 4,
+                      level: 8,
                     });
                     kakaoMapRef.current = kmap;
                     try {
@@ -238,7 +239,7 @@ function MapView({
               // eslint-disable-next-line @typescript-eslint/no-unused-vars
               const kmap = new kk.maps.Map(mapRef.current, {
                 center: new kk.maps.LatLng(37.5665, 126.978),
-                level: 4,
+                level: 8,
               });
               setMapReady(true);
             } else {
@@ -878,15 +879,24 @@ function MapView({
                   map.setBounds(bounds);
                 }
               }
-              // 너무 멀게 잡히면 기본 확대 레벨로 보정
-              const lv = map.getLevel?.();
-              if (
-                typeof lv === "number" &&
-                lv > 6 &&
-                typeof map.setLevel === "function"
-              ) {
-                map.setLevel(6);
+              // 지역 이동 시 줌 레벨을 8로 통일
+              if (typeof map.setLevel === "function") {
+                map.setLevel(8);
               }
+              // bounds 적용 직후 중앙 좌표/참조를 즉시 동기화하여 기본값으로 남지 않도록 보정
+              try {
+                setTimeout(() => {
+                  try {
+                    const cc = map.getCenter?.();
+                    if (cc) {
+                      const lat = cc.getLat();
+                      const lng = cc.getLng();
+                      lastCenterRef.current = { lat, lng };
+                      setCenterCoord({ lat, lng });
+                    }
+                  } catch {}
+                }, 0);
+              } catch {}
             }
             didInitialFitRef.current = true;
             pendingFitRef.current = false;
@@ -971,12 +981,16 @@ function MapView({
       try {
         const c = map.getCenter?.();
         if (c) setCenterCoord({ lat: c.getLat(), lng: c.getLng() });
+        const lv = map.getLevel?.();
+        if (typeof lv === "number") setZoomLevel(lv);
       } catch {}
 
       const onIdle = () => {
         try {
           const c = map.getCenter?.();
           if (c) setCenterCoord({ lat: c.getLat(), lng: c.getLng() });
+          const lv = map.getLevel?.();
+          if (typeof lv === "number") setZoomLevel(lv);
         } catch {}
       };
 
@@ -1165,7 +1179,11 @@ function MapView({
             <span className="text-[11px] text-gray-500">중앙</span>
             <span className="font-mono">
               {centerCoord
-                ? `${centerCoord.lat.toFixed(6)}, ${centerCoord.lng.toFixed(6)}`
+                ? `${centerCoord.lat.toFixed(6)}, ${centerCoord.lng.toFixed(
+                    6
+                  )}  z=${
+                    zoomLevel != null ? String(zoomLevel).padStart(2, "0") : "-"
+                  }`
                 : "-"}
             </span>
           </div>
