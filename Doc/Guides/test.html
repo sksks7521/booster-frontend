@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>부동산 상세 페이지 디자인 프로토타입</title>
+    <style>
+      /* 기본 & 폰트 설정 */
+      @import url("https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap");
+
+      body {
+        font-family: "Noto Sans KR", sans-serif;
+        background-color: #f8f9fa;
+        color: #212529;
+        margin: 0;
+        padding: 24px;
+      }
+
+      /* 레이아웃 */
+      .container {
+        max-width: 1200px;
+        margin: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 24px;
+      }
+
+      .main-grid {
+        display: grid;
+        grid-template-columns: 2fr 1fr;
+        gap: 24px;
+        align-items: start;
+      }
+
+      .main-content {
+        display: flex;
+        flex-direction: column;
+        gap: 24px;
+      }
+
+      .sidebar {
+        display: flex;
+        flex-direction: column;
+        gap: 24px;
+        position: sticky;
+        top: 24px;
+      }
+
+      /* 카드 컴포넌트 */
+      .card {
+        background-color: #ffffff;
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        padding: 24px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+      }
+
+      .card h2 {
+        margin-top: 0;
+        margin-bottom: 20px;
+        font-size: 18px;
+        border-bottom: 1px solid #e9ecef;
+        padding-bottom: 12px;
+      }
+
+      /* 헤더 & 태그 */
+      .header {
+        padding: 24px;
+        background-color: #fff;
+        border-radius: 8px;
+        border: 1px solid #dee2e6;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+      }
+
+      .header h1 {
+        margin: 0 0 12px 0;
+        font-size: 28px;
+        color: #343a40;
+      }
+
+      .tags {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+
+      .tag {
+        padding: 4px 12px;
+        border-radius: 16px;
+        font-size: 13px;
+        font-weight: 700;
+      }
+      .tag-info {
+        background-color: #e6f7ff;
+        border: 1px solid #91d5ff;
+        color: #0050b3;
+      }
+      .tag-warning {
+        background-color: #fff7e6;
+        border: 1px solid #ffd591;
+        color: #d46b08;
+      }
+      .tag-critical {
+        background-color: #fff1f0;
+        border: 1px solid #ffa39e;
+        color: #cf1322;
+      }
+
+      /* 테이블 스타일 */
+      table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+
+      th,
+      td {
+        padding: 12px 0;
+        text-align: left;
+        border-bottom: 1px solid #f1f3f5;
+        font-size: 15px;
+      }
+
+      th {
+        width: 40%;
+        color: #495057;
+        font-weight: 500;
+      }
+
+      td {
+        color: #212529;
+        font-weight: 500;
+      }
+
+      td.null-data {
+        color: #adb5bd;
+        font-weight: 400;
+      }
+
+      td strong {
+        font-weight: 700;
+        color: #000;
+      }
+
+      .copy-button {
+        margin-left: 8px;
+        font-size: 12px;
+        background-color: #e9ecef;
+        color: #495057;
+        border: none;
+        border-radius: 4px;
+        padding: 2px 6px;
+        cursor: pointer;
+      }
+
+      /* 위치 정보 & 액션 버튼 */
+      .map-placeholder {
+        width: 100%;
+        height: 180px;
+        background-color: #e9ecef;
+        border-radius: 4px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #868e96;
+        font-size: 14px;
+        margin-bottom: 12px;
+      }
+
+      .action-buttons {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+
+      .btn {
+        width: 100%;
+        padding: 12px;
+        font-size: 16px;
+        font-weight: 700;
+        border-radius: 6px;
+        border: 1px solid;
+        cursor: pointer;
+        text-align: center;
+      }
+
+      .btn-primary {
+        background-color: #007bff;
+        color: white;
+        border-color: #007bff;
+      }
+      .btn-secondary {
+        background-color: white;
+        color: #007bff;
+        border-color: #007bff;
+      }
+      .btn-tertiary {
+        background-color: transparent;
+        color: #495057;
+        border: none;
+        padding-left: 0;
+        text-align: left;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <header class="header">
+        <h1>다세대(빌라) | 경기 고양시 덕양구 흥국사길 33</h1>
+        <div class="tags">
+          <span class="tag tag-info">경매진행</span>
+          <span class="tag tag-warning">유찰 1회</span>
+          <span class="tag tag-critical">⚠️ 주의: 대항력 임차인</span>
+        </div>
+      </header>
+
+      <div class="main-grid">
+        <div class="main-content">
+          <section class="card">
+            <h2>가격 분석</h2>
+            <table>
+              <tr>
+                <th>감정가</th>
+                <td><strong>25,300만원</strong></td>
+              </tr>
+              <tr>
+                <th>최저가 (70%)</th>
+                <td><strong>17,710만원</strong></td>
+              </tr>
+              <tr>
+                <th>공시가격</th>
+                <td>13,600만원</td>
+              </tr>
+              <tr>
+                <th>예상 월세수익</th>
+                <td class="null-data">-</td>
+              </tr>
+            </table>
+          </section>
+
+          <section class="card">
+            <h2>물건 명세</h2>
+            <table>
+              <tr>
+                <th>건축연도</th>
+                <td>2016년</td>
+              </tr>
+              <tr>
+                <th>건물 / 토지 평형</th>
+                <td>59.3㎡ (17.93평) / 60.5㎡ (15.28평)</td>
+              </tr>
+              <tr>
+                <th>건물명</th>
+                <td class="null-data">-</td>
+              </tr>
+              <tr>
+                <th>해당 / 전체 층수</th>
+                <td class="null-data">-</td>
+              </tr>
+              <tr>
+                <th>주용도</th>
+                <td class="null-data">-</td>
+              </tr>
+              <tr>
+                <th>엘리베이터</th>
+                <td>있음</td>
+              </tr>
+            </table>
+          </section>
+
+          <section class="card">
+            <h2>권리 분석</h2>
+            <table>
+              <tr>
+                <th>특수권리</th>
+                <td><strong>대항력 있는 임차인 존재 (보증금 미상)</strong></td>
+              </tr>
+              <tr>
+                <th>등기부 요약</th>
+                <td class="null-data">-</td>
+              </tr>
+              <tr>
+                <th>임차인 현황</th>
+                <td class="null-data">-</td>
+              </tr>
+            </table>
+          </section>
+        </div>
+
+        <div class="sidebar">
+          <section class="card">
+            <h2>경매 기본 정보</h2>
+            <table>
+              <tr>
+                <th>사건번호</th>
+                <td>2024-87361<button class="copy-button">복사</button></td>
+              </tr>
+              <tr>
+                <th>매각기일</th>
+                <td>2025-08-26 (D-Day)</td>
+              </tr>
+              <tr>
+                <th>담당 법원</th>
+                <td class="null-data">-</td>
+              </tr>
+            </table>
+          </section>
+
+          <section class="card">
+            <h2>위치 정보</h2>
+            <div class="map-placeholder">지도 API 연동 영역</div>
+            <p style="font-size: 14px; color: #495057; margin: 0">
+              경기 고양시 덕양구 흥국사길 33
+            </p>
+          </section>
+
+          <div class="action-buttons">
+            <button class="btn btn-primary">관심 물건으로 추가</button>
+            <button class="btn btn-secondary">분석 보고서 생성</button>
+            <button class="btn btn-tertiary">전문가에게 문의</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

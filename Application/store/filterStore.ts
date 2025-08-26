@@ -63,6 +63,8 @@ interface FilterState {
   showSelectedOnly: boolean;
   // 🆕 관심물건 (간단 북마크 목록)
   favorites: string[];
+  // 🆕 지도 이동 펜딩 타깃(상세→지도에서 보기)
+  pendingMapTarget?: { lat: number; lng: number } | null;
 }
 
 // 필터 상태를 변경하는 액션(Action)의 타입을 정의합니다.
@@ -93,6 +95,8 @@ interface FilterActions {
   // 🆕 선택 연동 액션
   setSelectedIds: (ids: string[]) => void;
   setShowSelectedOnly: (v: boolean) => void;
+  // 🆕 지도 이동 펜딩 타깃 설정
+  setPendingMapTarget?: (target: { lat: number; lng: number } | null) => void;
 }
 
 // 필터의 초기 상태 값입니다.
@@ -151,6 +155,7 @@ const initialState: FilterState = {
   selectedIds: [],
   showSelectedOnly: false,
   favorites: [],
+  pendingMapTarget: null,
 };
 
 // Zustand 스토어를 생성합니다.
@@ -217,4 +222,6 @@ export const useFilterStore = create<FilterState & FilterActions>((set) => ({
         (x: string) => x !== String(id)
       ),
     })),
+  // 🆕 지도 이동 펜딩 타깃 설정
+  setPendingMapTarget: (target) => set({ pendingMapTarget: target }),
 }));

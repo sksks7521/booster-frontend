@@ -53,6 +53,10 @@ function MapView({
   >(new Map());
   const highlightedIdsRef = useRef<Set<string>>(new Set());
   const selectedOverlayMarkersRef = useRef<Map<string, any>>(new Map());
+  // 동일 좌표 그룹: key(lat,lng 6자리 고정) → items[]
+  const coordGroupsRef = useRef<Map<string, any[]>>(new Map());
+  // 마커 → 원본 아이템 매핑(클러스터 클릭 시 활용)
+  const markerToItemRef = useRef<Map<any, any>>(new Map());
   // 팝업/툴팁: 데스크톱 CustomOverlay 1개 재사용, 모바일은 하단 시트
   const popupOverlayRef = useRef<any>(null);
   const [mobilePopupItem, setMobilePopupItem] = useState<any | null>(null);
@@ -70,6 +74,8 @@ function MapView({
   const didInitialFitRef = useRef<boolean>(false);
   // 지역 전환 직후, 새 데이터 로드 완료 후에만 1회 fitBounds 하도록 보류 플래그
   const pendingFitRef = useRef<boolean>(false);
+  // 상세→지도 이동 시 목표 좌표를 저장하여 초기 fitBounds를 우회
+  const openTargetRef = useRef<{ lat: number; lng: number } | null>(null);
   // 좌표 표시용 상태 (지도 중심/마우스 포인터)
   const [centerCoord, setCenterCoord] = useState<{
     lat: number;
@@ -327,7 +333,14 @@ function MapView({
         if (provider === "kakao" && kakaoMapRef.current) {
           const w = window as any;
           const latlng = new w.kakao.maps.LatLng(detail.lat, detail.lng);
+          openTargetRef.current = { lat: detail.lat, lng: detail.lng };
           kakaoMapRef.current.setCenter(latlng);
+          // 요청: 지도에서 보기 → 해당 좌표로 이동 + 줌 레벨 4 고정
+          try {
+            if (typeof kakaoMapRef.current.setLevel === "function") {
+              kakaoMapRef.current.setLevel(4);
+            }
+          } catch {}
           lastCenterRef.current = { lat: detail.lat, lng: detail.lng };
 
           try {
@@ -379,6 +392,13 @@ function MapView({
     } catch {}
     markersRef.current = [];
     markerIndexRef.current.clear();
+    // 좌표 그룹/마커-아이템 맵 초기화(중복 누적 방지)
+    try {
+      coordGroupsRef.current.clear();
+    } catch {}
+    try {
+      markerToItemRef.current.clear();
+    } catch {}
 
     // Threshold (만원) - 전역 상태 사용 (동적 길이 1..5)
     const thresholds: number[] = Array.isArray(thresholdsState)
@@ -720,6 +740,200 @@ function MapView({
       setMobilePopupItem(null);
     };
 
+    const buildMultiPopupHTML = (itemsAtPoint: any[], pageIdx: number) => {
+      const target = itemsAtPoint[pageIdx] ?? itemsAtPoint[0];
+      const content = buildPopupHTML(target);
+      // 네비게이션 바 추가
+      const nav = document.createElement("div");
+      nav.style.display = "flex";
+      nav.style.justifyContent = "center";
+      nav.style.alignItems = "center";
+      nav.style.gap = "8px";
+      nav.style.marginTop = "8px";
+      nav.innerHTML = `
+        <button data-action="prev" style="padding:4px 8px;border:1px solid #e5e7eb;border-radius:8px;background:#fff">◀</button>
+        <span data-role="page" style="font-size:12px;color:#374151">${
+          pageIdx + 1
+        } / ${itemsAtPoint.length}</span>
+        <button data-action="next" style="padding:4px 8px;border:1px solid #e5e7eb;border-radius:8px;background:#fff">▶</button>
+      `;
+      content.appendChild(nav);
+      return content;
+    };
+
+    const openMultiPopup = (
+      itemsAtPoint: any[],
+      pos: any,
+      startIdx: number
+    ) => {
+      const w = window as any;
+      const mount = (idx: number) => {
+        const content = buildMultiPopupHTML(itemsAtPoint, idx);
+        if (!popupOverlayRef.current) {
+          popupOverlayRef.current = new w.kakao.maps.CustomOverlay({
+            position: pos,
+            yAnchor: 1,
+            zIndex: 9999,
+            content,
+          });
+        } else {
+          popupOverlayRef.current.setContent(content);
+          popupOverlayRef.current.setPosition(pos);
+        }
+        popupOverlayRef.current.setMap(kakaoMapRef.current);
+        // 네비게이션/액션 이벤트 (닫기/상세/복사/공유/즐겨찾기 포함)
+        const root: HTMLElement = content;
+        const prevBtn = root.querySelector(
+          '[data-action="prev"]'
+        ) as HTMLButtonElement | null;
+        const nextBtn = root.querySelector(
+          '[data-action="next"]'
+        ) as HTMLButtonElement | null;
+        const closeBtn = root.querySelector(
+          '[data-action="close"]'
+        ) as HTMLButtonElement | null;
+        const detailBtn = root.querySelector(
+          '[data-action="detail"]'
+        ) as HTMLButtonElement | null;
+        const favBtn = root.querySelector(
+          '[data-action="fav"]'
+        ) as HTMLButtonElement | null;
+        const shareBtn = root.querySelector(
+          '[data-action="share"]'
+        ) as HTMLButtonElement | null;
+        const copyAddrBtn = root.querySelector(
+          '[data-action="copy-addr"]'
+        ) as HTMLButtonElement | null;
+        const copyCaseBtn = root.querySelector(
+          '[data-action="copy-case"]'
+        ) as HTMLButtonElement | null;
+
+        prevBtn?.addEventListener("click", (ev) => {
+          ev.stopPropagation();
+          const next = (idx - 1 + itemsAtPoint.length) % itemsAtPoint.length;
+          mount(next);
+        });
+        nextBtn?.addEventListener("click", (ev) => {
+          ev.stopPropagation();
+          const next = (idx + 1) % itemsAtPoint.length;
+          mount(next);
+        });
+
+        // 현재 페이지의 아이템
+        const currentItem = itemsAtPoint[idx];
+        closeBtn?.addEventListener("click", (ev) => {
+          ev.stopPropagation();
+          try {
+            if (popupOverlayRef.current) popupOverlayRef.current.setMap(null);
+          } catch {}
+        });
+        detailBtn?.addEventListener("click", (ev) => {
+          ev.stopPropagation();
+          const evt = new CustomEvent("property:openDetail", {
+            detail: { id: String(currentItem?.id ?? "") },
+          });
+          window.dispatchEvent(evt);
+        });
+        favBtn?.addEventListener("click", (ev) => {
+          ev.stopPropagation();
+          const evt = new CustomEvent("property:toggleFavorite", {
+            detail: { id: String(currentItem?.id ?? "") },
+          });
+          window.dispatchEvent(evt);
+          try {
+            const active = favBtn.getAttribute("data-active") === "1";
+            if (active) {
+              favBtn.textContent = "☆";
+              favBtn.setAttribute("data-active", "0");
+            } else {
+              favBtn.textContent = "⭐";
+              favBtn.setAttribute("data-active", "1");
+            }
+          } catch {}
+        });
+
+        const showToastFixed = (msg: string) => {
+          try {
+            const toast = document.createElement("div");
+            toast.textContent = msg;
+            toast.style.position = "fixed";
+            toast.style.left = "50%";
+            toast.style.top = "24px";
+            toast.style.transform = "translate(-50%, -10px)";
+            toast.style.zIndex = "99999";
+            toast.style.padding = "8px 12px";
+            toast.style.borderRadius = "8px";
+            toast.style.fontSize = "12px";
+            toast.style.background = "rgba(17,24,39,.9)";
+            toast.style.color = "#fff";
+            toast.style.boxShadow = "0 4px 10px rgba(0,0,0,.2)";
+            toast.style.opacity = "0";
+            toast.style.transition =
+              "opacity .6s ease-in-out, transform .6s ease-in-out";
+            toast.style.pointerEvents = "none";
+            document.body.appendChild(toast);
+            requestAnimationFrame(() => {
+              toast.style.opacity = "1";
+              toast.style.transform = "translate(-50%, 0px)";
+            });
+            setTimeout(() => {
+              toast.style.opacity = "0";
+              toast.style.transform = "translate(-50%, -10px)";
+            }, 1400);
+            setTimeout(() => toast.remove(), 2000);
+          } catch {}
+        };
+        copyAddrBtn?.addEventListener("click", async (ev) => {
+          ev.stopPropagation();
+          try {
+            await navigator.clipboard.writeText(
+              String(currentItem?.road_address || "")
+            );
+            showToastFixed("주소가 복사되었습니다");
+          } catch {}
+        });
+        copyCaseBtn?.addEventListener("click", async (ev) => {
+          ev.stopPropagation();
+          try {
+            await navigator.clipboard.writeText(
+              String(currentItem?.case_number || "")
+            );
+            showToastFixed("사건번호가 복사되었습니다");
+          } catch {}
+        });
+        shareBtn?.addEventListener("click", async (ev) => {
+          ev.stopPropagation();
+          try {
+            const title = `${currentItem?.usage ?? ""} · ${
+              currentItem?.case_number ?? ""
+            }`;
+            const text = currentItem?.road_address ?? "";
+            const url = window.location.href;
+            if ((navigator as any).share) {
+              await (navigator as any).share({ title, text, url });
+            } else {
+              await navigator.clipboard.writeText(`${title}\n${text}\n${url}`);
+              showToastFixed("링크가 복사되었습니다");
+            }
+          } catch {}
+        });
+        // 팝업 내부 이벤트 전파 방지
+        const stop = (e: Event) => e.stopPropagation();
+        const stopPrevent = (e: Event) => {
+          e.stopPropagation();
+          e.preventDefault();
+        };
+        root.addEventListener("click", stop);
+        root.addEventListener("mousedown", stop);
+        root.addEventListener("touchstart", stop);
+        root.addEventListener("wheel", stopPrevent, { passive: false } as any);
+        root.addEventListener("touchmove", stopPrevent, {
+          passive: false,
+        } as any);
+      };
+      mount(startIdx);
+    };
+
     // SVG 배지 → MarkerImage (25x25, rx=6, 중앙 앵커) 캐싱
     const getModernBadgeImage = (color: string, text: string) => {
       const key = `${color}-${text}`;
@@ -755,8 +969,95 @@ function MapView({
         averageCenter: true,
         minLevel: 9, // 기본안: level ≥ 9 병합
         gridSize: 60,
-        disableClickZoom: false,
+        disableClickZoom: true, // 클릭 시 사용자 정의 동작
       });
+      // 클러스터 클릭 정책
+      // - level > 2: bounds로 확대(일반 동작)
+      // - level == 2: 동일좌표만이면 멀티팝업, 아니면 강제 level 1로 즉시 확대
+      // - level == 1: 동일좌표면 멀티팝업, 아니면 줌 변경 없이 유지
+      w.kakao.maps.event.addListener(
+        clustererRef.current,
+        "clusterclick",
+        (cluster: any) => {
+          try {
+            const center = cluster.getCenter?.();
+            const markers: any[] = cluster.getMarkers?.() || [];
+            // id 기준 유일화된 아이템 목록
+            const itemsAtPoint = Array.from(
+              new Map(
+                (markers || [])
+                  .map((m: any) => markerToItemRef.current.get(m))
+                  .filter(Boolean)
+                  .map((it: any) => [String(it?.id ?? ""), it])
+              ).values()
+            );
+            // 좌표 목록/uniq 키 계산
+            const bounds = new w.kakao.maps.LatLngBounds();
+            const posList: any[] = [];
+            markers.forEach((mk: any) => {
+              try {
+                const p = mk.getPosition?.();
+                if (p) {
+                  bounds.extend(p);
+                  posList.push(p);
+                }
+              } catch {}
+            });
+            const uniq = new Set(
+              posList.map(
+                (p: any) => `${p.getLat().toFixed(6)},${p.getLng().toFixed(6)}`
+              )
+            );
+            const level = map.getLevel?.();
+            if (typeof level !== "number") return;
+            if (level > 2) {
+              // 일반: bounds로 확대
+              if (!bounds.isEmpty?.()) {
+                try {
+                  (map as any).setBounds(bounds, 40, 40, 40, 40);
+                } catch {
+                  map.setBounds(bounds);
+                }
+              } else if (center && typeof map.panTo === "function") {
+                map.panTo(center);
+              }
+              return;
+            }
+            if (level === 2) {
+              if (uniq.size === 1 && itemsAtPoint.length > 0) {
+                // 동일좌표 → 멀티팝업, 줌 변경 없음
+                const pos =
+                  center instanceof w.kakao.maps.LatLng
+                    ? center
+                    : map.getCenter?.();
+                openMultiPopup(itemsAtPoint, pos, 0);
+              } else {
+                // 즉시 1레벨로 확대
+                try {
+                  map.setLevel(1);
+                } catch {}
+                if (center && typeof map.panTo === "function") {
+                  map.panTo(center);
+                }
+              }
+              return;
+            }
+            // level === 1
+            if (uniq.size === 1 && itemsAtPoint.length > 0) {
+              const pos =
+                center instanceof w.kakao.maps.LatLng
+                  ? center
+                  : map.getCenter?.();
+              openMultiPopup(itemsAtPoint, pos, 0);
+            } else {
+              // 좌표가 여전히 섞여 있어도 줌 변경 없이 유지(팬만)
+              if (center && typeof map.panTo === "function") {
+                map.panTo(center);
+              }
+            }
+          } catch {}
+        }
+      );
     } catch {}
 
     // 줌 정책 적용: level 기준 병합/부분/개별
@@ -811,6 +1112,9 @@ function MapView({
         });
         // 클러스터 사용 시 setMap은 클러스터러가 담당
         if (!clustererRef.current) marker.setMap(map);
+        try {
+          markerToItemRef.current.set(marker, it);
+        } catch {}
         const idStr = String(it?.id ?? "").trim();
         if (idStr) {
           markerIndexRef.current.set(idStr, {
@@ -821,6 +1125,12 @@ function MapView({
             label,
           });
         }
+        // 동일 좌표 그룹 키 구성
+        const key = `${lat.toFixed(6)},${lng.toFixed(6)}`;
+        const grp = coordGroupsRef.current.get(key) || [];
+        grp.push(it);
+        coordGroupsRef.current.set(key, grp);
+
         w.kakao.maps.event.addListener(marker, "click", () => {
           try {
             // 중심 이동 및 하이라이트 (크로스 헤어에 마커가 정확히 오도록 오프셋 적용)
@@ -883,8 +1193,24 @@ function MapView({
               } catch {}
               focusCircleRef.current = null as any;
             }
-            // 팝업 열기
-            openPopup(it, pos);
+            // 동일 좌표 그룹 팝업 처리(줌 레벨 1~2일 때만 멀티 팝업)
+            const level = map.getLevel?.();
+            // 그룹은 아이템 id 기준으로 유일화
+            let group = coordGroupsRef.current.get(key) || [it];
+            if (Array.isArray(group)) {
+              const seen = new Set<string>();
+              group = group.filter((g: any) => {
+                const id = String(g?.id ?? "");
+                if (!id || seen.has(id)) return false;
+                seen.add(id);
+                return true;
+              });
+            }
+            if (typeof level === "number" && level <= 2 && group.length > 1) {
+              openMultiPopup(group, pos, 0);
+            } else {
+              openPopup(it, pos);
+            }
           } catch {}
         });
         markersRef.current.push(marker);
@@ -916,8 +1242,20 @@ function MapView({
     try {
       if (toAdd.length > 0) {
         if (!didInitialFitRef.current) {
-          // 지역 전환 직후에는 새로운 데이터 로드 완료 시점에만 1회 fit
-          if (!pendingFitRef.current || !isLoading) {
+          // 상세→지도 이동 타깃이 있으면 fitBounds 대신 해당 좌표로 이동/확대
+          const tgt = openTargetRef.current;
+          if (tgt) {
+            try {
+              const latlng = new w.kakao.maps.LatLng(tgt.lat, tgt.lng);
+              if (typeof map.setCenter === "function") map.setCenter(latlng);
+              if (typeof map.setLevel === "function") map.setLevel(4);
+              lastCenterRef.current = { lat: tgt.lat, lng: tgt.lng };
+              setCenterCoord({ lat: tgt.lat, lng: tgt.lng });
+            } catch {}
+            didInitialFitRef.current = true;
+            pendingFitRef.current = false;
+            openTargetRef.current = null;
+          } else if (!pendingFitRef.current || !isLoading) {
             const bounds = new w.kakao.maps.LatLngBounds();
             toAdd.forEach((mk: any) => {
               const pos = mk.getPosition?.();
@@ -1089,6 +1427,27 @@ function MapView({
     try {
       const w = window as any;
       const map = kakaoMapRef.current;
+      // 페이지 상위에서 설정한 펜딩 타깃이 있으면 즉시 이동/줌 적용
+      try {
+        const pending = (useFilterStore as any)?.getState?.()?.pendingMapTarget;
+        if (
+          pending &&
+          typeof pending.lat === "number" &&
+          typeof pending.lng === "number"
+        ) {
+          const latlng = new w.kakao.maps.LatLng(pending.lat, pending.lng);
+          map.setCenter(latlng);
+          if (typeof map.setLevel === "function") map.setLevel(4);
+          if (
+            typeof (useFilterStore as any)?.getState?.()
+              ?.setPendingMapTarget === "function"
+          ) {
+            (useFilterStore as any).getState().setPendingMapTarget(null);
+          }
+          lastCenterRef.current = { lat: pending.lat, lng: pending.lng };
+          setCenterCoord({ lat: pending.lat, lng: pending.lng });
+        }
+      } catch {}
       // 초기 중심 세팅
       try {
         const c = map.getCenter?.();

@@ -17,6 +17,7 @@ import {
 import { useFilterStore } from "@/store/filterStore";
 import { useLocationsSimple } from "@/hooks/useLocations";
 import { useItems } from "@/hooks/useItems";
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import {
   ChevronDown,
   ChevronUp,
@@ -182,6 +183,43 @@ export default function FilterControl({
   // ✅ FilterStore 연동
   const setFilter = useFilterStore((state) => state.setFilter);
   const setSortConfig = useFilterStore((state) => state.setSortConfig);
+  const showSelectedOnly = (useFilterStore as any)(
+    (s: any) => s.showSelectedOnly
+  );
+  const setShowSelectedOnly = (useFilterStore as any)(
+    (s: any) => s.setShowSelectedOnly
+  );
+  const selectedIds = (useFilterStore as any)(
+    (s: any) => s.selectedIds as string[]
+  );
+
+  // URL 쿼리 동기화 준비
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const writeSelOnlyParam = (flag: boolean) => {
+    try {
+      const qs = new URLSearchParams(searchParams?.toString() || "");
+      if (flag) qs.set("selOnly", "1");
+      else qs.delete("selOnly");
+      const next = `${pathname}${qs.toString() ? `?${qs.toString()}` : ""}`;
+      router.replace(next, { scroll: false });
+    } catch {}
+  };
+  // 초기 쿼리 → 스토어 동기화
+  useEffect(() => {
+    try {
+      const v = searchParams?.get("selOnly");
+      const flag = v === "1";
+      if (flag !== showSelectedOnly) setShowSelectedOnly(flag);
+    } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+  // 스토어 → 쿼리 동기화
+  useEffect(() => {
+    writeSelOnlyParam(showSelectedOnly);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showSelectedOnly]);
 
   // 현재 날짜 기반 기본값 설정
   const today = new Date();
@@ -741,6 +779,41 @@ export default function FilterControl({
                   </div>
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* 🆕 선택 항목만 보기 토글 (상세 필터 패널에서만 표시) */}
+          {showDetailsOnly && (
+            <div className="flex items-center justify-between rounded border px-3 py-2 bg-white">
+              <div className="flex items-center gap-2">
+                <CheckCircle className="w-4 h-4 text-blue-600" />
+                <span className="text-sm font-medium">선택 항목만 보기</span>
+                {Array.isArray(selectedIds) && selectedIds.length > 0 && (
+                  <Badge variant="secondary">선택 {selectedIds.length}건</Badge>
+                )}
+              </div>
+              <button
+                className={`rounded px-3 py-1 text-xs border ${
+                  showSelectedOnly
+                    ? "bg-blue-600 text-white border-blue-600"
+                    : "bg-white text-gray-800 border-gray-300"
+                } ${
+                  selectedIds.length === 0
+                    ? "opacity-50 cursor-not-allowed"
+                    : ""
+                }`}
+                onClick={() =>
+                  selectedIds.length > 0 &&
+                  setShowSelectedOnly(!showSelectedOnly)
+                }
+                title={
+                  selectedIds.length === 0
+                    ? "선택된 항목이 없습니다"
+                    : "선택 항목만 보기 토글"
+                }
+              >
+                {showSelectedOnly ? "해제" : "적용"}
+              </button>
             </div>
           )}
 

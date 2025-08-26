@@ -45,8 +45,12 @@ export default function PropertyDetailDialog({
   const { vm, isLoading, isError, reload } = usePropertyDetail(detailId);
 
   const fallbackCoords = {
-    lat: (rowItem as any)?.lat as number | undefined,
-    lng: (rowItem as any)?.lng as number | undefined,
+    lat:
+      ((rowItem as any)?.lat as number | undefined) ??
+      ((rowItem as any)?.latitude as number | undefined),
+    lng:
+      ((rowItem as any)?.lng as number | undefined) ??
+      ((rowItem as any)?.longitude as number | undefined),
   };
 
   return (

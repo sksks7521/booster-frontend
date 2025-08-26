@@ -331,7 +331,9 @@ export function useItems(): UseItemsResult {
       : false) ||
     (Array.isArray((filters as any).specialConditions)
       ? ((filters as any).specialConditions as string[]).length > 0
-      : false);
+      : false) ||
+    // 🆕 선택 항목만 보기 활성화 시 클라 처리 필요
+    (filters as any).showSelectedOnly === true;
 
   const allParams = {
     ...buildQueryParamsFromFilters(filters),
@@ -400,6 +402,19 @@ export function useItems(): UseItemsResult {
 
   // 🔍 실제 데이터 구조 확인 및 클라이언트 사이드 필터링
   let items = (data as any)?.items ?? (data as any) ?? [];
+  // 🆕 선택 항목만 보기: 선택된 id만 남긴다
+  if ((filters as any).showSelectedOnly === true) {
+    const sel: string[] = Array.isArray((filters as any).selectedIds)
+      ? ((filters as any).selectedIds as string[])
+      : [];
+    if (sel.length > 0) {
+      const setSel = new Set(sel.map((s) => String(s)));
+      items = items.filter((it: any) => setSel.has(String(it.id)));
+    } else {
+      // 선택이 없으면 결과를 비움
+      items = [];
+    }
+  }
   // 지도 표시용 전체 결과(슬라이스 전)
   let mapItems: any[] | undefined = undefined;
   // 🔎 클라이언트 보정: contains 검색 (case_number, road_address)

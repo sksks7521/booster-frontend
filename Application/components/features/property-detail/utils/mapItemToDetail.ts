@@ -67,6 +67,44 @@ function toBoolLoose(value: unknown): boolean | null {
 }
 
 export function mapItemToDetail(item: Item): PropertyDetailData {
+  // 좌표 후보 추출 및 보정(대한민국 범위 기준)
+  const toNum = (v: unknown): number | undefined => {
+    if (typeof v === "number" && isFinite(v)) return v;
+    if (typeof v === "string") {
+      const cleaned = v.replace(/,/g, "").trim();
+      const n = parseFloat(cleaned);
+      return isFinite(n) ? n : undefined;
+    }
+    return undefined;
+  };
+  const latCandidates: Array<unknown> = [
+    (item as any).lat,
+    (item as any).latitude,
+    (item as any).y,
+    (item as any).lat_y,
+  ];
+  const lngCandidates: Array<unknown> = [
+    (item as any).lng,
+    (item as any).longitude,
+    (item as any).x,
+    (item as any).lon,
+    (item as any).long,
+  ];
+  let lat = latCandidates.map(toNum).find((v) => typeof v === "number");
+  let lng = lngCandidates.map(toNum).find((v) => typeof v === "number");
+  // 범위 스왑 보정: 한국 위도(33~39), 경도(124~132)
+  const inLatRange = (v?: number) =>
+    typeof v === "number" && v >= 33 && v <= 39.5;
+  const inLngRange = (v?: number) =>
+    typeof v === "number" && v >= 124 && v <= 132.5;
+  if (!inLatRange(lat) && inLatRange(lng) && inLngRange(lat)) {
+    const tmp = lat;
+    lat = lng;
+    lng = tmp;
+  }
+  // 최종 좌표(없는 값은 0으로)
+  const finalLat = typeof lat === "number" ? lat : 0;
+  const finalLng = typeof lng === "number" ? lng : 0;
   const minimum = parseNumber(item.minimum_bid_price);
   const appraised = parseNumber(item.appraised_value);
   const publicPrice = parseNumber(item.public_price);
@@ -111,8 +149,8 @@ export function mapItemToDetail(item: Item): PropertyDetailData {
     location: item.address ?? "-",
     postalCode: "-",
     pnu: "-",
-    longitude: parseNumber(item.lng),
-    latitude: parseNumber(item.lat),
+    longitude: finalLng,
+    latitude: finalLat,
     buildingName: "-",
     dongName: "-",
     landSize: 0,

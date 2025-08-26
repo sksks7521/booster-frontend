@@ -70,7 +70,20 @@ export default function AnalysisPage() {
 
   // 팝업에서 지도 열기 이벤트를 수신해 지도 탭으로 전환
   useEffect(() => {
-    const handler = () => setActiveView("map");
+    const handler = (e: Event) => {
+      setActiveView("map");
+      try {
+        const d = (e as CustomEvent).detail as
+          | { id?: string; lat?: number; lng?: number }
+          | undefined;
+        if (d && typeof d.lat === "number" && typeof d.lng === "number") {
+          (useFilterStore.getState() as any).setPendingMapTarget?.({
+            lat: d.lat,
+            lng: d.lng,
+          });
+        }
+      } catch {}
+    };
     window.addEventListener("property:openOnMap", handler as EventListener);
     return () =>
       window.removeEventListener(
