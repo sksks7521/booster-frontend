@@ -755,28 +755,7 @@ const ItemTable: React.FC<ItemTableProps> = ({
     null
   );
 
-  // 지도 마커 클릭 → 상세 열기
-  useEffect(() => {
-    const handler = (e: Event) => {
-      const detail = (e as CustomEvent).detail as
-        | { id?: string; lat?: number; lng?: number }
-        | undefined;
-      if (!detail?.id) return;
-      const found = items.find(
-        (it: any) => String(it?.id) === String(detail.id)
-      );
-      if (found) {
-        setAddressDialogItem(found as Item);
-        setAddressDialogOpen(true);
-      }
-    };
-    window.addEventListener("property:openDetail", handler as EventListener);
-    return () =>
-      window.removeEventListener(
-        "property:openDetail",
-        handler as EventListener
-      );
-  }, [items]);
+  // 지도 이벤트로 상세 오픈은 페이지 상위에서 처리하도록 변경
 
   // 🎯 드래그앤드롭 센서 설정
   const sensors = useSensors(

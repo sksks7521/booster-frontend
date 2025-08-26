@@ -13,6 +13,7 @@ const ItemTable = dynamic(() => import("@/components/features/item-table"), {
   ssr: false,
 });
 import MapView from "@/components/features/map-view";
+import PropertyDetailDialog from "@/components/features/property-detail/PropertyDetailDialog";
 import { useFilterStore } from "@/store/filterStore";
 import { useItems } from "@/hooks/useItems";
 import { useDebouncedValue } from "@/hooks/useDebounce";
@@ -85,8 +86,38 @@ export default function AnalysisPage() {
   const setSortConfig = useFilterStore((s) => s.setSortConfig);
   const sortBy = useFilterStore((s) => s.sortBy);
   const sortOrder = useFilterStore((s) => s.sortOrder);
+  const addFavorites = useFilterStore((s) => (s as any).addFavorites);
   const [detailsCollapsed, setDetailsCollapsed] = useState(false);
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
+  const setSelectedIds = useFilterStore((s) => (s as any).setSelectedIds);
+  const showSelectedOnly = useFilterStore((s) => (s as any).showSelectedOnly);
+  const setShowSelectedOnly = useFilterStore(
+    (s) => (s as any).setShowSelectedOnly
+  );
+
+  useEffect(() => {
+    // 목록 선택 변경 → 스토어 selectedIds 반영
+    try {
+      setSelectedIds(selectedRowKeys.map((k) => String(k)));
+    } catch {}
+  }, [selectedRowKeys]);
+
+  // 지역 변경 시 선택 전용 보기 자동 해제
+  useEffect(() => {
+    try {
+      if (showSelectedOnly) setShowSelectedOnly(false);
+      if (selectedRowKeys.length > 0) setSelectedRowKeys([]);
+      setSelectedIds([]);
+    } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    filters.sido_code,
+    filters.city_code,
+    filters.town_code,
+    filters.province,
+    filters.cityDistrict,
+    filters.town,
+  ]);
 
   const handleSearch = () => {
     console.log("🔍 [Search] 키워드 검색 실행:", debouncedQuery);
@@ -116,6 +147,39 @@ export default function AnalysisPage() {
     console.log("Setting up alert...");
     // 알림 설정 로직 구현
   };
+
+  // 지도 팝업에서 '상세보기' 클릭 시 상세 다이얼로그 오픈
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [detailItem, setDetailItem] = useState<any | null>(null);
+  useEffect(() => {
+    const handler = async (e: Event) => {
+      const id = String((e as CustomEvent).detail?.id || "");
+      if (!id) return;
+      // 현재 데이터에서 우선 탐색, 없으면 단건 조회(선택)
+      const findIn = (list?: any[]) =>
+        list?.find?.((x: any) => String(x?.id) === id);
+      const found = findIn(items) || findIn(mapItems);
+      if (found) {
+        setDetailItem(found);
+        setDetailOpen(true);
+        return;
+      }
+      try {
+        // 필요한 경우 단건 API 폴백 (옵션)
+        // const one = await itemApi.getItem(Number(id));
+        // setDetailItem(one);
+        // setDetailOpen(true);
+      } catch {}
+    };
+    window.addEventListener("property:openDetail", handler as EventListener);
+    return () =>
+      window.removeEventListener(
+        "property:openDetail",
+        handler as EventListener
+      );
+  }, [items, mapItems]);
+
+  // 상세 다이얼로그 렌더링(전역에서 열림)
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -196,6 +260,21 @@ export default function AnalysisPage() {
                     )}
                   </div>
                   <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      onClick={() =>
+                        selectedRowKeys.length > 0 &&
+                        addFavorites(selectedRowKeys.map((k) => String(k)))
+                      }
+                      disabled={selectedRowKeys.length === 0}
+                      title={
+                        selectedRowKeys.length === 0
+                          ? "선택된 항목이 없습니다"
+                          : "선택 항목을 관심물건에 추가"
+                      }
+                    >
+                      관심물건으로 넣기
+                    </Button>
                     <Tabs
                       value={activeView}
                       onValueChange={(value) =>
@@ -256,6 +335,7 @@ export default function AnalysisPage() {
                     isLoading={isLoading}
                     error={error}
                     onRetry={refetch}
+                    highlightIds={selectedRowKeys.map((k) => String(k))}
                   />
                 )}
                 {activeView === "both" && (
@@ -275,6 +355,7 @@ export default function AnalysisPage() {
                         isLoading={isLoading}
                         error={error}
                         onRetry={refetch}
+                        highlightIds={selectedRowKeys.map((k) => String(k))}
                       />
                     </div>
                     <div>
@@ -287,6 +368,8 @@ export default function AnalysisPage() {
                         sortBy={sortBy}
                         sortOrder={sortOrder}
                         onSort={handleSort}
+                        selectedRowKeys={selectedRowKeys}
+                        onSelectionChange={setSelectedRowKeys}
                       />
                     </div>
                   </div>
@@ -480,6 +563,12 @@ export default function AnalysisPage() {
 
       {/* 푸터 */}
       <Footer />
+      {/* 전역 상세 다이얼로그 */}
+      <PropertyDetailDialog
+        open={detailOpen}
+        onOpenChange={setDetailOpen}
+        rowItem={detailItem}
+      />
     </div>
   );
 }

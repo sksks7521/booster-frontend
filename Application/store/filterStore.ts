@@ -58,6 +58,11 @@ interface FilterState {
     red: string;
   };
   // (삭제 예정)이었던 팝업 고정 상태 제거
+  // 🆕 선택 전용 보기
+  selectedIds: string[];
+  showSelectedOnly: boolean;
+  // 🆕 관심물건 (간단 북마크 목록)
+  favorites: string[];
 }
 
 // 필터 상태를 변경하는 액션(Action)의 타입을 정의합니다.
@@ -85,6 +90,9 @@ interface FilterActions {
     red: string;
   }) => void;
   // (삭제) setPopupLocked 제거
+  // 🆕 선택 연동 액션
+  setSelectedIds: (ids: string[]) => void;
+  setShowSelectedOnly: (v: boolean) => void;
 }
 
 // 필터의 초기 상태 값입니다.
@@ -139,6 +147,10 @@ const initialState: FilterState = {
     orange: "#f59e0b",
     red: "#ef4444",
   },
+  // 🆕 선택 전용 보기 기본값
+  selectedIds: [],
+  showSelectedOnly: false,
+  favorites: [],
 };
 
 // Zustand 스토어를 생성합니다.
@@ -188,5 +200,21 @@ export const useFilterStore = create<FilterState & FilterActions>((set) => ({
         orange: p.orange || state.palette.orange,
         red: p.red || state.palette.red,
       },
+    })),
+  // 🆕 선택 연동 액션 구현
+  setSelectedIds: (ids) => set({ selectedIds: ids }),
+  setShowSelectedOnly: (v) => set({ showSelectedOnly: v, page: 1 }),
+  // 관심물건 추가/삭제 간단 액션
+  addFavorites: (ids: string[]) =>
+    set((state: any) => {
+      const setFav = new Set<string>([...(state.favorites || [])]);
+      ids.forEach((id) => setFav.add(String(id)));
+      return { favorites: Array.from(setFav) };
+    }),
+  removeFavorite: (id: string) =>
+    set((state: any) => ({
+      favorites: (state.favorites || []).filter(
+        (x: string) => x !== String(id)
+      ),
     })),
 }));

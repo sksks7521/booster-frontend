@@ -21,6 +21,8 @@ interface MapViewProps {
   onRetry?: () => void;
   // 지역/읍면동 키: 변경 시 내부 초기화/relayout 트리거
   locationKey?: string;
+  // 목록 선택 항목 id 배열: 지도에서 강조/이동 처리
+  highlightIds?: string[];
 }
 
 function MapView({
@@ -30,6 +32,7 @@ function MapView({
   error,
   onRetry,
   locationKey,
+  highlightIds = [],
 }: MapViewProps) {
   const mapRef = useRef<HTMLDivElement | null>(null);
   const [mapReady, setMapReady] = useState(false);
@@ -41,6 +44,15 @@ function MapView({
   const focusCircleRef = useRef<any>(null);
   const markersRef = useRef<any[]>([]);
   const clustererRef = useRef<any>(null);
+  // id→마커 인덱스/강조 관리
+  const markerIndexRef = useRef<
+    Map<
+      string,
+      { marker: any; pos: any; normalImage: any; color: string; label: string }
+    >
+  >(new Map());
+  const highlightedIdsRef = useRef<Set<string>>(new Set());
+  const selectedOverlayMarkersRef = useRef<Map<string, any>>(new Map());
   // 팝업/툴팁: 데스크톱 CustomOverlay 1개 재사용, 모바일은 하단 시트
   const popupOverlayRef = useRef<any>(null);
   const [mobilePopupItem, setMobilePopupItem] = useState<any | null>(null);
@@ -69,9 +81,25 @@ function MapView({
   } | null>(null);
   const [zoomLevel, setZoomLevel] = useState<number | null>(null);
   // Kakao 지도 타입(일반/위성) 토글 상태
-  const [kakaoMapType, setKakaoMapType] = useState<"ROADMAP" | "SKYVIEW">(
-    "ROADMAP"
-  );
+  const [kakaoMapType, setKakaoMapType] = useState<
+    "ROADMAP" | "SKYVIEW" | "HYBRID"
+  >("ROADMAP");
+
+  // 줌 변경 핸들러(카카오)
+  const changeZoomLevel = (delta: number) => {
+    if (provider !== "kakao") return;
+    const map = kakaoMapRef.current as any;
+    if (!map) return;
+    try {
+      const current =
+        typeof map.getLevel === "function" ? map.getLevel() : null;
+      if (typeof current === "number") {
+        const next = Math.max(1, Math.min(14, current + delta));
+        if (typeof map.setLevel === "function") map.setLevel(next);
+        setZoomLevel(next);
+      }
+    } catch {}
+  };
 
   // 지도 제공자: 안정화를 위해 Kakao를 강제 사용
   const providerEnv = "kakao";
@@ -116,10 +144,11 @@ function MapView({
     if (!map) return;
     try {
       const w = window as any;
-      const typeId =
-        kakaoMapType === "SKYVIEW"
-          ? w.kakao.maps.MapTypeId.SKYVIEW
-          : w.kakao.maps.MapTypeId.ROADMAP;
+      let typeId = w.kakao.maps.MapTypeId.ROADMAP;
+      if (kakaoMapType === "SKYVIEW") typeId = w.kakao.maps.MapTypeId.SKYVIEW;
+      else if (kakaoMapType === "HYBRID")
+        typeId =
+          w.kakao.maps.MapTypeId.HYBRID ?? w.kakao.maps.MapTypeId.SKYVIEW;
       if (typeof map.setMapTypeId === "function") map.setMapTypeId(typeId);
     } catch {}
   }, [kakaoMapType, mapReady, provider]);
@@ -349,6 +378,7 @@ function MapView({
       markersRef.current.forEach((m) => m.setMap(null));
     } catch {}
     markersRef.current = [];
+    markerIndexRef.current.clear();
 
     // Threshold (만원) - 전역 상태 사용 (동적 길이 1..5)
     const thresholds: number[] = Array.isArray(thresholdsState)
@@ -574,7 +604,7 @@ function MapView({
           ) as HTMLButtonElement | null;
           closeBtn?.addEventListener("click", () => closePopup());
           detailBtn?.addEventListener("click", () => {
-            const evt = new CustomEvent("property:navigateDetail", {
+            const evt = new CustomEvent("property:openDetail", {
               detail: { id: String(it?.id ?? "") },
             });
             window.dispatchEvent(evt);
@@ -616,23 +646,12 @@ function MapView({
               const toast = document.createElement("div");
               toast.textContent = msg;
               toast.style.position = "fixed";
-              // 지도 컨테이너(mapRef)를 기준으로 화면 우하단 근처 표시
-              const rect = (
-                mapRef.current as HTMLElement
-              )?.getBoundingClientRect?.();
-              if (rect) {
-                toast.style.left = `${Math.max(
-                  rect.left + rect.width - 240,
-                  12
-                )}px`;
-                toast.style.top = `${Math.max(
-                  rect.top + rect.height - 56,
-                  12
-                )}px`;
-              } else {
-                toast.style.right = "12px";
-                toast.style.bottom = "12px";
-              }
+              // 전체 창 기준 중앙 상단에 표시
+              toast.style.left = "50%";
+              toast.style.top = "24px";
+              // 초기에 더 위에서 시작 → 자연스러운 슬라이드-페이드 인
+              toast.style.transform = "translate(-50%, -10px)";
+              toast.style.zIndex = "99999";
               toast.style.padding = "8px 12px";
               toast.style.borderRadius = "8px";
               toast.style.fontSize = "12px";
@@ -640,11 +659,20 @@ function MapView({
               toast.style.color = "#fff";
               toast.style.boxShadow = "0 4px 10px rgba(0,0,0,.2)";
               toast.style.opacity = "0";
-              toast.style.transition = "opacity .2s";
+              toast.style.transition =
+                "opacity .6s ease-in-out, transform .6s ease-in-out";
+              toast.style.pointerEvents = "none";
               document.body.appendChild(toast);
-              requestAnimationFrame(() => (toast.style.opacity = "1"));
-              setTimeout(() => (toast.style.opacity = "0"), 2800);
-              setTimeout(() => toast.remove(), 3100);
+              requestAnimationFrame(() => {
+                toast.style.opacity = "1";
+                toast.style.transform = "translate(-50%, 0px)";
+              });
+              // 2초 내에 부드럽게 나타났다 사라지도록: 0.6s in + 0.8s 유지 + 0.6s out
+              setTimeout(() => {
+                toast.style.opacity = "0";
+                toast.style.transform = "translate(-50%, -10px)";
+              }, 1400);
+              setTimeout(() => toast.remove(), 2000);
             } catch {}
           };
 
@@ -783,12 +811,18 @@ function MapView({
         });
         // 클러스터 사용 시 setMap은 클러스터러가 담당
         if (!clustererRef.current) marker.setMap(map);
+        const idStr = String(it?.id ?? "").trim();
+        if (idStr) {
+          markerIndexRef.current.set(idStr, {
+            marker,
+            pos,
+            normalImage: image,
+            color,
+            label,
+          });
+        }
         w.kakao.maps.event.addListener(marker, "click", () => {
           try {
-            const evt = new CustomEvent("property:openDetail", {
-              detail: { id: String(it?.id ?? ""), lat, lng },
-            });
-            window.dispatchEvent(evt);
             // 중심 이동 및 하이라이트 (크로스 헤어에 마커가 정확히 오도록 오프셋 적용)
             const centerOnMarker = () => {
               const proj = map.getProjection?.();
@@ -954,6 +988,65 @@ function MapView({
       } catch {}
     };
   }, [items, isLoading, mapReady, provider]);
+
+  // 선택된 항목 오버레이 표시(좌표 이동 없음)
+  useEffect(() => {
+    if (provider !== "kakao" || !mapReady) return;
+    const map = kakaoMapRef.current;
+    if (!map) return;
+    const idx = markerIndexRef.current;
+    if (!idx || idx.size === 0) return;
+    const w = window as any;
+
+    // 0) 과거 이미지 강조가 있었다면 원복
+    highlightedIdsRef.current.forEach((id) => {
+      const entry = idx.get(id);
+      if (entry) {
+        try {
+          entry.marker.setImage(entry.normalImage);
+          if (typeof entry.marker.setZIndex === "function")
+            entry.marker.setZIndex(0);
+        } catch {}
+      }
+    });
+    highlightedIdsRef.current.clear();
+
+    // 1) 기존 선택 오버레이 제거
+    try {
+      selectedOverlayMarkersRef.current.forEach((ov) => {
+        try {
+          ov.setMap(null);
+        } catch {}
+      });
+      selectedOverlayMarkersRef.current.clear();
+    } catch {}
+
+    // 2) 선택 오버레이 추가(화살표형). 좌표 이동 없음
+    (highlightIds || []).forEach((idRaw) => {
+      const id = String(idRaw);
+      const entry = idx.get(id);
+      if (!entry) return;
+      try {
+        const color = entry.color || "#2563eb";
+        const container = document.createElement("div");
+        container.style.position = "relative";
+        container.style.width = "0";
+        container.style.height = "0";
+        container.innerHTML = `
+          <div style="position:absolute;left:-10px;top:-40px;width:20px;height:20px;border-radius:6px;background:${color};box-shadow:0 4px 10px rgba(0,0,0,.25);"></div>
+          <div style=\"position:absolute;left:-7px;top:-22px;width:0;height:0;border-left:7px solid transparent;border-right:7px solid transparent;border-top:9px solid ${color};\"></div>
+        `;
+        const overlay = new w.kakao.maps.CustomOverlay({
+          position: entry.pos,
+          yAnchor: 1,
+          zIndex: 10000,
+          content: container,
+        });
+        overlay.setMap(map);
+        selectedOverlayMarkersRef.current.set(id, overlay);
+      } catch {}
+    });
+  }, [highlightIds, mapReady, provider]);
 
   // vworld: 아이템 0건 시 기본 중심 유지 폴백
   useEffect(() => {
@@ -1181,6 +1274,17 @@ function MapView({
             >
               위성
             </button>
+            <button
+              className={
+                "rounded px-2 py-0.5 border " +
+                (kakaoMapType === "HYBRID"
+                  ? "bg-blue-600 text-white border-blue-600"
+                  : "bg-white text-gray-800 border-gray-300")
+              }
+              onClick={() => setKakaoMapType("HYBRID")}
+            >
+              하이브리드
+            </button>
           </div>
         )}
       </div>
@@ -1213,8 +1317,8 @@ function MapView({
       <div className="absolute bottom-2 right-2 rounded bg-white/90 px-2 py-1 text-xs text-gray-700 shadow">
         항목 {items.length}개
       </div>
-      {/* 좌측하단: 중심/마우스 좌표 표시 (provider 무관 표시, 스타일 개선) */}
-      <div className="absolute left-2 bottom-[21px] z-10">
+      {/* 우하단: 중심/마우스 좌표 표시 + 줌 버튼 */}
+      <div className="absolute right-2 bottom-[21px] z-10">
         <div className="rounded-lg border border-gray-200/80 bg-white/95 px-3 py-2 text-xs text-gray-800 shadow-sm">
           <div className="mb-1 flex items-center gap-2">
             <span className="text-[11px] font-semibold text-gray-700">
@@ -1240,6 +1344,22 @@ function MapView({
                 ? `${mouseCoord.lat.toFixed(6)}, ${mouseCoord.lng.toFixed(6)}`
                 : "-"}
             </span>
+          </div>
+          <div className="mt-2 flex items-center justify-end gap-1">
+            <button
+              className="rounded border border-gray-300 bg-white px-2 py-0.5 text-[11px] shadow-sm hover:bg-gray-50"
+              onClick={() => changeZoomLevel(-1)}
+              title="Zoom In"
+            >
+              +
+            </button>
+            <button
+              className="rounded border border-gray-300 bg-white px-2 py-0.5 text-[11px] shadow-sm hover:bg-gray-50"
+              onClick={() => changeZoomLevel(1)}
+              title="Zoom Out"
+            >
+              -
+            </button>
           </div>
         </div>
       </div>
