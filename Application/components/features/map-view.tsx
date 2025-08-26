@@ -68,6 +68,10 @@ function MapView({
     lng: number;
   } | null>(null);
   const [zoomLevel, setZoomLevel] = useState<number | null>(null);
+  // Kakao 지도 타입(일반/위성) 토글 상태
+  const [kakaoMapType, setKakaoMapType] = useState<"ROADMAP" | "SKYVIEW">(
+    "ROADMAP"
+  );
 
   // 지도 제공자: 안정화를 위해 Kakao를 강제 사용
   const providerEnv = "kakao";
@@ -104,6 +108,21 @@ function MapView({
       } catch {}
     }
   }, [locationKey, mapReady, provider]);
+
+  // Kakao 지도 타입 적용(일반/위성)
+  useEffect(() => {
+    if (provider !== "kakao" || !mapReady) return;
+    const map = kakaoMapRef.current as any;
+    if (!map) return;
+    try {
+      const w = window as any;
+      const typeId =
+        kakaoMapType === "SKYVIEW"
+          ? w.kakao.maps.MapTypeId.SKYVIEW
+          : w.kakao.maps.MapTypeId.ROADMAP;
+      if (typeof map.setMapTypeId === "function") map.setMapTypeId(typeId);
+    } catch {}
+  }, [kakaoMapType, mapReady, provider]);
 
   useEffect(() => {
     if (!mapRef.current) return;
@@ -1129,7 +1148,7 @@ function MapView({
           지도 초기화 중...
         </div>
       )}
-      {/* 전체화면 토글 버튼 */}
+      {/* 전체화면 토글 + 지도타입 토글 (좌상단) */}
       <div className="absolute top-2 left-2 flex gap-2 z-10">
         <button
           className="rounded bg-white/90 px-2 py-1 text-xs text-gray-800 shadow border"
@@ -1137,6 +1156,33 @@ function MapView({
         >
           {isFullscreen ? "닫기" : "전체화면"}
         </button>
+        {provider === "kakao" && (
+          <div className="rounded bg-white/90 px-2 py-1 text-xs text-gray-800 shadow border flex items-center gap-2">
+            <span className="text-[11px] text-gray-600">지도</span>
+            <button
+              className={
+                "rounded px-2 py-0.5 border " +
+                (kakaoMapType === "ROADMAP"
+                  ? "bg-blue-600 text-white border-blue-600"
+                  : "bg-white text-gray-800 border-gray-300")
+              }
+              onClick={() => setKakaoMapType("ROADMAP")}
+            >
+              일반
+            </button>
+            <button
+              className={
+                "rounded px-2 py-0.5 border " +
+                (kakaoMapType === "SKYVIEW"
+                  ? "bg-blue-600 text-white border-blue-600"
+                  : "bg-white text-gray-800 border-gray-300")
+              }
+              onClick={() => setKakaoMapType("SKYVIEW")}
+            >
+              위성
+            </button>
+          </div>
+        )}
       </div>
       {/* vworld 모드 전환 셀렉터 */}
       {provider !== "kakao" && mapReady && (
