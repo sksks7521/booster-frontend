@@ -46,16 +46,12 @@ const columns: ColumnDef<any>[] = [
     cell: (info: any) => info.getValue() ?? "-",
   },
   {
-    accessorKey: "road_address",
-    header: "도로명주소",
+    accessorKey: "location_detail",
+    header: "소재지",
     cell: (info: any) => (
-      <a
-        href="#"
-        onClick={(e) => e.preventDefault()}
-        className="hover:underline text-blue-600"
-      >
-        {info.getValue() ?? info.row.original.address ?? "-"}
-      </a>
+      <span className="whitespace-normal break-words">
+        {info.getValue() ?? "-"}
+      </span>
     ),
   },
   {

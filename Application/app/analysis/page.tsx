@@ -18,6 +18,9 @@ import { useFilterStore } from "@/store/filterStore";
 import { useItems } from "@/hooks/useItems";
 import { useDebouncedValue } from "@/hooks/useDebounce";
 import { Search, Map, List, Download, Bell } from "lucide-react";
+import { useSearchParams } from "next/navigation";
+import { useDataset } from "@/hooks/useDataset";
+import { datasetConfigs } from "@/datasets/registry";
 import {
   Pagination,
   PaginationContent,
@@ -59,6 +62,31 @@ export default function AnalysisPage() {
   // 스토어에서 필터 상태를 직접 구독합니다.
   const filters = useFilterStore((state) => state);
 
+  // 개발용: 공통 파이프라인 병행(기본 off) → ?ds_v2=1&ds=auction_ed
+  const searchParams = useSearchParams();
+  const dsV2Enabled = (searchParams?.get("ds_v2") || "0") === "1";
+  const dsIdParam = (searchParams?.get("ds") as any) || ("auction_ed" as const);
+  const queryFilters = {
+    province: filters?.province,
+    cityDistrict: filters?.cityDistrict,
+    town: filters?.town,
+    price_min: Array.isArray(filters?.priceRange)
+      ? filters.priceRange[0]
+      : undefined,
+    price_max: Array.isArray(filters?.priceRange)
+      ? filters.priceRange[1]
+      : undefined,
+    build_year_min: Array.isArray(filters?.buildYear)
+      ? filters.buildYear[0]
+      : undefined,
+    build_year_max: Array.isArray(filters?.buildYear)
+      ? filters.buildYear[1]
+      : undefined,
+  } as Record<string, unknown>;
+  const { total: devTotal = 0 } = dsV2Enabled
+    ? useDataset(dsIdParam, queryFilters, page, size)
+    : ({ total: 0 } as any);
+
   // 사용자 정보
   const user = {
     email: "user@example.com",
@@ -89,6 +117,50 @@ export default function AnalysisPage() {
       window.removeEventListener(
         "property:openOnMap",
         handler as EventListener
+      );
+  }, []);
+
+  // 전역: 관심 토글 이벤트 처리(스토어 favorites 연동)
+  useEffect(() => {
+    const onToggleFav = (e: Event) => {
+      try {
+        const id = String((e as CustomEvent).detail?.id || "");
+        if (!id) return;
+        const state = useFilterStore.getState() as any;
+        const isFav = (state.favorites || []).includes(id);
+        if (isFav) state.removeFavorite?.(id);
+        else state.addFavorites?.([id]);
+      } catch {}
+    };
+    window.addEventListener(
+      "property:toggleFavorite",
+      onToggleFav as EventListener
+    );
+    return () =>
+      window.removeEventListener(
+        "property:toggleFavorite",
+        onToggleFav as EventListener
+      );
+  }, []);
+
+  // 전역: 보고서 요청 이벤트 처리(임시 안내)
+  useEffect(() => {
+    const onOpenReport = (e: Event) => {
+      try {
+        const id = String((e as CustomEvent).detail?.id || "");
+        console.log("report open requested for id=", id);
+        // TODO: 페이지 준비 시 라우팅으로 교체 가능
+        alert("보고서 생성은 준비 중입니다. (id=" + id + ")");
+      } catch {}
+    };
+    window.addEventListener(
+      "property:openReport",
+      onOpenReport as EventListener
+    );
+    return () =>
+      window.removeEventListener(
+        "property:openReport",
+        onOpenReport as EventListener
       );
   }, []);
 
@@ -238,7 +310,12 @@ export default function AnalysisPage() {
         </div>
 
         {/* 🔀 2단계: 좌측=결과, 우측=필터 (반응형) */}
-        <div className="flex flex-col lg:flex-row items-start gap-8">
+        <div
+          className={
+            "flex flex-col lg:flex-row items-start " +
+            (detailsCollapsed ? "gap-0" : "gap-8")
+          }
+        >
           {/* 📊 좌측: 결과 뷰 */}
           <div className="flex-1 min-w-0 w-full">
             <Card>
@@ -258,6 +335,14 @@ export default function AnalysisPage() {
                           {(totalCount ?? items?.length ?? 0).toLocaleString()}
                           건
                         </span>
+                        {dsV2Enabled && (
+                          <>
+                            <span className="text-gray-400 mx-2">·</span>
+                            <span className="text-gray-500">
+                              v2 {(devTotal ?? 0).toLocaleString()}건
+                            </span>
+                          </>
+                        )}
                         <span className="text-gray-400 mx-2">·</span>
                         <span className="text-gray-800">
                           선택 {selectedRowKeys.length}건
@@ -269,6 +354,11 @@ export default function AnalysisPage() {
                         {isLoading
                           ? "로딩 중..."
                           : (totalCount ?? items?.length ?? 0) + "건"}
+                        {dsV2Enabled && (
+                          <span className="text-sm text-gray-500 ml-2">
+                            (v2 {(devTotal ?? 0).toLocaleString()}건)
+                          </span>
+                        )}
                       </CardTitle>
                     )}
                   </div>
@@ -557,9 +647,7 @@ export default function AnalysisPage() {
           {/* 📋 우측: 상세 필터 (접어두기 지원) */}
           <div
             className={
-              detailsCollapsed
-                ? "w-0 max-w-0 overflow-hidden"
-                : "w-full lg:w-[384px] max-w-[384px]"
+              detailsCollapsed ? "hidden" : "w-full lg:w-[384px] max-w-[384px]"
             }
           >
             <FilterControl

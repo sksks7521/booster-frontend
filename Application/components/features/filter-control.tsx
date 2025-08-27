@@ -97,6 +97,10 @@ interface FilterControlProps {
   handleSearch: () => void;
   showLocationOnly?: boolean; // 지역 선택만 표시
   showDetailsOnly?: boolean; // 상세 조건만 표시
+  // 🆕 데이터셋별 프리셋/기본값/네임스페이스(선택)
+  preset?: Array<Record<string, unknown>>;
+  defaults?: Record<string, unknown>;
+  namespace?: string;
 }
 
 export default function FilterControl({
@@ -107,11 +111,45 @@ export default function FilterControl({
   handleSearch,
   showLocationOnly = false,
   showDetailsOnly = false,
+  preset,
+  defaults,
+  namespace,
 }: FilterControlProps) {
-  // 스토어 상태
-  const filters = useFilterStore((state) => state);
-  const setRangeFilter = useFilterStore((state) => state.setRangeFilter);
+  // 스토어 상태 (네임스페이스 대응)
+  const storeAll = useFilterStore((state) => state as any);
+  const setRangeFilterBase = useFilterStore((state) => state.setRangeFilter);
   const resetFilters = useFilterStore((state) => state.resetFilters);
+  const setFilterBase = useFilterStore((state) => state.setFilter);
+  const setNsFilter = useFilterStore((s) => (s as any).setNsFilter);
+  const setNsRangeFilter = useFilterStore((s) => (s as any).setNsRangeFilter);
+  const nsOverrides = (
+    storeAll.ns && namespace ? (storeAll.ns as any)[namespace] : undefined
+  ) as any;
+  const filters: any =
+    namespace && nsOverrides ? { ...storeAll, ...nsOverrides } : storeAll;
+  // 네임스페이스 라우팅 래퍼
+  const setFilter = (key: any, value: any) => {
+    if (namespace && typeof setNsFilter === "function") {
+      (setNsFilter as any)(namespace, key, value);
+    } else {
+      (setFilterBase as any)(key, value);
+    }
+  };
+  const setRangeFilter = (
+    key:
+      | "priceRange"
+      | "areaRange"
+      | "buildingAreaRange"
+      | "landAreaRange"
+      | "buildYear",
+    value: [number, number]
+  ) => {
+    if (namespace && typeof setNsRangeFilter === "function") {
+      (setNsRangeFilter as any)(namespace, key, value);
+    } else {
+      setRangeFilterBase(key, value);
+    }
+  };
 
   // ✅ 지역 선택 상태 (이름 기반으로 유지, 코드는 내부적으로 관리)
   const [selectedProvince, setSelectedProvince] = useState<string>("");
@@ -181,7 +219,7 @@ export default function FilterControl({
   const { usageValues, floorValues } = useItems();
 
   // ✅ FilterStore 연동
-  const setFilter = useFilterStore((state) => state.setFilter);
+  // setFilter 는 상단에서 가져옵니다
   const setSortConfig = useFilterStore((state) => state.setSortConfig);
   const showSelectedOnly = (useFilterStore as any)(
     (s: any) => s.showSelectedOnly
@@ -477,6 +515,40 @@ export default function FilterControl({
       }
     }
   }, []);
+
+  // ✅ 데이터셋별 기본값(defaults) 적용 (namespace 변경 또는 defaults 변경 시 1회 적용)
+  const [lastAppliedNs, setLastAppliedNs] = useState<string | undefined>(
+    undefined
+  );
+  const [lastDefaultsKey, setLastDefaultsKey] = useState<string | undefined>(
+    undefined
+  );
+  useEffect(() => {
+    if (!defaults || typeof defaults !== "object") return;
+    const currentKey = JSON.stringify(defaults);
+    if (lastAppliedNs === namespace && lastDefaultsKey === currentKey) return;
+
+    try {
+      Object.entries(defaults).forEach(([key, value]) => {
+        // Range 계열 키는 setRangeFilter 사용
+        const isRangeKey =
+          key === "priceRange" ||
+          key === "areaRange" ||
+          key === "buildingAreaRange" ||
+          key === "landAreaRange" ||
+          key === "buildYear";
+        if (isRangeKey && Array.isArray(value) && value.length === 2) {
+          setRangeFilter(key as any, value as [number, number]);
+        } else {
+          (setFilter as any)(key, value as any);
+        }
+      });
+    } catch {}
+
+    setLastAppliedNs(namespace);
+    setLastDefaultsKey(currentKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [namespace, defaults]);
 
   // 매각기일 기본값 설정
   useEffect(() => {

@@ -12,7 +12,7 @@ export interface PropertyDetailData {
   appraisalValue: number;
   minimumPrice: number;
   priceRatio: number; // %
-  publicPriceRatio: number; // ratio
+  publicPriceRatio: number; // %
   publicPrice: number;
   under100Million: boolean;
   currentStatus: string;
@@ -20,6 +20,7 @@ export interface PropertyDetailData {
   location: string;
   postalCode: string;
   pnu: string;
+  adminDongName: string;
   longitude: number;
   latitude: number;
   buildingName: string;
@@ -67,112 +68,93 @@ function toBoolLoose(value: unknown): boolean | null {
 }
 
 export function mapItemToDetail(item: Item): PropertyDetailData {
-  // 좌표 후보 추출 및 보정(대한민국 범위 기준)
-  const toNum = (v: unknown): number | undefined => {
-    if (typeof v === "number" && isFinite(v)) return v;
-    if (typeof v === "string") {
-      const cleaned = v.replace(/,/g, "").trim();
-      const n = parseFloat(cleaned);
-      return isFinite(n) ? n : undefined;
-    }
-    return undefined;
-  };
-  const latCandidates: Array<unknown> = [
-    (item as any).lat,
-    (item as any).latitude,
-    (item as any).y,
-    (item as any).lat_y,
-  ];
-  const lngCandidates: Array<unknown> = [
-    (item as any).lng,
-    (item as any).longitude,
-    (item as any).x,
-    (item as any).lon,
-    (item as any).long,
-  ];
-  let lat = latCandidates.map(toNum).find((v) => typeof v === "number");
-  let lng = lngCandidates.map(toNum).find((v) => typeof v === "number");
-  // 범위 스왑 보정: 한국 위도(33~39), 경도(124~132)
-  const inLatRange = (v?: number) =>
-    typeof v === "number" && v >= 33 && v <= 39.5;
-  const inLngRange = (v?: number) =>
-    typeof v === "number" && v >= 124 && v <= 132.5;
-  if (!inLatRange(lat) && inLatRange(lng) && inLngRange(lat)) {
-    const tmp = lat;
-    lat = lng;
-    lng = tmp;
-  }
-  // 최종 좌표(없는 값은 0으로)
-  const finalLat = typeof lat === "number" ? lat : 0;
-  const finalLng = typeof lng === "number" ? lng : 0;
-  const minimum = parseNumber(item.minimum_bid_price);
-  const appraised = parseNumber(item.appraised_value);
-  const publicPrice = parseNumber(item.public_price);
-  const ratioFromText = parseNumber(item.bid_to_appraised_ratio);
+  // 좌표: 공식 키 사용
+  const finalLat = parseNumber((item as any).latitude);
+  const finalLng = parseNumber((item as any).longitude);
+
+  const minimum = parseNumber((item as any).minimum_bid_price);
+  const appraised = parseNumber((item as any).appraised_value);
+  const publicPrice = parseNumber((item as any).public_price);
+  const ratioBidToAppraised = parseNumber((item as any).bid_to_appraised_ratio);
+  const ratioBidToPublic = parseNumber((item as any).bid_to_public_ratio);
 
   const priceRatio =
-    ratioFromText > 0
-      ? ratioFromText
+    ratioBidToAppraised > 0
+      ? ratioBidToAppraised
       : appraised > 0
       ? (minimum / appraised) * 100
       : 0;
 
   const publicPriceRatio =
-    item.calculated_ratio ?? (publicPrice > 0 ? minimum / publicPrice : 0);
+    ratioBidToPublic > 0
+      ? ratioBidToPublic
+      : publicPrice > 0
+      ? (minimum / publicPrice) * 100
+      : 0;
 
-  const elevatorLoose = toBoolLoose(item.elevator_available);
-  const hasElevator =
-    elevatorLoose !== null
-      ? elevatorLoose
-      : typeof item.hasElevator === "boolean"
-      ? item.hasElevator
-      : null;
+  const elevatorLoose = toBoolLoose((item as any).elevator_available);
+  const hasElevator = elevatorLoose;
+
+  // 건축연도 숫자 정규화
+  const normalizedConstructionYear = (() => {
+    const v = (item as any).construction_year;
+    if (typeof v === "number") return v;
+    if (typeof v === "string") {
+      const m = (v as string).match(/\d{4}/);
+      return m ? parseInt(m[0], 10) : 0;
+    }
+    return 0;
+  })();
 
   return {
     id: String(item.id),
     title:
-      `${item.usage ?? ""} ${item.case_number ?? ""}`.trim() || String(item.id),
-    usage: item.usage ?? "-",
-    caseNumber: item.case_number ?? "-",
-    roadAddress: item.road_address ?? item.address ?? "-",
-    locationAddress: item.address ?? "-",
-    buildingArea: parseNumber(item.building_area_pyeong),
-    landArea: parseNumber(item.land_area_pyeong),
+      `${(item as any).usage ?? ""} ${
+        (item as any).case_number ?? ""
+      }`.trim() || String(item.id),
+    usage: (item as any).usage ?? "-",
+    caseNumber: (item as any).case_number ?? "-",
+    roadAddress: (item as any).road_address ?? (item as any).address ?? "-",
+    locationAddress: (item as any).address ?? "-",
+    buildingArea: parseNumber((item as any).building_area_pyeong),
+    landArea: parseNumber((item as any).land_area_pyeong),
     appraisalValue: appraised,
     minimumPrice: minimum,
     priceRatio,
     publicPriceRatio,
     publicPrice,
-    under100Million: String(item.under_100million ?? "").includes("O"),
-    currentStatus: item.current_status ?? "-",
-    saleDate: item.sale_date ?? "-",
-    location: item.address ?? "-",
-    postalCode: "-",
-    pnu: "-",
+    under100Million:
+      String((item as any).under_100million ?? "").toUpperCase() === "O",
+    currentStatus: (item as any).current_status ?? "-",
+    saleDate: (item as any).sale_date ?? "-",
+    location: (item as any).location_detail ?? "-",
+    postalCode: String((item as any).postal_code ?? "-") as string,
+    pnu: String((item as any).pnu ?? "-"),
+    adminDongName: String((item as any).administrative_dong_name ?? "-"),
     longitude: finalLng,
     latitude: finalLat,
-    buildingName: "-",
-    dongName: "-",
-    landSize: 0,
-    buildingSize: 0,
-    totalFloorArea: 0,
-    buildingCoverageRatio: 0,
-    floorAreaRatio: 0,
-    mainStructure: "-",
-    mainPurpose: "-",
-    otherPurpose: "-",
-    height: 0,
-    groundFloors: 0,
-    undergroundFloors: 0,
-    households: 0,
-    units: 0,
+    buildingName: String((item as any).building_name ?? "-"),
+    dongName: String((item as any).dong_name ?? "-"),
+    landSize: parseNumber((item as any).land_area_m2),
+    buildingSize: parseNumber((item as any).building_area_m2),
+    totalFloorArea: parseNumber((item as any).total_floor_area),
+    buildingCoverageRatio: parseNumber((item as any).building_coverage_ratio),
+    floorAreaRatio: parseNumber((item as any).floor_area_ratio),
+    mainStructure: String((item as any).main_structure ?? "-"),
+    mainPurpose: String((item as any).main_usage ?? "-"),
+    otherPurpose: String((item as any).other_usage ?? "-"),
+    height: parseNumber((item as any).height) || 0,
+    groundFloors: parseNumber((item as any).ground_floors) || 0,
+    undergroundFloors: parseNumber((item as any).basement_floors) || 0,
+    households: parseNumber((item as any).household_count) || 0,
+    units: parseNumber((item as any).family_count) || 0,
     roomNumber: "-",
-    approvalDate: "-",
-    elevators: 0,
-    constructionYear: item.construction_year ?? item.built_year ?? 0,
-    floorConfirm: item.floor_confirmation ?? "-",
+    approvalDate: String((item as any).use_approval_date ?? "-"),
+    elevators: parseNumber((item as any).elevator_count) || 0,
+    constructionYear: normalizedConstructionYear,
+    floorConfirm: (item as any).floor_confirmation ?? "-",
     hasElevator,
-    specialRights: item.special_rights ?? "-",
-    floors: item.floor_confirmation ?? "-",
+    specialRights: (item as any).special_rights ?? "-",
+    floors: (item as any).floor_info ?? "-",
   };
 }

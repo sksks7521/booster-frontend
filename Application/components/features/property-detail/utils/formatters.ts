@@ -8,6 +8,11 @@ export function formatPercent1(value: number | undefined | null): string {
   return `${n.toFixed(1)}%`;
 }
 
+export function formatFixed1(value: number | undefined | null): string {
+  const n = typeof value === "number" && isFinite(value) ? value : 0;
+  return n.toFixed(1);
+}
+
 export function formatDateYmd(value: string | undefined | null): string {
   if (!value) return "-";
   const d = new Date(value);

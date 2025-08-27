@@ -272,6 +272,7 @@ export function useItems(): UseItemsResult {
     "id",
     "usage",
     "case_number",
+    "location_detail",
     "case_year",
     "road_address",
     "building_area_pyeong",

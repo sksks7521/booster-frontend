@@ -53,6 +53,23 @@ export function InvestmentAnalysis({
     null
   );
 
+  // 숫자 안전 포맷터: 숫자가 아니거나 null/undefined면 '-'
+  const formatNumber = (value: unknown) =>
+    typeof value === "number" && Number.isFinite(value)
+      ? value.toLocaleString()
+      : "-";
+
+  // ㎡당 가격 안전 계산
+  const formatPerArea = (
+    price?: number | null,
+    area?: number | null
+  ): number | undefined => {
+    if (typeof price === "number" && typeof area === "number" && area) {
+      return Math.round(price / area);
+    }
+    return undefined;
+  };
+
   if (isLoading) {
     return (
       <div className="space-y-6">
@@ -270,7 +287,7 @@ export function InvestmentAnalysis({
                           <div>
                             <span className="text-gray-500">가격</span>
                             <div className="font-semibold">
-                              {comparable.price.toLocaleString()}만원
+                              {formatNumber(comparable.price)}만원
                             </div>
                           </div>
                           <div>
@@ -282,7 +299,7 @@ export function InvestmentAnalysis({
                           <div>
                             <span className="text-gray-500">㎡당 가격</span>
                             <div className="font-semibold">
-                              {comparable.pricePerArea.toLocaleString()}만원
+                              {formatNumber(comparable.pricePerArea)}만원
                             </div>
                           </div>
                           <div>
@@ -349,26 +366,26 @@ export function InvestmentAnalysis({
                   <div className="flex justify-between">
                     <span className="text-gray-600">평균 가격</span>
                     <span className="font-semibold">
-                      {statistics.averagePrice.toLocaleString()}만원
+                      {formatNumber(statistics.averagePrice)}만원
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-600">최저 가격</span>
                     <span className="font-semibold">
-                      {statistics.priceRange.min.toLocaleString()}만원
+                      {formatNumber(statistics.priceRange.min)}만원
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-600">최고 가격</span>
                     <span className="font-semibold">
-                      {statistics.priceRange.max.toLocaleString()}만원
+                      {formatNumber(statistics.priceRange.max)}만원
                     </span>
                   </div>
                   <Separator />
                   <div className="flex justify-between">
                     <span className="text-gray-600">현재 매물</span>
                     <span className="font-bold text-blue-600">
-                      {baseItem.price.toLocaleString()}만원
+                      {formatNumber(baseItem.price)}만원
                     </span>
                   </div>
                   <div className="flex justify-between">
@@ -401,15 +418,18 @@ export function InvestmentAnalysis({
                   <div className="flex justify-between">
                     <span className="text-gray-600">평균 ㎡당 가격</span>
                     <span className="font-semibold">
-                      {statistics.averagePricePerArea.toLocaleString()}만원
+                      {formatNumber(statistics.averagePricePerArea)}만원
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-600">현재 매물</span>
                     <span className="font-bold text-blue-600">
-                      {Math.round(
-                        baseItem.price / baseItem.area
-                      ).toLocaleString()}
+                      {formatNumber(
+                        formatPerArea(
+                          baseItem.price as any,
+                          baseItem.area as any
+                        )
+                      )}
                       만원
                     </span>
                   </div>

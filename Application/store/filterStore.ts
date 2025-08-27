@@ -65,6 +65,8 @@ interface FilterState {
   favorites: string[];
   // 🆕 지도 이동 펜딩 타깃(상세→지도에서 보기)
   pendingMapTarget?: { lat: number; lng: number } | null;
+  // 🆕 네임스페이스별 오버라이드 저장소
+  ns?: Record<string, Partial<FilterState>>;
 }
 
 // 필터 상태를 변경하는 액션(Action)의 타입을 정의합니다.
@@ -97,6 +99,19 @@ interface FilterActions {
   setShowSelectedOnly: (v: boolean) => void;
   // 🆕 지도 이동 펜딩 타깃 설정
   setPendingMapTarget?: (target: { lat: number; lng: number } | null) => void;
+  // 🆕 네임스페이스 전용 액션
+  setNsFilter?: (namespace: string, key: keyof FilterState, value: any) => void;
+  setNsRangeFilter?: (
+    namespace: string,
+    key:
+      | "priceRange"
+      | "areaRange"
+      | "buildingAreaRange"
+      | "landAreaRange"
+      | "buildYear",
+    value: [number, number]
+  ) => void;
+  resetNsFilters?: (namespace: string) => void;
 }
 
 // 필터의 초기 상태 값입니다.
@@ -156,6 +171,7 @@ const initialState: FilterState = {
   showSelectedOnly: false,
   favorites: [],
   pendingMapTarget: null,
+  ns: {},
 };
 
 // Zustand 스토어를 생성합니다.
@@ -224,4 +240,23 @@ export const useFilterStore = create<FilterState & FilterActions>((set) => ({
     })),
   // 🆕 지도 이동 펜딩 타깃 설정
   setPendingMapTarget: (target) => set({ pendingMapTarget: target }),
+  // 🆕 네임스페이스 액션 구현: 오버라이드 병합 저장
+  setNsFilter: (namespace, key, value) =>
+    set((state: any) => {
+      const nextNs = { ...(state.ns || {}) };
+      nextNs[namespace] = { ...(nextNs[namespace] || {}), [key]: value };
+      return { ns: nextNs };
+    }),
+  setNsRangeFilter: (namespace, key, value) =>
+    set((state: any) => {
+      const nextNs = { ...(state.ns || {}) };
+      nextNs[namespace] = { ...(nextNs[namespace] || {}), [key]: value };
+      return { ns: nextNs };
+    }),
+  resetNsFilters: (namespace) =>
+    set((state: any) => {
+      const nextNs = { ...(state.ns || {}) };
+      nextNs[namespace] = {};
+      return { ns: nextNs };
+    }),
 }));

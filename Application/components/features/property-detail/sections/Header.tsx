@@ -14,6 +14,8 @@ export default function PropertyDetailHeader({ vm, rowItem }: Props) {
   const id =
     (vm?.id as unknown as string) ?? String((rowItem as any)?.id ?? "-");
   const address =
+    vm?.location ||
+    (rowItem as any)?.location_detail ||
     vm?.roadAddress ||
     (rowItem as any)?.road_address ||
     (rowItem as any)?.address ||
@@ -25,7 +27,7 @@ export default function PropertyDetailHeader({ vm, rowItem }: Props) {
   return (
     <div className="mb-4">
       <div className="text-[11px] text-gray-400">ID: {id}</div>
-      <h2 className="mt-1 text-2xl md:text-3xl font-bold text-gray-900 leading-tight">
+      <h2 className="mt-1 text-2xl md:text-3xl font-bold text-gray-900 leading-tight whitespace-normal break-words">
         {address}
       </h2>
       <div className="mt-2 flex flex-wrap items-center gap-4 text-sm text-gray-600">

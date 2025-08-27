@@ -152,6 +152,12 @@ export default function PropertyDetailPage() {
     );
   };
 
+  // 숫자 안전 포맷터: 숫자가 아니거나 undefined/null이면 '-'
+  const formatNumber = (value: unknown) =>
+    typeof value === "number" && Number.isFinite(value)
+      ? value.toLocaleString()
+      : "-";
+
   // 로딩 상태 처리
   if (isLoading || isRefreshing) {
     return (
@@ -275,13 +281,13 @@ export default function PropertyDetailPage() {
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
                   <div className="text-center">
                     <div className="text-2xl font-bold text-blue-600">
-                      {property.price.toLocaleString()}만원
+                      {formatNumber(property.price)}만원
                     </div>
                     <div className="text-sm text-gray-500">경매 시작가</div>
                   </div>
                   <div className="text-center">
                     <div className="text-2xl font-bold text-green-600">
-                      {property.estimatedValue?.toLocaleString()}만원
+                      {formatNumber(property.estimatedValue)}만원
                     </div>
                     <div className="text-sm text-gray-500">감정가</div>
                   </div>
@@ -406,14 +412,13 @@ export default function PropertyDetailPage() {
                         <div>
                           <span className="font-medium">최저입찰가:</span>
                           <span className="ml-2">
-                            {property.legalInfo?.minimumBid.toLocaleString()}
-                            만원
+                            {formatNumber(property.legalInfo?.minimumBid)}만원
                           </span>
                         </div>
                         <div>
                           <span className="font-medium">보증금:</span>
                           <span className="ml-2">
-                            {property.legalInfo?.deposit.toLocaleString()}만원
+                            {formatNumber(property.legalInfo?.deposit)}만원
                           </span>
                         </div>
                       </div>
@@ -540,7 +545,7 @@ export default function PropertyDetailPage() {
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-medium">주변 평균가</span>
                   <span className="font-bold">
-                    {property.marketAnalysis?.averagePrice.toLocaleString()}만원
+                    {formatNumber(property.marketAnalysis?.averagePrice)}만원
                   </span>
                 </div>
                 <div className="flex items-center justify-between">

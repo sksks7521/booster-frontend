@@ -53,7 +53,6 @@ export interface Item {
   sale_date?: string;
   sale_month?: number;
   case_year?: number;
-  special_rights?: string;
   floor_confirmation?: string;
   public_price?: number;
   under_100million?: string;
@@ -340,6 +339,18 @@ class ApiClient {
     return this.request<ItemsResponse>(`/api/v1/items/?${queryParams}`);
   }
 
+  // 컬럼 메타데이터
+  async getItemsColumns(): Promise<any> {
+    return this.request<any>(`/api/v1/items/columns`);
+  }
+
+  // 선택 컬럼 API
+  async getItemsCustom(params?: Record<string, any>): Promise<any> {
+    const finalParams: Record<string, any> = { ...(params ?? {}) };
+    const queryParams = new URLSearchParams(finalParams).toString();
+    return this.request<any>(`/api/v1/items/custom?${queryParams}`);
+  }
+
   async getItemsSimple(params?: Record<string, any>): Promise<Item[]> {
     const finalParams: Record<string, any> = { ...(params ?? {}) };
     if (finalParams.limit === undefined) finalParams.limit = 20;
@@ -356,6 +367,14 @@ class ApiClient {
 
   async getItem(id: number): Promise<Item> {
     return this.request<Item>(`/api/v1/items/${id}`);
+  }
+
+  // 단건 전용 커스텀(제안 엔드포인트): /api/v1/items/{id}/custom?fields=...
+  // 백엔드 적용 전까지는 404/400 가능성이 있어 try-catch로 감쌀 것
+  async getItemCustom(id: number, params?: Record<string, any>): Promise<any> {
+    const queryParams = params ? new URLSearchParams(params).toString() : "";
+    const suffix = queryParams ? `?${queryParams}` : "";
+    return this.request<any>(`/api/v1/items/${id}/custom${suffix}`);
   }
 
   // 투자 분석 API
@@ -480,6 +499,12 @@ export const itemApi = {
     apiClient.getItemsSimple(params),
   createItem: (itemData: ItemCreate) => apiClient.createItem(itemData),
   getItem: (id: number) => apiClient.getItem(id),
+  getItemCustom: (id: number, params?: Record<string, any>) =>
+    apiClient.getItemCustom(id, params),
+  // 메타/선택 컬럼 API
+  getItemsColumns: () => apiClient.getItemsColumns(),
+  getItemsCustom: (params?: Record<string, any>) =>
+    apiClient.getItemsCustom(params),
   // 투자 분석
   getComparables: (itemId: number, params?: Record<string, any>) =>
     apiClient.getComparables(itemId, params),

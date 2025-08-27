@@ -18,7 +18,9 @@ export default function FooterActions({
 }: Props) {
   const effLat = vm?.latitude ?? coords?.lat;
   const effLng = vm?.longitude ?? coords?.lng;
-  const hasCoords = typeof effLat === "number" && typeof effLng === "number";
+  const inLat = typeof effLat === "number" && effLat >= 33 && effLat <= 39.5;
+  const inLng = typeof effLng === "number" && effLng >= 124 && effLng <= 132.5;
+  const hasCoords = inLat && inLng;
   const id = String(vm?.id ?? "");
 
   const handleOpenMap = () => {

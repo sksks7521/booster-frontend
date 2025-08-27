@@ -130,7 +130,7 @@ interface ColumnWithId extends ColumnType<Item> {
 const DEFAULT_COLUMN_ORDER = [
   "usage",
   "case_number",
-  "road_address",
+  "location_detail",
   "sale_date",
   "current_status",
   "building_area_pyeong",
@@ -274,32 +274,31 @@ const createColumns = (
       }),
     },
     {
-      id: "road_address",
+      id: "location_detail",
       title: (
         <DraggableHeader
-          id="road_address"
-          width={getWidth?.("road_address")}
-          onResize={(dx) => onResizeColumn?.("road_address", dx)}
+          id="location_detail"
+          width={getWidth?.("location_detail")}
+          onResize={(dx) => onResizeColumn?.("location_detail", dx)}
         >
-          {renderHeaderLabel("road_address", "도로명주소")}
+          {renderHeaderLabel("location_detail", "소재지")}
         </DraggableHeader>
       ),
-      dataIndex: "road_address",
-      key: "road_address",
-      width: getWidth?.("road_address") ?? Math.round(250 * 1.3),
+      dataIndex: "location_detail",
+      key: "location_detail",
+      width: getWidth?.("location_detail") ?? Math.round(250 * 1.95),
       render: (text: string, record: Item) => {
-        const display = text || (record as any).address || "-";
+        const display = text || "-"; // 오직 소재지(location_detail)만 표시
         const handleClick: React.MouseEventHandler<HTMLSpanElement> = (e) => {
           e.stopPropagation();
           e.preventDefault();
           onAddressClick?.(record);
         };
-        // Phase 5: 주소 셀 호버 프리패치 (디바운스/디듀프)
         const prefetch = (() => {
           let timer: number | undefined;
           let lastRun = 0;
           const DEBOUNCE_MS = 200;
-          const MIN_INTERVAL_MS = 1200; // 1.2s 내 중복 금지
+          const MIN_INTERVAL_MS = 1200;
           return () => {
             const now = Date.now();
             if (now - lastRun < MIN_INTERVAL_MS) return;
@@ -336,13 +335,14 @@ const createColumns = (
               cursor: "pointer",
             }}
             title={display}
+            className="whitespace-normal break-words"
           >
             {display}
           </span>
         );
       },
       onHeaderCell: () => ({
-        onClick: () => safeHeaderClick("road_address"),
+        onClick: () => safeHeaderClick("location_detail"),
         style: { cursor: "pointer" },
       }),
     },
@@ -725,6 +725,9 @@ interface ItemTableProps {
   // ✅ 행 선택 제어 (선택 개수 표시용)
   selectedRowKeys?: React.Key[];
   onSelectionChange?: (keys: React.Key[]) => void;
+  // 🆕 데이터셋 동적 컬럼 모드(옵션)
+  schemaColumns?: { key: string; header: string }[];
+  getValueForKey?: (row: any, key: string) => any;
 }
 
 // 🚀 Ant Design Table 컴포넌트 - 완전 새로운 구현!
@@ -744,6 +747,8 @@ const ItemTable: React.FC<ItemTableProps> = ({
   onPageSizeChange,
   selectedRowKeys: controlledSelectedKeys,
   onSelectionChange,
+  schemaColumns,
+  getValueForKey,
 }) => {
   // 🎯 컬럼 순서 상태 관리 (드래그앤드롭용)
   const [columnOrder, setColumnOrder] =
@@ -793,7 +798,7 @@ const ItemTable: React.FC<ItemTableProps> = ({
       const minById: Record<string, number> = {
         usage: 100,
         case_number: 120,
-        road_address: 200,
+        location_detail: 260,
         building_area_pyeong: 110,
         land_area_pyeong: 110,
         appraised_value: 130,
@@ -820,19 +825,95 @@ const ItemTable: React.FC<ItemTableProps> = ({
     setAddressDialogOpen(true);
   };
 
-  const baseColumns = createColumns(
+  // 🆕 동적 컬럼 모드 지원
+  const schemaBasedColumns: ColumnWithId[] | null = React.useMemo(() => {
+    if (!schemaColumns || schemaColumns.length === 0) return null;
+    const getVal = (row: any, key: string) => {
+      if (typeof getValueForKey === "function") return getValueForKey(row, key);
+      const direct = (row as any)?.[key];
+      if (direct !== undefined && direct !== null) return direct;
+      const extra = (row as any)?.extra ?? {};
+      const v = extra?.[key];
+      return v;
+    };
+    const makeHeader = (id: string, label: string) => (
+      <DraggableHeader
+        id={id}
+        width={getWidth?.(id)}
+        onResize={(dx) => onResizeColumn?.(id, dx)}
+      >
+        <span
+          style={{
+            cursor: "pointer",
+            userSelect: "none",
+            color: sortBy === id ? "#2563eb" : undefined,
+            fontWeight: sortBy === id ? 600 : undefined,
+          }}
+          onClick={() => {
+            if (!onSort) return;
+            if (sortBy !== id) onSort(id, "asc");
+            else if (sortOrder === "asc") onSort(id, "desc");
+            else onSort(undefined, undefined);
+          }}
+        >
+          {label}
+          {sortBy === id ? (sortOrder === "asc" ? " ▲" : " ▼") : ""}
+        </span>
+      </DraggableHeader>
+    );
+    return schemaColumns.map((c) => ({
+      id: c.key,
+      title: makeHeader(c.key, c.header),
+      dataIndex: c.key as any,
+      key: c.key,
+      width: getWidth?.(c.key) ?? 140,
+      render: (_: any, row: any) => {
+        const v = getVal(row, c.key);
+        if (typeof v === "number") return v.toLocaleString();
+        return v ?? "-";
+      },
+      onHeaderCell: () => ({
+        onClick: () => {
+          if (!onSort) return;
+          if (sortBy !== c.key) onSort?.(c.key, "asc");
+          else if (sortOrder === "asc") onSort?.(c.key, "desc");
+          else onSort?.(undefined, undefined);
+        },
+        style: { cursor: "pointer" },
+      }),
+    })) as unknown as ColumnWithId[];
+  }, [
+    schemaColumns,
+    getWidth,
+    onResizeColumn,
     sortBy,
     sortOrder,
     onSort,
-    getWidth,
-    onResizeColumn,
-    handleAddressClick
+    getValueForKey,
+  ]);
+
+  const baseColumns = React.useMemo(
+    () =>
+      createColumns(
+        sortBy,
+        sortOrder,
+        onSort,
+        getWidth,
+        onResizeColumn,
+        handleAddressClick
+      ),
+    [sortBy, sortOrder, onSort, getWidth, onResizeColumn]
   );
+
   const orderedColumns = React.useMemo(() => {
+    if (schemaBasedColumns) {
+      // 동적 모드: 순서 = 스키마 순서
+      return schemaBasedColumns;
+    }
     return columnOrder
       .map((id) => baseColumns.find((col) => col.id === id))
       .filter(Boolean) as ColumnWithId[];
-  }, [columnOrder, baseColumns, sortBy, sortOrder]);
+  }, [schemaBasedColumns, columnOrder, baseColumns]);
 
   // ✅ 행 선택(체크박스) - 맨 앞 고정
   const [selectedRowKeysState, setSelectedRowKeysState] = React.useState<

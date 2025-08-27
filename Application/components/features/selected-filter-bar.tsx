@@ -8,18 +8,52 @@ import { X } from "lucide-react";
 type SelectedFilterBarProps = {
   detailsCollapsed: boolean;
   onToggleDetailsCollapse: () => void;
+  namespace?: string;
 };
 
 export default function SelectedFilterBar({
   detailsCollapsed,
   onToggleDetailsCollapse,
+  namespace,
 }: SelectedFilterBarProps) {
-  // 스토어에서 직접 상태와 액션을 가져옵니다.
-  const filters = useFilterStore((state) => state);
-  const setFilter = useFilterStore((state) => state.setFilter);
-  const setRangeFilter = useFilterStore((state) => state.setRangeFilter);
+  // 스토어에서 직접 상태와 액션을 가져옵니다. (네임스페이스 대응)
+  const storeAll = useFilterStore((state) => state as any);
+  const setFilterBase = useFilterStore((state) => state.setFilter);
+  const setRangeFilterBase = useFilterStore((state) => state.setRangeFilter);
   const resetFilters = useFilterStore((state) => state.resetFilters);
   const setSortConfig = useFilterStore((state) => state.setSortConfig);
+  const setNsFilter = useFilterStore((s) => (s as any).setNsFilter);
+  const setNsRangeFilter = useFilterStore((s) => (s as any).setNsRangeFilter);
+
+  const nsOverrides = (
+    storeAll.ns && namespace ? (storeAll.ns as any)[namespace] : undefined
+  ) as any;
+  const filters: any =
+    namespace && nsOverrides ? { ...storeAll, ...nsOverrides } : storeAll;
+
+  // 네임스페이스 라우팅 래퍼
+  const setFilter = (key: any, value: any) => {
+    if (namespace && typeof setNsFilter === "function") {
+      (setNsFilter as any)(namespace, key, value);
+    } else {
+      (setFilterBase as any)(key, value);
+    }
+  };
+  const setRangeFilter = (
+    key:
+      | "priceRange"
+      | "areaRange"
+      | "buildingAreaRange"
+      | "landAreaRange"
+      | "buildYear",
+    value: [number, number]
+  ) => {
+    if (namespace && typeof setNsRangeFilter === "function") {
+      (setNsRangeFilter as any)(namespace, key, value);
+    } else {
+      setRangeFilterBase(key, value);
+    }
+  };
 
   // 'x' 버튼 클릭 시 호출되는 함수를 수정합니다.
   const handleRemove = (key: string) => {

@@ -23,6 +23,10 @@ interface MapViewProps {
   locationKey?: string;
   // 목록 선택 항목 id 배열: 지도에서 강조/이동 처리
   highlightIds?: string[];
+  // 🆕 데이터셋 전용 전략(선택)
+  markerColorFn?: (row: any) => string;
+  legendItems?: { label: string; color: string }[];
+  namespace?: string;
 }
 
 function MapView({
@@ -33,6 +37,9 @@ function MapView({
   onRetry,
   locationKey,
   highlightIds = [],
+  markerColorFn,
+  legendItems,
+  namespace,
 }: MapViewProps) {
   const mapRef = useRef<HTMLDivElement | null>(null);
   const [mapReady, setMapReady] = useState(false);
@@ -1099,7 +1106,10 @@ function MapView({
         // 색상: 최저가(만원), 텍스트: 비율 10% 버킷
         const price = it?.minimum_bid_price ?? it?.min_bid_price ?? 0;
         const ratioRaw = it?.bid_to_appraised_ratio ?? it?.percentage ?? null;
-        const color = getColorByPrice(price);
+        const color =
+          typeof markerColorFn === "function"
+            ? markerColorFn(it)
+            : getColorByPrice(price);
         const label = getBucketText(ratioRaw);
         const image = getModernBadgeImage(color, label);
 

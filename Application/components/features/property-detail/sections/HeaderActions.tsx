@@ -1,10 +1,16 @@
 "use client";
 
-import { Share2, FileText, Heart } from "lucide-react";
+import { Share2, FileText, Heart, FileSignature } from "lucide-react";
 import React from "react";
+import { useRouter } from "next/navigation";
 
-export default function HeaderActions() {
+interface Props {
+  itemId?: number;
+}
+
+export default function HeaderActions({ itemId }: Props) {
   const [fav, setFav] = React.useState(false);
+  const router = useRouter();
 
   const handleShare = async () => {
     try {
@@ -23,6 +29,13 @@ export default function HeaderActions() {
     } catch {}
   };
 
+  const handleCreateReport = () => {
+    if (!itemId) return;
+    try {
+      router.push(`/analysis/${itemId}`);
+    } catch {}
+  };
+
   return (
     <div className="flex items-center gap-2">
       <button
@@ -38,6 +51,15 @@ export default function HeaderActions() {
         onClick={handlePrint}
       >
         <FileText className="w-5 h-5" />
+      </button>
+      <button
+        aria-label="분석 보고서 생성"
+        className="rounded p-2 text-blue-600 hover:text-blue-800 hover:bg-blue-50"
+        onClick={handleCreateReport}
+        disabled={!itemId}
+        title={itemId ? "분석 보고서 생성" : "아이템 아이디 없음"}
+      >
+        <FileSignature className="w-5 h-5" />
       </button>
       <button
         aria-label="즐겨찾기"
