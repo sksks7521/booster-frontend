@@ -2,9 +2,9 @@ Param(
   [string[]]$Urls = @(
     'http://127.0.0.1:8000/api/v1/items/simple?limit=1',
     'http://127.0.0.1:8000/api/v1/items/?limit=1',
-    'http://127.0.0.1:8000/api/v1/auction-completed/?limit=1',
-    'http://127.0.0.1:8000/api/v1/real-transactions/?limit=1',
-    'http://127.0.0.1:8000/api/v1/real-rents/?limit=1'
+    'http://127.0.0.1:8000/api/v1/auction-completed/?page=1&size=1',
+    'http://127.0.0.1:8000/api/v1/real-transactions/?page=1&size=1',
+    'http://127.0.0.1:8000/api/v1/real-rents/?page=1&size=1'
   )
 )
 

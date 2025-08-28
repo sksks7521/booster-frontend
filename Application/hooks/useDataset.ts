@@ -1,6 +1,13 @@
 import useSWR from "swr";
 import { datasetConfigs } from "@/datasets/registry";
+import {
+  normalizeItemLike,
+  roundBounds,
+  isValidBounds,
+  sanitizeFilters,
+} from "@/datasets/normalize";
 import type { DatasetId, ItemLike } from "@/types/datasets";
+import { validateRow } from "@/datasets/schemas";
 
 export function useDataset(
   datasetId: DatasetId,
@@ -9,10 +16,31 @@ export function useDataset(
   size: number
 ) {
   const cfg = datasetConfigs[datasetId];
-  const key = cfg.api.buildListKey({ filters, page, size });
+  const safeFilters = roundBounds(sanitizeFilters(filters));
+  // 중심+반경이 존재하면(bounds가 함께 오더라도) bounds 유효성 검사는 건너뛰고
+  // 쿼리에서 bounds를 제거하여 서버에 center+radius만 전달한다.
+  const hasCenterRadius =
+    (safeFilters as any).lat != null && (safeFilters as any).lng != null;
+  const filtersForQuery: Record<string, unknown> = { ...safeFilters };
+  if (hasCenterRadius) {
+    delete (filtersForQuery as any).south;
+    delete (filtersForQuery as any).west;
+    delete (filtersForQuery as any).north;
+    delete (filtersForQuery as any).east;
+  }
+  const key = cfg.api.buildListKey({ filters: filtersForQuery, page, size });
   const { data, error, isLoading, mutate } = useSWR(key, async () => {
     try {
-      return await cfg.api.fetchList({ filters, page, size });
+      // bounds 간단 검증 실패 시 네트워크 요청 생략
+      // 단, 중심+반경 모드일 때는 bounds 무효여도 요청을 진행한다.
+      if (!hasCenterRadius && !isValidBounds(safeFilters)) {
+        return { items: [], total: 0, page, size } as any;
+      }
+      return await cfg.api.fetchList({
+        filters: filtersForQuery,
+        page,
+        size,
+      });
     } catch (e) {
       // 백엔드 미구현/일시 오류 시에도 UI는 동작하도록 안전 결과 반환
       return { items: [], total: 0, page, size, _error: e } as any;
@@ -20,8 +48,14 @@ export function useDataset(
   });
 
   // items 표준화: { items, total, page, size } 또는 배열 형태 모두 수용
-  const rawItems: any[] = Array.isArray(data) ? data : data?.items ?? [];
-  const items: ItemLike[] = rawItems.map(cfg.adapter.toItemLike);
+  const rawItemsAll: any[] = Array.isArray(data) ? data : data?.items ?? [];
+  const rawItems: any[] = rawItemsAll
+    .map((r) => validateRow(datasetId, r))
+    .filter((r): r is any => r != null);
+  const items: ItemLike[] = rawItems
+    .map(cfg.adapter.toItemLike)
+    .map(normalizeItemLike)
+    .filter((x): x is ItemLike => x != null);
   const total: number = data?.total ?? rawItems.length ?? 0;
 
   return { items, total, page, size, isLoading, error, mutate, cfg };

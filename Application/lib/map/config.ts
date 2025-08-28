@@ -36,3 +36,21 @@ export const DEFAULT_PALETTE_ORDER: string[] = [
   PALETTE.orange,
   PALETTE.red,
 ];
+
+// 지도 페치 가드/디바운스 환경 설정 (NEXT_PUBLIC_* 로 주입)
+export const MAP_GUARD = {
+  // 최소 줌 레벨(이상 시 서버 페치 억제). 예: 9
+  minFetchLevel: Number(process.env.NEXT_PUBLIC_MAP_MIN_FETCH_LEVEL ?? 9),
+  // 바운즈 면적 상한(㎢). 예: 1500
+  maxFetchAreaKm2: Number(process.env.NEXT_PUBLIC_MAP_MAX_AREA_KM2 ?? 1500),
+  // 지도에 동시에 표시할 마커 개수 상한. 예: 1500
+  maxMarkers: Number(process.env.NEXT_PUBLIC_MAP_MAX_MARKERS ?? 1500),
+  // 바운즈 변경 이벤트 디바운스(ms). 예: 300
+  boundsDebounceMs: Number(
+    process.env.NEXT_PUBLIC_MAP_BOUNDS_DEBOUNCE_MS ?? 300
+  ),
+  // 클러스터 정책 적용 디바운스(ms). 예: 200
+  clusterPolicyDebounceMs: Number(
+    process.env.NEXT_PUBLIC_MAP_CLUSTER_DEBOUNCE_MS ?? 200
+  ),
+} as const;

@@ -3,7 +3,8 @@ import * as React from "react";
 import { useEffect, useRef, useState } from "react";
 import { loadKakaoSdk } from "@/lib/map/kakaoLoader";
 import MapLegend from "./MapLegend";
-import { DEFAULT_THRESHOLDS } from "@/lib/map/config";
+import { captureError } from "@/lib/monitoring";
+import { DEFAULT_THRESHOLDS, MAP_GUARD } from "@/lib/map/config";
 import { useFilterStore } from "@/store/filterStore";
 import {
   Sheet,
@@ -19,6 +20,15 @@ interface MapViewProps {
   isLoading?: boolean;
   error?: any;
   onRetry?: () => void;
+  // 활성화 상태: false일 때 초기화/로딩 지연
+  enabled?: boolean;
+  // 뷰포트 바운딩 박스 변경 시 상위로 전달 (카카오 전용)
+  onBoundsChange?: (bounds: {
+    south: number;
+    west: number;
+    north: number;
+    east: number;
+  }) => void;
   // 지역/읍면동 키: 변경 시 내부 초기화/relayout 트리거
   locationKey?: string;
   // 목록 선택 항목 id 배열: 지도에서 강조/이동 처리
@@ -35,6 +45,8 @@ function MapView({
   isLoading,
   error,
   onRetry,
+  enabled = true,
+  onBoundsChange,
   locationKey,
   highlightIds = [],
   markerColorFn,
@@ -93,10 +105,14 @@ function MapView({
     lng: number;
   } | null>(null);
   const [zoomLevel, setZoomLevel] = useState<number | null>(null);
+  // onBoundsChange 디바운스 및 중복 억제용
+  const lastSentBoundsRef = useRef<string>("");
+  const emitBoundsDebouncedRef = useRef<null | ((b: any) => void)>(null);
   // Kakao 지도 타입(일반/위성) 토글 상태
   const [kakaoMapType, setKakaoMapType] = useState<
     "ROADMAP" | "SKYVIEW" | "HYBRID"
   >("ROADMAP");
+  const initializedRef = useRef<boolean>(false);
 
   // 줌 변경 핸들러(카카오)
   const changeZoomLevel = (delta: number) => {
@@ -114,16 +130,9 @@ function MapView({
     } catch {}
   };
 
-  // 지도 제공자: 안정화를 위해 Kakao를 강제 사용
-  const providerEnv = "kakao";
+  // Kakao만 사용
   const kakaoKey = process.env.NEXT_PUBLIC_KAKAO_APP_KEY;
-  const vworldKeyEnv = process.env.NEXT_PUBLIC_VWORLD_API_KEY;
-  // 사용자가 제공한 기본 키를 폴백으로 사용 (환경변수 미설정 시 즉시 표시)
-  const vworldKey =
-    vworldKeyEnv && vworldKeyEnv.trim().length > 0
-      ? vworldKeyEnv
-      : "276AABBA-2990-3BAE-B46A-82A7FE6BE021";
-  const provider: "kakao" | "vworld" = kakaoKey ? "kakao" : "vworld";
+  const provider: "kakao" = "kakao";
 
   // 지역 키가 바뀌었을 때 내부 마커/클러스터 정리 및 초기 fitBounds 1회 재허용
   useEffect(() => {
@@ -167,153 +176,32 @@ function MapView({
   }, [kakaoMapType, mapReady, provider]);
 
   useEffect(() => {
+    // 지도 초기화는 탭 활성화 여부와 무관하게 최초 1회 수행
+    if (initializedRef.current) return;
+    if (kakaoMapRef.current) {
+      setMapReady(true);
+      initializedRef.current = true;
+      return;
+    }
     if (!mapRef.current) return;
-
-    if (provider === "kakao") {
-      if (!kakaoKey) return;
-      loadKakaoSdk(kakaoKey)
-        .then(() => {
-          const w = window as any;
-          const map = new w.kakao.maps.Map(mapRef.current, {
-            center: new w.kakao.maps.LatLng(37.5665, 126.978),
-            level: 8,
-          });
-          kakaoMapRef.current = map;
-          try {
-            const c = map.getCenter?.();
-            if (c) lastCenterRef.current = { lat: c.getLat(), lng: c.getLng() };
-          } catch {}
-          setMapReady(true);
-        })
-        .catch(() => setMapReady(false));
-      return;
-    }
-
-    if (!vworldKey) return;
-    const existing = document.querySelector(
-      'script[data-vendor="vworld"]'
-    ) as HTMLScriptElement | null;
-
-    const initVworld = () => {
-      try {
+    if (!kakaoKey) return;
+    loadKakaoSdk(kakaoKey)
+      .then(() => {
         const w = window as any;
-        if (mapRef.current) {
-          mapRef.current.innerHTML =
-            '<div id="vmap" style="width:100%;height:100%;left:0;top:0"></div>';
-        }
-
-        const tryInit = (attempt = 0) => {
-          if (w.vw && w.vw.MapController) {
-            w.vw.MapControllerOption = {
-              container: "vmap",
-              mapMode: "2d-map",
-              basemapType: w.vw.ol3.BasemapType.GRAPHIC,
-              controlDensity: w.vw.ol3.DensityType.EMPTY,
-              interactionDensity: w.vw.ol3.DensityType.BASIC,
-              controlsAutoArrange: true,
-              homePosition: w.vw.ol3.CameraPosition,
-              initPosition: w.vw.ol3.CameraPosition,
-            };
-            // eslint-disable-next-line @typescript-eslint/no-unused-vars
-            const mapController = new w.vw.MapController(
-              w.vw.MapControllerOption
-            );
-            mapControllerRef.current = mapController;
-            try {
-              const c = mapController?.getCenter?.();
-              if (c) lastCenterRef.current = { lat: c.y, lng: c.x };
-            } catch {}
-            setMapReady(true);
-            return;
-          }
-          if (w.vw && w.vw.ol3 && w.vw.ol3.Map) {
-            // eslint-disable-next-line @typescript-eslint/no-unused-vars
-            const map = new w.vw.ol3.Map("vmap", {
-              basemapType: w.vw.ol3.BasemapType.GRAPHIC,
-            });
-            setMapReady(true);
-            return;
-          }
-          if (attempt < 20) {
-            setTimeout(() => tryInit(attempt + 1), 150);
-          } else {
-            // 최종 실패 시 Kakao로 폴백 시도
-            if (kakaoKey) {
-              loadKakaoSdk(kakaoKey)
-                .then(() => {
-                  const kk = (window as any).kakao;
-                  if (mapRef.current && kk?.maps) {
-                    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-                    const kmap = new kk.maps.Map(mapRef.current, {
-                      center: new kk.maps.LatLng(37.5665, 126.978),
-                      level: 8,
-                    });
-                    kakaoMapRef.current = kmap;
-                    try {
-                      const c = kmap.getCenter?.();
-                      if (c)
-                        lastCenterRef.current = {
-                          lat: c.getLat(),
-                          lng: c.getLng(),
-                        };
-                    } catch {}
-                    setMapReady(true);
-                  } else {
-                    setMapReady(false);
-                  }
-                })
-                .catch(() => setMapReady(false));
-            } else {
-              setMapReady(false);
-            }
-          }
-        };
-        tryInit();
-      } catch (e) {
-        console.error("vworld init error", e);
-        setMapReady(false);
-      }
-    };
-
-    if (existing) {
-      initVworld();
-      return;
-    }
-    const script = document.createElement("script");
-    const domainParam =
-      typeof window !== "undefined"
-        ? `&domain=${window.location.hostname}`
-        : "";
-    script.src = `https://map.vworld.kr/js/vworldMap.js.do?apiKey=${vworldKey}${domainParam}`;
-    script.async = true;
-    script.defer = true;
-    script.setAttribute("data-vendor", "vworld");
-    script.onload = initVworld;
-    script.onerror = () => {
-      console.error("vworld script load failed");
-      // 스크립트 로드 자체가 실패한 경우에도 Kakao로 폴백 시도
-      if (kakaoKey) {
-        loadKakaoSdk(kakaoKey)
-          .then(() => {
-            const kk = (window as any).kakao;
-            if (mapRef.current && kk?.maps) {
-              // eslint-disable-next-line @typescript-eslint/no-unused-vars
-              const kmap = new kk.maps.Map(mapRef.current, {
-                center: new kk.maps.LatLng(37.5665, 126.978),
-                level: 8,
-              });
-              setMapReady(true);
-            } else {
-              setMapReady(false);
-            }
-          })
-          .catch(() => setMapReady(false));
-      } else {
-        setMapReady(false);
-      }
-    };
-    document.head.appendChild(script);
-  }, []);
+        const map = new w.kakao.maps.Map(mapRef.current, {
+          center: new w.kakao.maps.LatLng(37.5665, 126.978),
+          level: 8,
+        });
+        kakaoMapRef.current = map;
+        try {
+          const c = map.getCenter?.();
+          if (c) lastCenterRef.current = { lat: c.getLat(), lng: c.getLng() };
+        } catch {}
+        setMapReady(true);
+        initializedRef.current = true;
+      })
+      .catch(() => setMapReady(false));
+  }, [kakaoKey]);
 
   // 뷰포트 기준 모바일 여부 추정
   useEffect(() => {
@@ -974,7 +862,7 @@ function MapView({
       clustererRef.current = new w.kakao.maps.MarkerClusterer({
         map,
         averageCenter: true,
-        minLevel: 9, // 기본안: level ≥ 9 병합
+        minLevel: 9, // 기본값. 정책은 아래 applyClusterPolicy에서 동적으로 조정
         gridSize: 60,
         disableClickZoom: true, // 클릭 시 사용자 정의 동작
       });
@@ -1087,12 +975,12 @@ function MapView({
       w.kakao.maps.event.addListener(
         map,
         "zoom_changed",
-        debounce(applyClusterPolicy, 200)
+        debounce(applyClusterPolicy, MAP_GUARD.clusterPolicyDebounceMs)
       );
     } catch {}
 
-    // 최대 N개만 표시(성능 보호)
-    const MAX = 1500;
+    // 최대 N개만 표시(성능 보호) - 면적 상한과 분리된 표시 상한 사용
+    const MAX = MAP_GUARD.maxMarkers;
     const slice = items.slice(0, MAX);
     const toAdd: any[] = [];
     slice.forEach((it: any) => {
@@ -1472,6 +1360,65 @@ function MapView({
           if (c) setCenterCoord({ lat: c.getLat(), lng: c.getLng() });
           const lv = map.getLevel?.();
           if (typeof lv === "number") setZoomLevel(lv);
+          // 바운즈 계산 후 상위 전달(bbox)
+          if (typeof map.getBounds === "function" && onBoundsChange) {
+            try {
+              // 최소 줌 가드: 너무 멀리서 페치하지 않음
+              const level = map.getLevel?.();
+              if (typeof level === "number" && level >= MAP_GUARD.minFetchLevel)
+                return;
+              const b = map.getBounds();
+              const sw = b?.getSouthWest?.();
+              const ne = b?.getNorthEast?.();
+              if (sw && ne) {
+                const payload = {
+                  south: sw.getLat(),
+                  west: sw.getLng(),
+                  north: ne.getLat(),
+                  east: ne.getLng(),
+                } as const;
+                const sig = `${payload.south.toFixed(4)},${payload.west.toFixed(
+                  4
+                )}-${payload.north.toFixed(4)},${payload.east.toFixed(
+                  4
+                )}-l${level}`;
+                if (!emitBoundsDebouncedRef.current) {
+                  // 환경변수 기반 디바운스
+                  let t: any;
+                  emitBoundsDebouncedRef.current = (bb) => {
+                    clearTimeout(t);
+                    t = setTimeout(() => {
+                      // 면적 상한(㎢) 가드: 과도한 영역은 이벤트 자체를 억제
+                      try {
+                        const latMid = (bb.south + bb.north) / 2;
+                        const toRad = (d: number) => (d * Math.PI) / 180;
+                        const heightKm = Math.abs(bb.north - bb.south) * 111.0;
+                        const widthKm =
+                          Math.abs(bb.east - bb.west) *
+                          111.0 *
+                          Math.cos(toRad(latMid));
+                        const areaKm2 = Math.abs(widthKm * heightKm);
+                        if (
+                          Number.isFinite(areaKm2) &&
+                          areaKm2 > MAP_GUARD.maxFetchAreaKm2
+                        )
+                          return;
+                      } catch {}
+                      const s = `${bb.south.toFixed(4)},${bb.west.toFixed(
+                        4
+                      )}-${bb.north.toFixed(4)},${bb.east.toFixed(
+                        4
+                      )}-l${level}`;
+                      if (lastSentBoundsRef.current === s) return;
+                      lastSentBoundsRef.current = s;
+                      onBoundsChange(bb);
+                    }, MAP_GUARD.boundsDebounceMs);
+                  };
+                }
+                emitBoundsDebouncedRef.current(payload);
+              }
+            } catch {}
+          }
         } catch {}
       };
 

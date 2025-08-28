@@ -1,6 +1,6 @@
 // 데이터셋 공통 타입 정의 (상세 v2)
 
-export type DatasetId = "auction_ed" | "sale" | "rent" | "naver";
+export type DatasetId = "auction_ed" | "sale" | "rent" | "listings";
 
 // 프론트 공통 테이블/지도에서 소비할 최소 행 형태
 export interface ItemLike {

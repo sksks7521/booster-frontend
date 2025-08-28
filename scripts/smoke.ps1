@@ -8,9 +8,9 @@ if (-not $Urls -or $Urls.Count -eq 0) {
   $Urls = @(
     "$BaseURL/api/v1/items/simple?limit=1",
     "$BaseURL/api/v1/items/?limit=1",
-    "$BaseURL/api/v1/auction-completed/?limit=1",
-    "$BaseURL/api/v1/real-transactions/?limit=1",
-    "$BaseURL/api/v1/real-rents/?limit=1"
+    "$BaseURL/api/v1/auction-completed/?page=1&size=1",
+    "$BaseURL/api/v1/real-transactions/?page=1&size=1",
+    "$BaseURL/api/v1/real-rents/?page=1&size=1"
   )
 }
 

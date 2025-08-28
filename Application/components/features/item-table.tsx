@@ -27,6 +27,9 @@ import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import type { Item } from "@/lib/api";
 import PropertyDetailDialog from "@/components/features/property-detail/PropertyDetailDialog";
+import { useColumnOrder } from "@/hooks/useColumnOrder";
+import { formatArea, m2ToPyeong } from "@/lib/units";
+import { useFeatureFlags } from "@/lib/featureFlags";
 
 // const { Link } = Typography; // 링크 색상(파랑) 제거를 위해 사용 안 함
 
@@ -361,7 +364,29 @@ const createColumns = (
       key: "building_area_pyeong",
       width: getWidth?.("building_area_pyeong") ?? 120,
       align: "right",
-      render: (text: number, record: Item) => text || record.area || "-",
+      // 면적 표시 개선: record.area 가 있으면 "㎡ (평)" 동시 표기
+      render: (text: number, record: Item) => {
+        const { areaDisplay } = useFeatureFlags();
+        const m2 = (record as any)?.area as number | undefined;
+        if (Number.isFinite(m2 as any)) {
+          if (areaDisplay?.mode === "m2") return `${Math.round(m2!)}㎡`;
+          if (areaDisplay?.mode === "pyeong") {
+            const py = m2ToPyeong(
+              m2!,
+              areaDisplay?.rounding,
+              areaDisplay?.digits
+            );
+            return py != null ? `${py}평` : "-";
+          }
+          return formatArea(m2, {
+            withBoth: true,
+            digits: areaDisplay?.digits ?? 1,
+            rounding: areaDisplay?.rounding,
+          });
+        }
+        if (Number.isFinite(text as any)) return `${text}평`;
+        return "-";
+      },
       onHeaderCell: () => ({
         onClick: () => safeHeaderClick("building_area_pyeong"),
         style: { cursor: "pointer" },
@@ -382,7 +407,28 @@ const createColumns = (
       key: "land_area_pyeong",
       width: getWidth?.("land_area_pyeong") ?? 120,
       align: "right",
-      render: (text: number) => text || "-",
+      render: (text: number, record: Item) => {
+        const { areaDisplay } = useFeatureFlags();
+        const m2 = (record as any)?.land_area_m2 as number | undefined;
+        if (Number.isFinite(m2 as any)) {
+          if (areaDisplay?.mode === "m2") return `${Math.round(m2!)}㎡`;
+          if (areaDisplay?.mode === "pyeong") {
+            const py = m2ToPyeong(
+              m2!,
+              areaDisplay?.rounding,
+              areaDisplay?.digits
+            );
+            return py != null ? `${py}평` : "-";
+          }
+          return formatArea(m2, {
+            withBoth: true,
+            digits: areaDisplay?.digits ?? 1,
+            rounding: areaDisplay?.rounding,
+          });
+        }
+        if (Number.isFinite(text as any)) return `${text}평`;
+        return "-";
+      },
       onHeaderCell: () => ({
         onClick: () => safeHeaderClick("land_area_pyeong"),
         style: { cursor: "pointer" },
@@ -753,6 +799,9 @@ const ItemTable: React.FC<ItemTableProps> = ({
   // 🎯 컬럼 순서 상태 관리 (드래그앤드롭용)
   const [columnOrder, setColumnOrder] =
     React.useState<string[]>(DEFAULT_COLUMN_ORDER);
+  const { order: serverOrder, save: saveOrder } = useColumnOrder(
+    DEFAULT_COLUMN_ORDER as unknown as string[]
+  );
 
   // 🔍 도로명주소 팝업 상태
   const [addressDialogOpen, setAddressDialogOpen] = React.useState(false);
@@ -777,7 +826,13 @@ const ItemTable: React.FC<ItemTableProps> = ({
       setColumnOrder((prev) => {
         const activeIndex = prev.indexOf(active.id as string);
         const overIndex = prev.indexOf(over?.id as string);
-        return arrayMove(prev, activeIndex, overIndex);
+        const next = arrayMove(prev, activeIndex, overIndex);
+        try {
+          const allowed = new Set((baseColumns || []).map((c) => c.id));
+          const payload = next.filter((k) => allowed.has(k));
+          void saveOrder(payload);
+        } catch {}
+        return next;
       });
     }
   };
@@ -787,13 +842,13 @@ const ItemTable: React.FC<ItemTableProps> = ({
     Record<string, number>
   >({});
 
-  const getWidth = (id: string) => columnWidths[id];
-  const onResizeColumn = (id: string, deltaX: number) => {
+  const getWidth = React.useCallback(
+    (id: string) => columnWidths[id],
+    [columnWidths]
+  );
+  const onResizeColumn = React.useCallback((id: string, deltaX: number) => {
     setColumnWidths((prev) => {
-      const current =
-        prev[id] ??
-        (baseColumns.find((c) => c.id === id)?.width as number) ??
-        120;
+      const current = prev[id] ?? 120;
       // 최소 너비: 컬럼명(+ 핸들 아이콘 공간) 고려하여 100~140 사이로 보수적으로 설정
       const minById: Record<string, number> = {
         usage: 100,
@@ -818,12 +873,12 @@ const ItemTable: React.FC<ItemTableProps> = ({
       const next = Math.max(minWidth, current + deltaX);
       return { ...prev, [id]: next };
     });
-  };
+  }, []);
 
-  const handleAddressClick = (item: Item) => {
+  const handleAddressClick = React.useCallback((item: Item) => {
     setAddressDialogItem(item);
     setAddressDialogOpen(true);
-  };
+  }, []);
 
   // 🆕 동적 컬럼 모드 지원
   const schemaBasedColumns: ColumnWithId[] | null = React.useMemo(() => {
@@ -869,8 +924,41 @@ const ItemTable: React.FC<ItemTableProps> = ({
       width: getWidth?.(c.key) ?? 140,
       render: (_: any, row: any) => {
         const v = getVal(row, c.key);
-        if (typeof v === "number") return v.toLocaleString();
-        return v ?? "-";
+        const isNum = typeof v === "number";
+        const text = isNum ? (v as number).toLocaleString() : v ?? "-";
+        // 전월세 price_basis 표기: price/deposit/monthlyRent 컬럼에 배지 추가
+        const basis = (row?.extra || {}).price_basis as string | undefined;
+        const k = (row?.extra || {}).price_k as number | string | undefined;
+        const needsBadge = ["price", "deposit", "monthlyRent"].includes(c.key);
+        if (needsBadge && (basis || k)) {
+          return (
+            <span>
+              {text}
+              <span
+                style={{
+                  marginLeft: 6,
+                  padding: "1px 6px",
+                  border: "1px solid #e5e7eb",
+                  borderRadius: 12,
+                  fontSize: 11,
+                  color: "#374151",
+                  background: "#f9fafb",
+                }}
+                title={
+                  basis
+                    ? `price_basis: ${basis}${k ? `, k=${k}` : ""}`
+                    : k
+                    ? `k=${k}`
+                    : ""
+                }
+              >
+                {basis ? basis : "basis"}
+                {k ? ` · k=${k}` : ""}
+              </span>
+            </span>
+          );
+        }
+        return text;
       },
       onHeaderCell: () => ({
         onClick: () => {
@@ -904,6 +992,19 @@ const ItemTable: React.FC<ItemTableProps> = ({
       ),
     [sortBy, sortOrder, onSort, getWidth, onResizeColumn]
   );
+
+  // 서버 저장 컬럼 순서를 안전하게 적용(허용 컬럼만 유지 + 누락 컬럼 보강)
+  React.useEffect(() => {
+    try {
+      const allowed = new Set((baseColumns || []).map((c) => c.id));
+      const safeServer = (serverOrder || []).filter((k) => allowed.has(k));
+      const rest = (baseColumns || [])
+        .map((c) => c.id)
+        .filter((k) => !safeServer.includes(k));
+      const next = [...safeServer, ...rest];
+      if (next.length > 0) setColumnOrder(next);
+    } catch {}
+  }, [serverOrder, baseColumns]);
 
   const orderedColumns = React.useMemo(() => {
     if (schemaBasedColumns) {

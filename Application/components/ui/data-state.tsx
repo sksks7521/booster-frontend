@@ -39,7 +39,8 @@ export function ErrorState({
   onRetry,
   retryText = "다시 시도",
   className,
-}: StateBaseProps & { error?: unknown }) {
+  extra,
+}: StateBaseProps & { error?: unknown; extra?: React.ReactNode }) {
   return (
     <div
       className={`flex flex-col items-center justify-center py-8 ${
@@ -57,6 +58,7 @@ export function ErrorState({
           {retryText}
         </Button>
       )}
+      {extra}
     </div>
   );
 }

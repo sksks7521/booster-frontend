@@ -421,7 +421,14 @@ class ApiClient {
     params?: Record<string, any>
   ): Promise<AuctionCompleted[]> {
     const finalParams: Record<string, any> = { ...(params ?? {}) };
-    if (finalParams.limit === undefined) finalParams.limit = 20;
+    // page/size 방식으로 전환
+    if (finalParams.page === undefined) finalParams.page = 1;
+    if (finalParams.size === undefined) finalParams.size = 20;
+    // 하위호환: limit가 들어오면 size로 승격
+    if (finalParams.limit !== undefined && finalParams.size === undefined) {
+      finalParams.size = finalParams.limit;
+      delete finalParams.limit;
+    }
     const queryParams = new URLSearchParams(finalParams).toString();
     return this.request<AuctionCompleted[]>(
       `/api/v1/auction-completed/?${queryParams}`
@@ -432,6 +439,11 @@ class ApiClient {
     return this.request<AuctionCompleted>(
       `/api/v1/auction-completed/${itemId}`
     );
+  }
+
+  // 컬럼 메타: 경매 완료
+  async getAuctionCompletedColumns(): Promise<any> {
+    return this.request<any>(`/api/v1/auction-completed/columns`);
   }
 
   async getAuctionMarketAnalysis(params?: Record<string, any>): Promise<any> {
@@ -446,11 +458,22 @@ class ApiClient {
     params?: Record<string, any>
   ): Promise<RealTransaction[]> {
     const finalParams: Record<string, any> = { ...(params ?? {}) };
-    if (finalParams.limit === undefined) finalParams.limit = 20;
+    // page/size 방식으로 전환
+    if (finalParams.page === undefined) finalParams.page = 1;
+    if (finalParams.size === undefined) finalParams.size = 20;
+    if (finalParams.limit !== undefined && finalParams.size === undefined) {
+      finalParams.size = finalParams.limit;
+      delete finalParams.limit;
+    }
     const queryParams = new URLSearchParams(finalParams).toString();
     return this.request<RealTransaction[]>(
       `/api/v1/real-transactions/?${queryParams}`
     );
+  }
+
+  // 컬럼 메타: 실거래 매매
+  async getRealTransactionsColumns(): Promise<any> {
+    return this.request<any>(`/api/v1/real-transactions/columns`);
   }
 
   async getMarketPrice(params?: Record<string, any>): Promise<any> {
@@ -463,14 +486,66 @@ class ApiClient {
   // 실거래 전월세 (수익률 분석) API
   async getRealRents(params?: Record<string, any>): Promise<RealRent[]> {
     const finalParams: Record<string, any> = { ...(params ?? {}) };
-    if (finalParams.limit === undefined) finalParams.limit = 20;
+    // page/size 방식으로 전환
+    if (finalParams.page === undefined) finalParams.page = 1;
+    if (finalParams.size === undefined) finalParams.size = 20;
+    if (finalParams.limit !== undefined && finalParams.size === undefined) {
+      finalParams.size = finalParams.limit;
+      delete finalParams.limit;
+    }
     const queryParams = new URLSearchParams(finalParams).toString();
     return this.request<RealRent[]>(`/api/v1/real-rents/?${queryParams}`);
+  }
+
+  // 컬럼 메타: 실거래 전월세
+  async getRealRentsColumns(): Promise<any> {
+    return this.request<any>(`/api/v1/real-rents/columns`);
   }
 
   async getRentalYield(params?: Record<string, any>): Promise<any> {
     const queryParams = params ? new URLSearchParams(params).toString() : "";
     return this.request<any>(`/api/v1/real-rents/rental-yield/?${queryParams}`);
+  }
+
+  // 사용자 선호도(User Preferences)
+  async getUserPreference(page: string, key: string): Promise<any | null> {
+    const endpoint = `/api/v1/user-preferences/${encodeURIComponent(
+      page
+    )}/${encodeURIComponent(key)}`;
+    try {
+      return await this.request<any>(endpoint, {
+        credentials: "include" as any,
+      });
+    } catch (e: any) {
+      if (e?.status === 404) return null;
+      throw e;
+    }
+  }
+
+  async putUserPreference(
+    page: string,
+    key: string,
+    value: unknown
+  ): Promise<any> {
+    const endpoint = `/api/v1/user-preferences/${encodeURIComponent(
+      page
+    )}/${encodeURIComponent(key)}`;
+    return this.request<any>(endpoint, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ page, key, value }),
+      credentials: "include" as any,
+    });
+  }
+
+  async deleteUserPreference(page: string, key: string): Promise<void> {
+    const endpoint = `/api/v1/user-preferences/${encodeURIComponent(
+      page
+    )}/${encodeURIComponent(key)}`;
+    await this.request<any>(endpoint, {
+      method: "DELETE",
+      credentials: "include" as any,
+    });
   }
 }
 
@@ -540,4 +615,12 @@ export const realRentApi = {
   getRents: (params?: Record<string, any>) => apiClient.getRealRents(params),
   getRentalYield: (params?: Record<string, any>) =>
     apiClient.getRentalYield(params),
+};
+
+export const userPrefsApi = {
+  get: (page: string, key: string) => apiClient.getUserPreference(page, key),
+  put: (page: string, key: string, value: unknown) =>
+    apiClient.putUserPreference(page, key, value),
+  delete: (page: string, key: string) =>
+    apiClient.deleteUserPreference(page, key),
 };

@@ -12,15 +12,23 @@ import dynamic from "next/dynamic";
 const ItemTable = dynamic(() => import("@/components/features/item-table"), {
   ssr: false,
 });
+const ItemTableVirtual = dynamic(
+  () => import("@/components/features/item-table-virtual"),
+  { ssr: false }
+);
 import MapView from "@/components/features/map-view";
 import PropertyDetailDialog from "@/components/features/property-detail/PropertyDetailDialog";
 import { useFilterStore } from "@/store/filterStore";
 import { useItems } from "@/hooks/useItems";
 import { useDebouncedValue } from "@/hooks/useDebounce";
+import useSWR from "swr";
+import { itemApi } from "@/lib/api";
 import { Search, Map, List, Download, Bell } from "lucide-react";
 import { useSearchParams } from "next/navigation";
+import { useFeatureFlags } from "@/lib/featureFlags";
 import { useDataset } from "@/hooks/useDataset";
 import { datasetConfigs } from "@/datasets/registry";
+import { ViewState } from "@/components/ui/view-state";
 import {
   Pagination,
   PaginationContent,
@@ -45,6 +53,12 @@ export default function AnalysisPage() {
   const [activeView, setActiveView] = useState<"table" | "map" | "both">(
     "table"
   );
+  const [bounds, setBounds] = useState<{
+    south: number;
+    west: number;
+    north: number;
+    east: number;
+  } | null>(null);
   const {
     items,
     mapItems,
@@ -59,6 +73,18 @@ export default function AnalysisPage() {
   const page = useFilterStore((s) => s.page);
   const size = useFilterStore((s) => s.size);
 
+  // /api/v1/items/columns 에서 정렬 허용 컬럼 로드
+  const { data: itemsColumnsMeta } = useSWR(
+    ["/api/v1/items/columns"],
+    () => itemApi.getItemsColumns(),
+    { keepPreviousData: true }
+  );
+  const sortableColumns: string[] = Array.isArray(
+    (itemsColumnsMeta as any)?.sortable_columns
+  )
+    ? ((itemsColumnsMeta as any).sortable_columns as string[])
+    : [];
+
   // 스토어에서 필터 상태를 직접 구독합니다.
   const filters = useFilterStore((state) => state);
 
@@ -66,10 +92,40 @@ export default function AnalysisPage() {
   const searchParams = useSearchParams();
   const dsV2Enabled = (searchParams?.get("ds_v2") || "0") === "1";
   const dsIdParam = (searchParams?.get("ds") as any) || ("auction_ed" as const);
+  const centerAndRadius = (() => {
+    if (!bounds) return null;
+    const lat = (bounds.south + bounds.north) / 2;
+    const lng = (bounds.west + bounds.east) / 2;
+    const toRad = (d: number) => (d * Math.PI) / 180;
+    // 대각선 절반을 반지름으로 근사
+    const R = 6371; // km
+    const lat1 = toRad(lat);
+    const lng1 = toRad(lng);
+    const lat2 = toRad(bounds.north);
+    const lng2 = toRad(bounds.east);
+    const dlat = lat2 - lat1;
+    const dlng = lng2 - lng1;
+    const a =
+      Math.sin(dlat / 2) * Math.sin(dlat / 2) +
+      Math.cos(lat1) * Math.cos(lat2) * Math.sin(dlng / 2) * Math.sin(dlng / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    const diagKm = R * c;
+    const radius_km = Math.min(10, Math.max(0.5, diagKm / 2)); // 서버 상한 10km 적용
+    return { lat, lng, radius_km };
+  })();
   const queryFilters = {
     province: filters?.province,
     cityDistrict: filters?.cityDistrict,
     town: filters?.town,
+    // 지도 bbox (있을 때만 전송)
+    south: bounds?.south,
+    west: bounds?.west,
+    north: bounds?.north,
+    east: bounds?.east,
+    // 보조: center + radius_km (서버가 bbox 우선 사용)
+    lat: centerAndRadius?.lat,
+    lng: centerAndRadius?.lng,
+    radius_km: centerAndRadius?.radius_km,
     price_min: Array.isArray(filters?.priceRange)
       ? filters.priceRange[0]
       : undefined,
@@ -86,6 +142,10 @@ export default function AnalysisPage() {
   const { total: devTotal = 0 } = dsV2Enabled
     ? useDataset(dsIdParam, queryFilters, page, size)
     : ({ total: 0 } as any);
+
+  // 가상 스크롤 사용 조건: 전역 플래그 또는 총 건수 임계치 초과
+  const { virtualTable } = useFeatureFlags();
+  const useVirtual = virtualTable || (totalCount ?? 0) > 500;
 
   // 사용자 정보
   const user = {
@@ -219,6 +279,18 @@ export default function AnalysisPage() {
 
   // 🔄 서버 사이드 정렬 핸들러
   const handleSort = (column?: string, direction?: "asc" | "desc") => {
+    if (
+      column &&
+      sortableColumns.length > 0 &&
+      !sortableColumns.includes(column)
+    ) {
+      console.warn(
+        `[Sort] 금지된 컬럼 무시: ${column}. 허용: ${sortableColumns.join(
+          ", "
+        )}`
+      );
+      return;
+    }
     console.log(`🔄 [Sort] 정렬 변경: ${column} ${direction}`);
     setSortConfig(column || undefined, direction);
   };
@@ -414,66 +486,130 @@ export default function AnalysisPage() {
               </CardHeader>
               <CardContent>
                 {activeView === "table" && (
-                  <ItemTable
-                    items={items}
+                  <ViewState
                     isLoading={isLoading}
                     error={error}
+                    total={totalCount}
                     onRetry={refetch}
-                    sortBy={sortBy}
-                    sortOrder={sortOrder}
-                    onSort={handleSort}
-                    selectedRowKeys={selectedRowKeys}
-                    onSelectionChange={setSelectedRowKeys}
-                  />
-                )}
-                {activeView === "map" && (
-                  <MapView
-                    key={`${filters.sido_code || filters.province}-${
-                      filters.city_code || filters.cityDistrict
-                    }-${filters.town_code || filters.town || ""}`}
-                    locationKey={`${filters.sido_code || filters.province}-${
-                      filters.city_code || filters.cityDistrict
-                    }-${filters.town_code || filters.town || ""}`}
-                    items={mapItems || items}
-                    isLoading={isLoading}
-                    error={error}
-                    onRetry={refetch}
-                    highlightIds={selectedRowKeys.map((k) => String(k))}
-                  />
-                )}
-                {activeView === "both" && (
-                  <div className="space-y-6">
-                    <div>
-                      <h3 className="text-lg font-semibold mb-3">지도</h3>
-                      <MapView
-                        key={`${filters.sido_code || filters.province}-${
-                          filters.city_code || filters.cityDistrict
-                        }-${filters.town_code || filters.town || ""}-both`}
-                        locationKey={`${
-                          filters.sido_code || filters.province
-                        }-${filters.city_code || filters.cityDistrict}-${
-                          filters.town_code || filters.town || ""
-                        }`}
-                        items={mapItems || items}
-                        isLoading={isLoading}
-                        error={error}
-                        onRetry={refetch}
-                        highlightIds={selectedRowKeys.map((k) => String(k))}
+                  >
+                    {useVirtual ? (
+                      <ItemTableVirtual
+                        items={items}
+                        isLoading={false}
+                        error={undefined}
+                        onRetry={undefined}
+                        sortBy={sortBy}
+                        sortOrder={sortOrder}
+                        onSort={handleSort}
+                        selectedRowKeys={selectedRowKeys}
+                        onSelectionChange={setSelectedRowKeys}
+                        containerHeight={560}
+                        rowHeight={44}
+                        overscan={8}
                       />
-                    </div>
-                    <div>
-                      <h3 className="text-lg font-semibold mb-3">목록</h3>
+                    ) : (
                       <ItemTable
                         items={items}
-                        isLoading={isLoading}
-                        error={error}
-                        onRetry={refetch}
+                        isLoading={false}
+                        error={undefined}
+                        onRetry={undefined}
                         sortBy={sortBy}
                         sortOrder={sortOrder}
                         onSort={handleSort}
                         selectedRowKeys={selectedRowKeys}
                         onSelectionChange={setSelectedRowKeys}
                       />
+                    )}
+                  </ViewState>
+                )}
+                {activeView === "map" && (
+                  <ViewState
+                    isLoading={isLoading}
+                    error={error}
+                    total={totalCount}
+                    onRetry={refetch}
+                  >
+                    <MapView
+                      key={`${filters.sido_code || filters.province}-${
+                        filters.city_code || filters.cityDistrict
+                      }-${filters.town_code || filters.town || ""}`}
+                      locationKey={`${filters.sido_code || filters.province}-${
+                        filters.city_code || filters.cityDistrict
+                      }-${filters.town_code || filters.town || ""}`}
+                      items={mapItems || items}
+                      isLoading={false}
+                      error={undefined}
+                      onRetry={undefined}
+                      highlightIds={selectedRowKeys.map((k) => String(k))}
+                      onBoundsChange={(b) => setBounds(b)}
+                    />
+                  </ViewState>
+                )}
+                {activeView === "both" && (
+                  <div className="space-y-6">
+                    <div>
+                      <h3 className="text-lg font-semibold mb-3">지도</h3>
+                      <ViewState
+                        isLoading={isLoading}
+                        error={error}
+                        total={totalCount}
+                        onRetry={refetch}
+                      >
+                        <MapView
+                          key={`${filters.sido_code || filters.province}-${
+                            filters.city_code || filters.cityDistrict
+                          }-${filters.town_code || filters.town || ""}-both`}
+                          locationKey={`${
+                            filters.sido_code || filters.province
+                          }-${filters.city_code || filters.cityDistrict}-${
+                            filters.town_code || filters.town || ""
+                          }`}
+                          items={mapItems || items}
+                          isLoading={false}
+                          error={undefined}
+                          onRetry={undefined}
+                          highlightIds={selectedRowKeys.map((k) => String(k))}
+                          onBoundsChange={(b) => setBounds(b)}
+                        />
+                      </ViewState>
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-semibold mb-3">목록</h3>
+                      <ViewState
+                        isLoading={isLoading}
+                        error={error}
+                        total={totalCount}
+                        onRetry={refetch}
+                      >
+                        {useVirtual ? (
+                          <ItemTableVirtual
+                            items={items}
+                            isLoading={false}
+                            error={undefined}
+                            onRetry={undefined}
+                            sortBy={sortBy}
+                            sortOrder={sortOrder}
+                            onSort={handleSort}
+                            selectedRowKeys={selectedRowKeys}
+                            onSelectionChange={setSelectedRowKeys}
+                            containerHeight={560}
+                            rowHeight={44}
+                            overscan={8}
+                          />
+                        ) : (
+                          <ItemTable
+                            items={items}
+                            isLoading={false}
+                            error={undefined}
+                            onRetry={undefined}
+                            sortBy={sortBy}
+                            sortOrder={sortOrder}
+                            onSort={handleSort}
+                            selectedRowKeys={selectedRowKeys}
+                            onSelectionChange={setSelectedRowKeys}
+                          />
+                        )}
+                      </ViewState>
                     </div>
                   </div>
                 )}
