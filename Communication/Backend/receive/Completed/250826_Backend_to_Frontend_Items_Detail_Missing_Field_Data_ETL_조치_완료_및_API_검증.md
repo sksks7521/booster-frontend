@@ -50,7 +50,7 @@ curl -s "$BASE/api/v1/items/{id}/custom?fields=building_name,dong_name,main_usag
 ### 5) 향후 운영(중요)
 
 - CSV가 주기적으로 갱신되어도, 현재 등록된 매핑에 포함된 필드는 동일하게 적재됩니다.
-- 신규/변경 컬럼명이 등장하는 경우 `scripts/data_config.py`의 `COLUMN_MAPPINGS['auction_items']`에 추가/보정만 해주시면 다음 적재부터 반영됩니다.
+- 신규/변경 컬럼명이 등장하는 경우 `scripts/data_config.py`의 `COLUMN_MAPPINGS['auction_items']` 및 `COLUMN_MAPPINGS['auction_completed']`에 추가/보정만 해주시면 다음 적재부터 반영됩니다.
 - 필요 시 증분/전량 재적재는 아래로 수행 가능합니다.
 
 ```bash
@@ -62,6 +62,121 @@ python -X utf8 scripts/load_data.py --table auction_items --limit 10000
 ```
 
 ---
+
+### 7) 경매완료(auction_completed) 전량 재적재 및 검증 결과
+
+- 전량 재적재 완료(인코딩/타입/날짜 변환 보강 포함)
+- 총 적재 건수: 99,075
+
+#### 단건 스냅샷(핵심 필드, 3건)
+
+```json
+{
+  "id": 156359,
+  "final_sale_price": 20411.0,
+  "sale_to_appraised_ratio": 85.0,
+  "bidder_count": 1,
+  "building_coverage_ratio": null,
+  "floor_area_ratio": null
+}
+```
+
+```json
+{
+  "id": 156360,
+  "final_sale_price": 24295.55,
+  "sale_to_appraised_ratio": 82.0,
+  "bidder_count": 1,
+  "building_coverage_ratio": 26.18,
+  "floor_area_ratio": 94.73
+}
+```
+
+```json
+{
+  "id": 156361,
+  "final_sale_price": 24785.0,
+  "sale_to_appraised_ratio": 82.0,
+  "bidder_count": 1,
+  "building_coverage_ratio": 59.93,
+  "floor_area_ratio": 181.93
+}
+```
+
+#### 변환 보강 요약
+
+- 날짜: `YYYYMMDD`, `YYYYMMDD.0`(float 문자열), 혼합문자 포함 케이스까지 안전 파싱(미해석 값은 None)
+- 엘리베이터 여부: 원본(예: "유/무", "확인불가")를 `O/X/None`으로 정규화해 길이 제약(String(2)) 충돌 제거
+
+검증 기준을 모두 충족했으며, 추가 샘플이 필요하면 요청해 주시면 즉시 제공하겠습니다.
+
+### 8) 실거래(매매, real_transactions) 전량 재적재 및 검증 결과
+
+- 총 적재 건수: 726,423
+- 타입 정렬: `transaction_amount`, `price_per_pyeong`, `construction_year_real` → Integer로 일원화(반올림 변환)
+
+#### 단건 스냅샷(핵심 필드, 3건)
+
+```json
+{
+  "id": 809429,
+  "transaction_amount": 29400,
+  "price_per_pyeong": 2636,
+  "construction_year_real": 2017,
+  "exclusive_area_sqm": 36.8,
+  "floor_info_real": "2",
+  "longitude": 126.900853,
+  "latitude": 37.47318428
+}
+```
+
+### 9) 실거래(전월세, real_rents) 전량 재적재 및 검증 결과
+
+- 총 적재 건수: 1,397,729
+
+#### 단건 스냅샷(핵심 필드, 3건)
+
+```json
+{
+  "id": 4208187,
+  "rent_type": "월세",
+  "deposit_amount": 500,
+  "monthly_rent": 38,
+  "construction_year_real": 2012,
+  "exclusive_area_sqm": 40.74,
+  "floor_info_real": "3",
+  "longitude": 126.7406319,
+  "latitude": 35.72280919
+}
+```
+
+```json
+{
+  "id": 4208186,
+  "rent_type": "전세",
+  "deposit_amount": 8500,
+  "monthly_rent": 0,
+  "construction_year_real": 2012,
+  "exclusive_area_sqm": 59.9258,
+  "floor_info_real": "4",
+  "longitude": 126.7274092,
+  "latitude": 35.72544827
+}
+```
+
+```json
+{
+  "id": 4208185,
+  "rent_type": "전세",
+  "deposit_amount": 9000,
+  "monthly_rent": 0,
+  "construction_year_real": 2011,
+  "exclusive_area_sqm": 77.7588,
+  "floor_info_real": "1",
+  "longitude": 126.733801,
+  "latitude": 35.71666436
+}
+```
 
 ### 6) 문의
 

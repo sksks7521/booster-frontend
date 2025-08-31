@@ -252,3 +252,12 @@ const data = await callAPI(
 
 **백엔드 팀 드림**  
 **2025-08-21**
+
+---
+
+## 완료 로그
+
+- 상태: Completed (공지/가이드 배포 완료)
+- 이동: Communication/Frontend/send/Completed/250821_Backend_to_Frontend_API_일관성_통합_연동가이드_v2.0_제공.md
+- 완료일: 2025-08-30
+- 메모: v2.0 가이드 공지 문서, 이미 완료 상태로 배포됨.

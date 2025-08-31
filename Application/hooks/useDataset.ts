@@ -47,16 +47,33 @@ export function useDataset(
     }
   });
 
-  // items 표준화: { items, total, page, size } 또는 배열 형태 모두 수용
-  const rawItemsAll: any[] = Array.isArray(data) ? data : data?.items ?? [];
+  // items 표준화: { results, count, page, size }, { items, total, page, size } 또는 배열 형태 모두 수용
+  const rawItemsAll: any[] = Array.isArray(data)
+    ? data
+    : data?.results ?? data?.items ?? [];
+
   const rawItems: any[] = rawItemsAll
     .map((r) => validateRow(datasetId, r))
     .filter((r): r is any => r != null);
+
   const items: ItemLike[] = rawItems
-    .map(cfg.adapter.toItemLike)
-    .map(normalizeItemLike)
+    .map((r) => {
+      const itemLike = cfg.adapter.toItemLike(r);
+      if (!itemLike) {
+        console.log("❌ [toItemLike] 실패:", { id: r?.id });
+      }
+      return itemLike;
+    })
+    .map((item) => {
+      const normalized = normalizeItemLike(item);
+      if (!normalized) {
+        console.log("❌ [normalizeItemLike] 실패:", { id: item?.id });
+      }
+      return normalized;
+    })
     .filter((x): x is ItemLike => x != null);
-  const total: number = data?.total ?? rawItems.length ?? 0;
+
+  const total: number = data?.count ?? data?.total ?? rawItems.length ?? 0;
 
   return { items, total, page, size, isLoading, error, mutate, cfg };
 }

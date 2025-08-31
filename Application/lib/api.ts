@@ -456,7 +456,7 @@ class ApiClient {
   // 실거래 매매 (시세 분석) API
   async getRealTransactions(
     params?: Record<string, any>
-  ): Promise<RealTransaction[]> {
+  ): Promise<{ results: RealTransaction[]; count: number }> {
     const finalParams: Record<string, any> = { ...(params ?? {}) };
     // page/size 방식으로 전환
     if (finalParams.page === undefined) finalParams.page = 1;
@@ -466,9 +466,17 @@ class ApiClient {
       delete finalParams.limit;
     }
     const queryParams = new URLSearchParams(finalParams).toString();
-    return this.request<RealTransaction[]>(
-      `/api/v1/real-transactions/?${queryParams}`
-    );
+
+    // 백엔드 응답 형식: {items, total_items} → 프론트엔드 기대 형식: {results, count}
+    const response = await this.request<{
+      items: RealTransaction[];
+      total_items: number;
+    }>(`/api/v1/real-transactions/?${queryParams}`);
+
+    return {
+      results: response.items || [],
+      count: response.total_items || 0,
+    };
   }
 
   // 컬럼 메타: 실거래 매매
@@ -484,7 +492,9 @@ class ApiClient {
   }
 
   // 실거래 전월세 (수익률 분석) API
-  async getRealRents(params?: Record<string, any>): Promise<RealRent[]> {
+  async getRealRents(
+    params?: Record<string, any>
+  ): Promise<{ results: RealRent[]; count: number }> {
     const finalParams: Record<string, any> = { ...(params ?? {}) };
     // page/size 방식으로 전환
     if (finalParams.page === undefined) finalParams.page = 1;
@@ -494,7 +504,17 @@ class ApiClient {
       delete finalParams.limit;
     }
     const queryParams = new URLSearchParams(finalParams).toString();
-    return this.request<RealRent[]>(`/api/v1/real-rents/?${queryParams}`);
+
+    // 백엔드 응답 형식: {items, total_items} → 프론트엔드 기대 형식: {results, count}
+    const response = await this.request<{
+      items: RealRent[];
+      total_items: number;
+    }>(`/api/v1/real-rents/?${queryParams}`);
+
+    return {
+      results: response.items || [],
+      count: response.total_items || 0,
+    };
   }
 
   // 컬럼 메타: 실거래 전월세

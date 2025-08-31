@@ -30,3 +30,12 @@
 
 - 스모크/테스트 모두 통과(내부 CI 확인)
 - 문의: 백엔드 팀
+
+---
+
+## 완료 로그
+
+- 상태: Completed
+- 이동: Communication/Frontend/send/Completed/250828_Backend_to_Frontend_OpenAPI_v1_배포_공지.md
+- 완료일: 2025-08-30
+- 메모: OpenAPI v1 아티팩트 공유 및 적용 가이드 공지 완료. 후속 피드백 없음.

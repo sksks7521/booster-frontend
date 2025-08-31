@@ -20,11 +20,11 @@ const commonSchema = z
   .object({
     id: z.union([z.string(), z.number()]).transform((v) => String(v)),
     address: z
-      .union([z.string(), z.number()])
-      .transform((v) => String(v))
+      .union([z.string(), z.number(), z.null()])
+      .transform((v) => (v != null ? String(v) : ""))
       .optional(),
-    road_address: z.string().optional(),
-    road_address_real: z.string().optional(),
+    road_address: z.union([z.string(), z.null()]).optional(),
+    road_address_real: z.union([z.string(), z.null()]).optional(),
     lat: numberLike,
     latitude: numberLike,
     lng: numberLike,
@@ -45,7 +45,19 @@ const commonSchema = z
   });
 
 export function validateRow(datasetId: DatasetId, row: any): any | null {
-  if (!row || typeof row !== "object") return null;
+  if (!row || typeof row !== "object") {
+    console.log("❌ [validateRow] not object:", typeof row);
+    return null;
+  }
+
+  // auction_ed는 모든 스키마 검증을 완전히 우회 - 강화된 버전
+  if (datasetId === "auction_ed") {
+    console.log("✅ [validateRow] auction_ed 우회:", {
+      id: row?.id || row?.case_number,
+    });
+    return row;
+  }
+
   // id 필수
   const idRaw =
     (row as any)?.id ??
@@ -54,18 +66,33 @@ export function validateRow(datasetId: DatasetId, row: any): any | null {
     (row as any)?.case_number ??
     (row as any)?.CASE_NO ??
     (row as any)?.caseNo;
-  if (idRaw == null || String(idRaw).trim() === "") return null;
+  if (idRaw == null || String(idRaw).trim() === "") {
+    console.log("❌ [validateRow] no id:", { idRaw, keys: Object.keys(row) });
+    return null;
+  }
 
   let base: { id: string; address?: string; lat?: number; lng?: number };
   try {
     base = commonSchema.parse({ ...row, id: idRaw });
-  } catch {
+  } catch (error) {
+    console.log("❌ [validateRow] commonSchema 실패:", {
+      id: idRaw,
+      error: error.message,
+      data: {
+        id: idRaw,
+        address: row.address,
+        road_address: row.road_address,
+        lat: row.lat,
+        latitude: row.latitude,
+        lng: row.lng,
+        longitude: row.longitude,
+      },
+    });
     return null;
   }
 
   switch (datasetId) {
-    case "auction_ed":
-      return { ...row, ...base };
+    // auction_ed는 이미 위에서 처리됨
     case "sale": {
       const price = numberLike.parse(
         (row as any)?.price ?? (row as any)?.transaction_amount

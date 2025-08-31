@@ -17,6 +17,12 @@ import PropertyDetailSimple from "@/components/features/property-detail/Property
 import AuctionEdList from "@/components/features/detail-v2/auction-ed-list";
 import SelectedFilterBar from "@/components/features/selected-filter-bar";
 import FilterControl from "@/components/features/filter-control";
+import {
+  AuctionEdSearchResults,
+  AuctionEdFilter,
+} from "@/components/features/auction-ed";
+import { SaleSearchResults, SaleFilter } from "@/components/features/sale";
+import { RentSearchResults, RentFilter } from "@/components/features/rent";
 import { useDataset } from "@/hooks/useDataset";
 import { datasetConfigs } from "@/datasets/registry";
 import { useFilterStore } from "@/store/filterStore";
@@ -46,6 +52,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useLocationsSimple } from "@/hooks/useLocations";
+import { Label } from "@/components/ui/label";
 
 export default function PropertyDetailV2Page() {
   const params = useParams();
@@ -116,6 +124,70 @@ export default function PropertyDetailV2Page() {
   const [detailsCollapsed, setDetailsCollapsed] = useState(false);
   const [isFilterCollapsed, setIsFilterCollapsed] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+
+  // 지역 선택을 위한 상태 및 로직
+  const { locations } = useLocationsSimple();
+  const [selectedProvince, setSelectedProvince] = useState("");
+  const [selectedCity, setSelectedCity] = useState("");
+  const [selectedDistrict, setSelectedDistrict] = useState("");
+  const [availableCities, setAvailableCities] = useState<string[]>([]);
+  const [availableDistricts, setAvailableDistricts] = useState<string[]>([]);
+  const setFilter = useFilterStore((s: any) => s.setFilter);
+
+  // 지역 선택 로직 - 시도 변경 시
+  useEffect(() => {
+    if (selectedProvince && locations?.cities) {
+      const cities = Object.keys(locations.cities).filter((city) => {
+        return locations.cities![city].some(
+          (item: any) => item.province === selectedProvince
+        );
+      });
+      setAvailableCities(cities);
+      if (!cities.includes(selectedCity)) {
+        setSelectedCity("");
+        setSelectedDistrict("");
+        setAvailableDistricts([]);
+      }
+    } else {
+      setAvailableCities([]);
+      setSelectedCity("");
+      setSelectedDistrict("");
+      setAvailableDistricts([]);
+    }
+  }, [selectedProvince, selectedCity, locations]);
+
+  // 지역 선택 로직 - 시군구 변경 시
+  useEffect(() => {
+    if (selectedCity && locations?.districts) {
+      const districts = locations.districts[selectedCity] || [];
+      setAvailableDistricts(districts);
+      if (!districts.includes(selectedDistrict)) {
+        setSelectedDistrict("");
+      }
+    } else {
+      setAvailableDistricts([]);
+      setSelectedDistrict("");
+    }
+  }, [selectedCity, selectedDistrict, locations]);
+
+  // 실제 필터 적용 - 값이 있을 때만 적용
+  useEffect(() => {
+    if (selectedProvince) {
+      setFilter("province", selectedProvince);
+    }
+  }, [selectedProvince, setFilter]);
+
+  useEffect(() => {
+    if (selectedCity) {
+      setFilter("cityDistrict", selectedCity);
+    }
+  }, [selectedCity, setFilter]);
+
+  useEffect(() => {
+    if (selectedDistrict) {
+      setFilter("town", selectedDistrict);
+    }
+  }, [selectedDistrict, setFilter]);
   const handleSearch = () => {};
   const initialPage = useMemo(() => {
     const p = Number(searchParams?.get("p"));
@@ -191,7 +263,6 @@ export default function PropertyDetailV2Page() {
   }, [bounds, property, searchParams]);
 
   // analysis → v2로 넘어올 때 URL의 지역 파라미터를 스토어에 1회 주입
-  const setFilter = useFilterStore((s: any) => s.setFilter);
   useEffect(() => {
     try {
       const p = searchParams?.get("province");
@@ -516,6 +587,102 @@ export default function PropertyDetailV2Page() {
             <TabsTrigger value="listings">매물</TabsTrigger>
           </TabsList>
 
+          {/* 지역 선택 UI */}
+          <Card className="mb-4">
+            <CardContent className="pt-4">
+              <div className="flex items-center gap-2 mb-3">
+                <MapPin className="w-4 h-4 text-blue-600" />
+                <Label className="text-sm font-medium">
+                  지역 선택 (모든 데이터셋 공통 적용)
+                </Label>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {/* 시도명 */}
+                <div>
+                  <Label className="text-xs text-gray-600 mb-1 block">
+                    시도
+                  </Label>
+                  <Select
+                    value={selectedProvince || "all"}
+                    onValueChange={(value) => {
+                      const actualValue = value === "all" ? "" : value;
+                      setSelectedProvince(actualValue);
+                      setSelectedCity("");
+                      setSelectedDistrict("");
+                    }}
+                  >
+                    <SelectTrigger className="h-9">
+                      <SelectValue placeholder="시도 선택" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">전체</SelectItem>
+                      {(locations?.provinces || []).map((province) => (
+                        <SelectItem key={province} value={province}>
+                          {province}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* 시군구 */}
+                <div>
+                  <Label className="text-xs text-gray-600 mb-1 block">
+                    시군구
+                  </Label>
+                  <Select
+                    value={selectedCity || "all"}
+                    onValueChange={(value) => {
+                      const actualValue = value === "all" ? "" : value;
+                      setSelectedCity(actualValue);
+                      setSelectedDistrict("");
+                    }}
+                    disabled={!selectedProvince}
+                  >
+                    <SelectTrigger className="h-9">
+                      <SelectValue placeholder="시군구 선택" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">전체</SelectItem>
+                      {availableCities.map((city) => (
+                        <SelectItem key={city} value={city}>
+                          {city}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* 읍면동 */}
+                <div>
+                  <Label className="text-xs text-gray-600 mb-1 block">
+                    읍면동
+                  </Label>
+                  <Select
+                    value={selectedDistrict || "all"}
+                    onValueChange={(value) => {
+                      const actualValue = value === "all" ? "" : value;
+                      setSelectedDistrict(actualValue);
+                    }}
+                    disabled={!selectedCity || availableDistricts.length === 0}
+                  >
+                    <SelectTrigger className="h-9">
+                      <SelectValue placeholder="읍면동 선택" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">전체</SelectItem>
+                      {availableDistricts.map((district) => (
+                        <SelectItem key={district} value={district}>
+                          {district}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
           {/* 선택된 필터 바 */}
           <SelectedFilterBar
             detailsCollapsed={detailsCollapsed}
@@ -539,349 +706,122 @@ export default function PropertyDetailV2Page() {
                   {(["auction_ed", "sale", "rent", "listings"] as const).map(
                     (ds) => (
                       <TabsContent key={ds} value={ds} className="mt-4">
-                        <Tabs
-                          value={activeView}
-                          onValueChange={(v) => {
-                            // 탭 전환 시 데이터/지도 상태가 꼬이지 않도록 페이지를 1로 초기화하고 선택도 초기화
-                            handleChangeView(v as ViewType);
-                            setPageNum(1);
-                            if (selectedRowKeys.length > 0)
-                              setSelectedRowKeys([]);
-                          }}
-                        >
-                          <div className="flex items-center justify-between">
-                            <div className="font-semibold text-lg">
-                              검색 결과{" "}
-                              {(dsTotal ?? 0).toLocaleString?.() ??
-                                dsTotal ??
-                                0}
-                              건
-                            </div>
-                            <TabsList>
-                              <TabsTrigger
-                                value="list"
-                                className="flex items-center space-x-2"
-                              >
-                                <List className="w-4 h-4" />
-                                <span>목록</span>
-                              </TabsTrigger>
-                              <TabsTrigger
-                                value="map"
-                                className="flex items-center space-x-2"
-                              >
-                                <Map className="w-4 h-4" />
-                                <span>지도</span>
-                              </TabsTrigger>
-                              <TabsTrigger
-                                value="integrated"
-                                className="flex items-center space-x-2"
-                              >
-                                <List className="w-4 h-4" />
-                                <Map className="w-4 h-4" />
-                                <span>통합</span>
-                              </TabsTrigger>
-                            </TabsList>
-                          </div>
-
-                          <TabsContent value="list" className="mt-4" forceMount>
-                            <ViewState
-                              isLoading={Boolean(dsLoading)}
-                              error={dsError as any}
-                              total={dsTotal as number}
-                              onRetry={() => dsRefetch?.()}
-                            >
-                              {useVirtual ? (
-                                <ItemTableVirtual
-                                  items={dsItems as any}
-                                  isLoading={false}
-                                  error={undefined}
-                                  sortBy={sortBy as any}
-                                  sortOrder={sortOrder as any}
-                                  onSort={handleSort}
-                                  selectedRowKeys={selectedRowKeys}
-                                  onSelectionChange={setSelectedRowKeys}
-                                  containerHeight={560}
-                                  rowHeight={44}
-                                  overscan={8}
-                                />
-                              ) : (
-                                <ItemTable
-                                  items={dsItems as any}
-                                  isLoading={false}
-                                  error={undefined}
-                                  schemaColumns={schemaColumns}
-                                  getValueForKey={(row: any, key: string) => {
-                                    // area 컬럼 전역 플래그 기반 포맷
-                                    if (key === "area") {
-                                      const m2 = row?.area as
-                                        | number
-                                        | undefined;
-                                      if (
-                                        typeof m2 === "number" &&
-                                        Number.isFinite(m2)
-                                      ) {
-                                        if (areaDisplay?.mode === "m2")
-                                          return `${Math.round(m2)}㎡`;
-                                        if (areaDisplay?.mode === "pyeong") {
-                                          const py = m2ToPyeong(
-                                            m2,
-                                            areaDisplay?.rounding,
-                                            areaDisplay?.digits
-                                          );
-                                          return py != null ? `${py}평` : "-";
-                                        }
-                                        return formatArea(m2, {
-                                          withBoth: true,
-                                          digits: areaDisplay?.digits ?? 1,
-                                          rounding: areaDisplay?.rounding,
-                                        });
-                                      }
-                                    }
-                                    const direct = row?.[key];
-                                    if (direct !== undefined) return direct;
-                                    return row?.extra?.[key];
-                                  }}
-                                  sortBy={sortBy as any}
-                                  sortOrder={sortOrder as any}
-                                  onSort={handleSort}
-                                  selectedRowKeys={selectedRowKeys}
-                                  onSelectionChange={setSelectedRowKeys}
-                                  totalCount={dsTotal as any}
-                                  page={pageNum}
-                                  pageSize={pageSize}
-                                  onPageChange={(p) => setPageNum(p)}
-                                />
-                              )}
-                            </ViewState>
-                            {/* External pagination controls */}
-                            <div className="mt-6 space-y-4">
-                              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                                <div className="flex items-center gap-4">
-                                  <div className="flex items-center gap-2">
-                                    <span className="text-sm text-gray-600">
-                                      페이지당
-                                    </span>
-                                    <Select
-                                      value={String(pageSize)}
-                                      onValueChange={(value) => {
-                                        const s = parseInt(value);
-                                        if (Number.isFinite(s) && s > 0) {
-                                          setPageSize(s);
-                                          setPageNum(1);
-                                        }
-                                      }}
-                                    >
-                                      <SelectTrigger className="w-20">
-                                        <SelectValue />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        <SelectItem value="20">20</SelectItem>
-                                        <SelectItem value="50">50</SelectItem>
-                                        <SelectItem value="100">100</SelectItem>
-                                      </SelectContent>
-                                    </Select>
-                                    <span className="text-sm text-gray-600">
-                                      개
-                                    </span>
-                                  </div>
-                                </div>
-                                <div className="text-sm text-gray-600">
-                                  전체 {(dsTotal ?? 0).toLocaleString()}건 중{" "}
-                                  {Math.min(
-                                    pageSize * (pageNum - 1) + 1,
-                                    dsTotal ?? 0
-                                  )}
-                                  -{Math.min(pageSize * pageNum, dsTotal ?? 0)}
-                                  건 표시
-                                </div>
-                              </div>
-                              <Pagination>
-                                <PaginationContent>
-                                  <PaginationItem>
-                                    <PaginationPrevious
-                                      href="#"
-                                      onClick={(e) => {
-                                        e.preventDefault();
-                                        if (pageNum > 1)
-                                          setPageNum(pageNum - 1);
-                                      }}
-                                      className={
-                                        pageNum <= 1
-                                          ? "pointer-events-none opacity-50"
-                                          : ""
-                                      }
-                                    />
-                                  </PaginationItem>
-                                  {(() => {
-                                    const totalPages = Math.max(
-                                      1,
-                                      Math.ceil((dsTotal ?? 0) / pageSize)
-                                    );
-                                    const pages: JSX.Element[] = [];
-                                    const startPage = Math.max(1, pageNum - 2);
-                                    const endPage = Math.min(
-                                      totalPages,
-                                      pageNum + 2
-                                    );
-                                    if (startPage > 1) {
-                                      pages.push(
-                                        <PaginationItem key="1">
-                                          <PaginationLink
-                                            href="#"
-                                            onClick={(e) => {
-                                              e.preventDefault();
-                                              setPageNum(1);
-                                            }}
-                                            isActive={pageNum === 1}
-                                          >
-                                            1
-                                          </PaginationLink>
-                                        </PaginationItem>
-                                      );
-                                      if (startPage > 2) {
-                                        pages.push(
-                                          <PaginationItem key="ellipsis1">
-                                            <PaginationEllipsis />
-                                          </PaginationItem>
-                                        );
-                                      }
-                                    }
-                                    for (let i = startPage; i <= endPage; i++) {
-                                      pages.push(
-                                        <PaginationItem key={i}>
-                                          <PaginationLink
-                                            href="#"
-                                            onClick={(e) => {
-                                              e.preventDefault();
-                                              setPageNum(i);
-                                            }}
-                                            isActive={pageNum === i}
-                                          >
-                                            {i}
-                                          </PaginationLink>
-                                        </PaginationItem>
-                                      );
-                                    }
-                                    if (endPage < totalPages) {
-                                      if (endPage < totalPages - 1) {
-                                        pages.push(
-                                          <PaginationItem key="ellipsis2">
-                                            <PaginationEllipsis />
-                                          </PaginationItem>
-                                        );
-                                      }
-                                      pages.push(
-                                        <PaginationItem key={totalPages}>
-                                          <PaginationLink
-                                            href="#"
-                                            onClick={(e) => {
-                                              e.preventDefault();
-                                              setPageNum(totalPages);
-                                            }}
-                                            isActive={pageNum === totalPages}
-                                          >
-                                            {totalPages}
-                                          </PaginationLink>
-                                        </PaginationItem>
-                                      );
-                                    }
-                                    return pages;
-                                  })()}
-                                  <PaginationItem>
-                                    <PaginationNext
-                                      href="#"
-                                      onClick={(e) => {
-                                        e.preventDefault();
-                                        const totalPages = Math.max(
-                                          1,
-                                          Math.ceil((dsTotal ?? 0) / pageSize)
-                                        );
-                                        if (pageNum < totalPages)
-                                          setPageNum(pageNum + 1);
-                                      }}
-                                      className={
-                                        pageNum >=
-                                        Math.max(
-                                          1,
-                                          Math.ceil((dsTotal ?? 0) / pageSize)
-                                        )
-                                          ? "pointer-events-none opacity-50"
-                                          : ""
-                                      }
-                                    />
-                                  </PaginationItem>
-                                </PaginationContent>
-                              </Pagination>
-                            </div>
-                          </TabsContent>
-
-                          <TabsContent value="map" className="mt-4" forceMount>
-                            <ViewState
-                              isLoading={Boolean(dsLoading)}
-                              error={dsError as any}
-                              total={dsTotal as number}
-                              onRetry={() => dsRefetch?.()}
-                            >
-                              <MapView
-                                enabled={activeView === "map"}
-                                key={`${activeDataset}-map`}
-                                items={dsItems as any}
-                                isLoading={false}
-                                error={undefined}
-                                markerColorFn={
-                                  datasetConfigs[
-                                    activeDataset as keyof typeof datasetConfigs
-                                  ]?.map?.marker as any
-                                }
-                                // 범례는 현재 내부 공통 레전드 사용. 필요 시 legendItems 전달
-                                namespace={activeDataset}
-                                highlightIds={selectedRowKeys.map((k) =>
-                                  String(k)
-                                )}
-                                onBoundsChange={(b) => setBounds(b)}
-                              />
-                            </ViewState>
-                          </TabsContent>
-
-                          <TabsContent
-                            value="integrated"
-                            className="mt-4"
-                            forceMount
+                        {ds === "auction_ed" ? (
+                          <AuctionEdSearchResults
+                            activeView={
+                              activeView === "list"
+                                ? "table"
+                                : activeView === "integrated"
+                                ? "both"
+                                : (activeView as "table" | "map" | "both")
+                            }
+                            onViewChange={(view) => {
+                              const mappedView =
+                                view === "both"
+                                  ? "integrated"
+                                  : view === "table"
+                                  ? "list"
+                                  : view;
+                              handleChangeView(mappedView as ViewType);
+                              setPageNum(1);
+                              if (selectedRowKeys.length > 0)
+                                setSelectedRowKeys([]);
+                            }}
+                          />
+                        ) : ds === "sale" ? (
+                          <SaleSearchResults
+                            activeView={
+                              activeView === "list"
+                                ? "table"
+                                : activeView === "integrated"
+                                ? "both"
+                                : (activeView as "table" | "map" | "both")
+                            }
+                            onViewChange={(view) => {
+                              const mappedView =
+                                view === "both"
+                                  ? "integrated"
+                                  : view === "table"
+                                  ? "list"
+                                  : view;
+                              handleChangeView(mappedView as ViewType);
+                              setPageNum(1);
+                              if (selectedRowKeys.length > 0)
+                                setSelectedRowKeys([]);
+                            }}
+                          />
+                        ) : ds === "rent" ? (
+                          <RentSearchResults
+                            activeView={
+                              activeView === "list"
+                                ? "table"
+                                : activeView === "integrated"
+                                ? "both"
+                                : (activeView as "table" | "map" | "both")
+                            }
+                            onViewChange={(view) => {
+                              const mappedView =
+                                view === "both"
+                                  ? "integrated"
+                                  : view === "table"
+                                  ? "list"
+                                  : view;
+                              handleChangeView(mappedView as ViewType);
+                              setPageNum(1);
+                              if (selectedRowKeys.length > 0)
+                                setSelectedRowKeys([]);
+                            }}
+                          />
+                        ) : (
+                          <Tabs
+                            value={activeView}
+                            onValueChange={(v) => {
+                              // 탭 전환 시 데이터/지도 상태가 꼬이지 않도록 페이지를 1로 초기화하고 선택도 초기화
+                              handleChangeView(v as ViewType);
+                              setPageNum(1);
+                              if (selectedRowKeys.length > 0)
+                                setSelectedRowKeys([]);
+                            }}
                           >
-                            <div className="space-y-4">
-                              <Card>
-                                <CardHeader>
-                                  <CardTitle className="text-sm">
-                                    지도
-                                  </CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                  <ViewState
-                                    isLoading={Boolean(dsLoading)}
-                                    error={dsError as any}
-                                    total={dsTotal as number}
-                                    onRetry={() => dsRefetch?.()}
-                                  >
-                                    <MapView
-                                      enabled={activeView === "integrated"}
-                                      key={`${activeDataset}-integrated`}
-                                      items={dsItems as any}
-                                      isLoading={false}
-                                      error={undefined}
-                                      markerColorFn={
-                                        datasetConfigs[
-                                          activeDataset as keyof typeof datasetConfigs
-                                        ]?.map?.marker as any
-                                      }
-                                      namespace={activeDataset}
-                                      highlightIds={selectedRowKeys.map((k) =>
-                                        String(k)
-                                      )}
-                                      onBoundsChange={(b) => setBounds(b)}
-                                    />
-                                  </ViewState>
-                                </CardContent>
-                              </Card>
+                            <div className="flex items-center justify-between">
+                              <div className="font-semibold text-lg">
+                                검색 결과{" "}
+                                {(dsTotal ?? 0).toLocaleString?.() ??
+                                  dsTotal ??
+                                  0}
+                                건
+                              </div>
+                              <TabsList>
+                                <TabsTrigger
+                                  value="list"
+                                  className="flex items-center space-x-2"
+                                >
+                                  <List className="w-4 h-4" />
+                                  <span>목록</span>
+                                </TabsTrigger>
+                                <TabsTrigger
+                                  value="map"
+                                  className="flex items-center space-x-2"
+                                >
+                                  <Map className="w-4 h-4" />
+                                  <span>지도</span>
+                                </TabsTrigger>
+                                <TabsTrigger
+                                  value="integrated"
+                                  className="flex items-center space-x-2"
+                                >
+                                  <List className="w-4 h-4" />
+                                  <Map className="w-4 h-4" />
+                                  <span>통합</span>
+                                </TabsTrigger>
+                              </TabsList>
+                            </div>
+
+                            <TabsContent
+                              value="list"
+                              className="mt-4"
+                              forceMount
+                            >
                               <ViewState
                                 isLoading={Boolean(dsLoading)}
                                 error={dsError as any}
@@ -909,6 +849,7 @@ export default function PropertyDetailV2Page() {
                                     error={undefined}
                                     schemaColumns={schemaColumns}
                                     getValueForKey={(row: any, key: string) => {
+                                      // area 컬럼 전역 플래그 기반 포맷
                                       if (key === "area") {
                                         const m2 = row?.area as
                                           | number
@@ -950,7 +891,7 @@ export default function PropertyDetailV2Page() {
                                   />
                                 )}
                               </ViewState>
-                              {/* External pagination controls for integrated list */}
+                              {/* External pagination controls */}
                               <div className="mt-6 space-y-4">
                                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                                   <div className="flex items-center gap-4">
@@ -1120,9 +1061,342 @@ export default function PropertyDetailV2Page() {
                                   </PaginationContent>
                                 </Pagination>
                               </div>
-                            </div>
-                          </TabsContent>
-                        </Tabs>
+                            </TabsContent>
+
+                            <TabsContent
+                              value="map"
+                              className="mt-4"
+                              forceMount
+                            >
+                              <ViewState
+                                isLoading={Boolean(dsLoading)}
+                                error={dsError as any}
+                                total={dsTotal as number}
+                                onRetry={() => dsRefetch?.()}
+                              >
+                                <MapView
+                                  enabled={activeView === "map"}
+                                  key={`${activeDataset}-map`}
+                                  items={dsItems as any}
+                                  isLoading={false}
+                                  error={undefined}
+                                  markerColorFn={
+                                    datasetConfigs[
+                                      activeDataset as keyof typeof datasetConfigs
+                                    ]?.map?.marker as any
+                                  }
+                                  // 범례는 현재 내부 공통 레전드 사용. 필요 시 legendItems 전달
+                                  namespace={activeDataset}
+                                  highlightIds={selectedRowKeys.map((k) =>
+                                    String(k)
+                                  )}
+                                  onBoundsChange={(b) => setBounds(b)}
+                                />
+                              </ViewState>
+                            </TabsContent>
+
+                            <TabsContent
+                              value="integrated"
+                              className="mt-4"
+                              forceMount
+                            >
+                              <div className="space-y-4">
+                                <Card>
+                                  <CardHeader>
+                                    <CardTitle className="text-sm">
+                                      지도
+                                    </CardTitle>
+                                  </CardHeader>
+                                  <CardContent>
+                                    <ViewState
+                                      isLoading={Boolean(dsLoading)}
+                                      error={dsError as any}
+                                      total={dsTotal as number}
+                                      onRetry={() => dsRefetch?.()}
+                                    >
+                                      <MapView
+                                        enabled={activeView === "integrated"}
+                                        key={`${activeDataset}-integrated`}
+                                        items={dsItems as any}
+                                        isLoading={false}
+                                        error={undefined}
+                                        markerColorFn={
+                                          datasetConfigs[
+                                            activeDataset as keyof typeof datasetConfigs
+                                          ]?.map?.marker as any
+                                        }
+                                        namespace={activeDataset}
+                                        highlightIds={selectedRowKeys.map((k) =>
+                                          String(k)
+                                        )}
+                                        onBoundsChange={(b) => setBounds(b)}
+                                      />
+                                    </ViewState>
+                                  </CardContent>
+                                </Card>
+                                <ViewState
+                                  isLoading={Boolean(dsLoading)}
+                                  error={dsError as any}
+                                  total={dsTotal as number}
+                                  onRetry={() => dsRefetch?.()}
+                                >
+                                  {useVirtual ? (
+                                    <ItemTableVirtual
+                                      items={dsItems as any}
+                                      isLoading={false}
+                                      error={undefined}
+                                      sortBy={sortBy as any}
+                                      sortOrder={sortOrder as any}
+                                      onSort={handleSort}
+                                      selectedRowKeys={selectedRowKeys}
+                                      onSelectionChange={setSelectedRowKeys}
+                                      containerHeight={560}
+                                      rowHeight={44}
+                                      overscan={8}
+                                    />
+                                  ) : (
+                                    <ItemTable
+                                      items={dsItems as any}
+                                      isLoading={false}
+                                      error={undefined}
+                                      schemaColumns={schemaColumns}
+                                      getValueForKey={(
+                                        row: any,
+                                        key: string
+                                      ) => {
+                                        if (key === "area") {
+                                          const m2 = row?.area as
+                                            | number
+                                            | undefined;
+                                          if (
+                                            typeof m2 === "number" &&
+                                            Number.isFinite(m2)
+                                          ) {
+                                            if (areaDisplay?.mode === "m2")
+                                              return `${Math.round(m2)}㎡`;
+                                            if (
+                                              areaDisplay?.mode === "pyeong"
+                                            ) {
+                                              const py = m2ToPyeong(
+                                                m2,
+                                                areaDisplay?.rounding,
+                                                areaDisplay?.digits
+                                              );
+                                              return py != null
+                                                ? `${py}평`
+                                                : "-";
+                                            }
+                                            return formatArea(m2, {
+                                              withBoth: true,
+                                              digits: areaDisplay?.digits ?? 1,
+                                              rounding: areaDisplay?.rounding,
+                                            });
+                                          }
+                                        }
+                                        const direct = row?.[key];
+                                        if (direct !== undefined) return direct;
+                                        return row?.extra?.[key];
+                                      }}
+                                      sortBy={sortBy as any}
+                                      sortOrder={sortOrder as any}
+                                      onSort={handleSort}
+                                      selectedRowKeys={selectedRowKeys}
+                                      onSelectionChange={setSelectedRowKeys}
+                                      totalCount={dsTotal as any}
+                                      page={pageNum}
+                                      pageSize={pageSize}
+                                      onPageChange={(p) => setPageNum(p)}
+                                    />
+                                  )}
+                                </ViewState>
+                                {/* External pagination controls for integrated list */}
+                                <div className="mt-6 space-y-4">
+                                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                                    <div className="flex items-center gap-4">
+                                      <div className="flex items-center gap-2">
+                                        <span className="text-sm text-gray-600">
+                                          페이지당
+                                        </span>
+                                        <Select
+                                          value={String(pageSize)}
+                                          onValueChange={(value) => {
+                                            const s = parseInt(value);
+                                            if (Number.isFinite(s) && s > 0) {
+                                              setPageSize(s);
+                                              setPageNum(1);
+                                            }
+                                          }}
+                                        >
+                                          <SelectTrigger className="w-20">
+                                            <SelectValue />
+                                          </SelectTrigger>
+                                          <SelectContent>
+                                            <SelectItem value="20">
+                                              20
+                                            </SelectItem>
+                                            <SelectItem value="50">
+                                              50
+                                            </SelectItem>
+                                            <SelectItem value="100">
+                                              100
+                                            </SelectItem>
+                                          </SelectContent>
+                                        </Select>
+                                        <span className="text-sm text-gray-600">
+                                          개
+                                        </span>
+                                      </div>
+                                    </div>
+                                    <div className="text-sm text-gray-600">
+                                      전체 {(dsTotal ?? 0).toLocaleString()}건
+                                      중{" "}
+                                      {Math.min(
+                                        pageSize * (pageNum - 1) + 1,
+                                        dsTotal ?? 0
+                                      )}
+                                      -
+                                      {Math.min(
+                                        pageSize * pageNum,
+                                        dsTotal ?? 0
+                                      )}
+                                      건 표시
+                                    </div>
+                                  </div>
+                                  <Pagination>
+                                    <PaginationContent>
+                                      <PaginationItem>
+                                        <PaginationPrevious
+                                          href="#"
+                                          onClick={(e) => {
+                                            e.preventDefault();
+                                            if (pageNum > 1)
+                                              setPageNum(pageNum - 1);
+                                          }}
+                                          className={
+                                            pageNum <= 1
+                                              ? "pointer-events-none opacity-50"
+                                              : ""
+                                          }
+                                        />
+                                      </PaginationItem>
+                                      {(() => {
+                                        const totalPages = Math.max(
+                                          1,
+                                          Math.ceil((dsTotal ?? 0) / pageSize)
+                                        );
+                                        const pages: JSX.Element[] = [];
+                                        const startPage = Math.max(
+                                          1,
+                                          pageNum - 2
+                                        );
+                                        const endPage = Math.min(
+                                          totalPages,
+                                          pageNum + 2
+                                        );
+                                        if (startPage > 1) {
+                                          pages.push(
+                                            <PaginationItem key="1">
+                                              <PaginationLink
+                                                href="#"
+                                                onClick={(e) => {
+                                                  e.preventDefault();
+                                                  setPageNum(1);
+                                                }}
+                                                isActive={pageNum === 1}
+                                              >
+                                                1
+                                              </PaginationLink>
+                                            </PaginationItem>
+                                          );
+                                          if (startPage > 2) {
+                                            pages.push(
+                                              <PaginationItem key="ellipsis1">
+                                                <PaginationEllipsis />
+                                              </PaginationItem>
+                                            );
+                                          }
+                                        }
+                                        for (
+                                          let i = startPage;
+                                          i <= endPage;
+                                          i++
+                                        ) {
+                                          pages.push(
+                                            <PaginationItem key={i}>
+                                              <PaginationLink
+                                                href="#"
+                                                onClick={(e) => {
+                                                  e.preventDefault();
+                                                  setPageNum(i);
+                                                }}
+                                                isActive={pageNum === i}
+                                              >
+                                                {i}
+                                              </PaginationLink>
+                                            </PaginationItem>
+                                          );
+                                        }
+                                        if (endPage < totalPages) {
+                                          if (endPage < totalPages - 1) {
+                                            pages.push(
+                                              <PaginationItem key="ellipsis2">
+                                                <PaginationEllipsis />
+                                              </PaginationItem>
+                                            );
+                                          }
+                                          pages.push(
+                                            <PaginationItem key={totalPages}>
+                                              <PaginationLink
+                                                href="#"
+                                                onClick={(e) => {
+                                                  e.preventDefault();
+                                                  setPageNum(totalPages);
+                                                }}
+                                                isActive={
+                                                  pageNum === totalPages
+                                                }
+                                              >
+                                                {totalPages}
+                                              </PaginationLink>
+                                            </PaginationItem>
+                                          );
+                                        }
+                                        return pages;
+                                      })()}
+                                      <PaginationItem>
+                                        <PaginationNext
+                                          href="#"
+                                          onClick={(e) => {
+                                            e.preventDefault();
+                                            const totalPages = Math.max(
+                                              1,
+                                              Math.ceil(
+                                                (dsTotal ?? 0) / pageSize
+                                              )
+                                            );
+                                            if (pageNum < totalPages)
+                                              setPageNum(pageNum + 1);
+                                          }}
+                                          className={
+                                            pageNum >=
+                                            Math.max(
+                                              1,
+                                              Math.ceil(
+                                                (dsTotal ?? 0) / pageSize
+                                              )
+                                            )
+                                              ? "pointer-events-none opacity-50"
+                                              : ""
+                                          }
+                                        />
+                                      </PaginationItem>
+                                    </PaginationContent>
+                                  </Pagination>
+                                </div>
+                              </div>
+                            </TabsContent>
+                          </Tabs>
+                        )}
                       </TabsContent>
                     )
                   )}
@@ -1138,23 +1412,63 @@ export default function PropertyDetailV2Page() {
                   : "shrink-0 w-full lg:w-[384px] max-w-[384px]"
               }
             >
-              <FilterControl
-                isCollapsed={detailsCollapsed}
-                onToggleCollapse={() => setDetailsCollapsed(!detailsCollapsed)}
-                searchQuery={searchQuery}
-                setSearchQuery={setSearchQuery}
-                handleSearch={handleSearch}
-                showDetailsOnly={true}
-                preset={
-                  datasetConfigs[activeDataset as keyof typeof datasetConfigs]
-                    ?.filters?.ui
-                }
-                defaults={
-                  datasetConfigs[activeDataset as keyof typeof datasetConfigs]
-                    ?.filters?.defaults
-                }
-                namespace={activeDataset}
-              />
+              {activeDataset === "auction_ed" ? (
+                <AuctionEdFilter
+                  isCollapsed={detailsCollapsed}
+                  onToggleCollapse={() =>
+                    setDetailsCollapsed(!detailsCollapsed)
+                  }
+                  searchQuery={searchQuery}
+                  setSearchQuery={setSearchQuery}
+                  handleSearch={handleSearch}
+                  showDetailsOnly={true}
+                  namespace={activeDataset}
+                />
+              ) : activeDataset === "sale" ? (
+                <SaleFilter
+                  isCollapsed={detailsCollapsed}
+                  onToggleCollapse={() =>
+                    setDetailsCollapsed(!detailsCollapsed)
+                  }
+                  searchQuery={searchQuery}
+                  setSearchQuery={setSearchQuery}
+                  handleSearch={handleSearch}
+                  showDetailsOnly={true}
+                  namespace={activeDataset}
+                />
+              ) : activeDataset === "rent" ? (
+                <RentFilter
+                  isCollapsed={detailsCollapsed}
+                  onToggleCollapse={() =>
+                    setDetailsCollapsed(!detailsCollapsed)
+                  }
+                  searchQuery={searchQuery}
+                  setSearchQuery={setSearchQuery}
+                  handleSearch={handleSearch}
+                  showDetailsOnly={true}
+                  namespace={activeDataset}
+                />
+              ) : (
+                <FilterControl
+                  isCollapsed={detailsCollapsed}
+                  onToggleCollapse={() =>
+                    setDetailsCollapsed(!detailsCollapsed)
+                  }
+                  searchQuery={searchQuery}
+                  setSearchQuery={setSearchQuery}
+                  handleSearch={handleSearch}
+                  showDetailsOnly={true}
+                  preset={
+                    datasetConfigs[activeDataset as keyof typeof datasetConfigs]
+                      ?.filters?.ui
+                  }
+                  defaults={
+                    datasetConfigs[activeDataset as keyof typeof datasetConfigs]
+                      ?.filters?.defaults
+                  }
+                  namespace={activeDataset}
+                />
+              )}
             </div>
           </div>
         </Tabs>

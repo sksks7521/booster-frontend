@@ -77,6 +77,16 @@
 - **Requester:** 백엔드 담당자
 - **Assignee:** 프론트엔드 담당자
 - **Requested At:** 2025-08-27
-- **Completed At:**
+- **Completed At:** 2025-08-28
 - **History:**
   - 2025-08-27: 회신 초안 송부(합의 필요 포인트/선적용 항목 제시)
+  - 2025-08-28: 후속 문서(표준계약 회신 답변)로 대체 완료 → 본 초안 문서 마감
+
+---
+
+## 완료 로그
+
+- 상태: Completed (Superseded by 250828 회신 답변)
+- 이동: Communication/Frontend/send/Completed/250827_Backend_to_Frontend_Dataset_API_표준계약_회신_초안.md
+- 완료일: 2025-08-30
+- 메모: 후속 정식 답변 문서로 대체되어 완료 처리합니다.

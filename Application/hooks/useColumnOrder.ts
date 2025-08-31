@@ -19,6 +19,18 @@ export function useColumnOrder(defaultOrder: string[]) {
         ) {
           return null;
         }
+        // CORS나 404 등의 에러도 조용히 처리 (백엔드 API 미구현)
+        if (
+          e &&
+          (String(e).includes("CORS") ||
+            String(e).includes("Failed to fetch") ||
+            (typeof e.status === "number" && e.status === 404))
+        ) {
+          console.warn(
+            "⚠️ User preferences API not available, using default column order"
+          );
+          return null;
+        }
         throw e;
       }
     },
@@ -27,6 +39,22 @@ export function useColumnOrder(defaultOrder: string[]) {
       dedupingInterval: 1000,
       keepPreviousData: true,
       shouldRetryOnError: false,
+      onError: (error) => {
+        // SWR 레벨에서도 에러를 조용히 처리
+        if (
+          error &&
+          (String(error).includes("CORS") ||
+            String(error).includes("Failed to fetch") ||
+            String(error).includes("user-preferences"))
+        ) {
+          console.warn(
+            "⚠️ User preferences API error suppressed:",
+            error.message || error
+          );
+          return; // 에러를 조용히 무시
+        }
+        console.error("SWR Error in useColumnOrder:", error);
+      },
     }
   );
 

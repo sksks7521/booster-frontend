@@ -173,6 +173,15 @@ curl http://127.0.0.1:8000/api/v1/user-preferences/analysis/column_order
 curl -X DELETE http://127.0.0.1:8000/api/v1/user-preferences/analysis/column_order
 ```
 
+---
+
+## 완료 로그
+
+- 상태: Completed (가이드 배포 완료)
+- 이동: Communication/Frontend/send/Completed/250826_UserDB_API_Documentation.md
+- 완료일: 2025-08-30
+- 메모: User Preferences API 가이드 제공 완료, 프론트 통합 가이드와 정합.
+
 ## 11) SWR 통합 예시
 
 ```ts
