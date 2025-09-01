@@ -39,6 +39,17 @@ import {
   PaginationEllipsis,
 } from "@/components/ui/pagination";
 
+// 안정 참조 보장을 위한 상수 (selector fallback에 사용)
+const NOOP = () => {};
+const EMPTY_ARRAY: any[] = [];
+// 지역명 정규화: 공백 제거 + 접미사(특별시/광역시/자치시/자치도/도) 제거
+const normalizeRegion = (s?: string) =>
+  (s ? String(s) : "")
+    .replace(/\s+/g, "")
+    .replace(/(특별시|광역시|자치시|자치도|도)$/u, "");
+const eqRegion = (a?: string, b?: string) =>
+  normalizeRegion(a) === normalizeRegion(b);
+
 interface AuctionEdSearchResultsProps {
   activeView: "table" | "map" | "both";
   onViewChange: (view: "table" | "map" | "both") => void;
@@ -57,10 +68,20 @@ export default function AuctionEdSearchResults({
   bounds,
   onBoundsChange,
 }: AuctionEdSearchResultsProps) {
-  // 필터 상태 가져오기 (좌표 필터는 완전히 제거)
-  const allFilters = useFilterStore();
+  // 필터 상태 가져오기 (네임스페이스 필터 포함)
+  const allFilters: any = useFilterStore();
+
+  // auction_ed 네임스페이스 필터 병합
+  const namespace = "auction_ed";
+  const nsOverrides = (
+    allFilters.ns && namespace ? (allFilters.ns as any)[namespace] : undefined
+  ) as any;
+  const mergedFilters: any =
+    namespace && nsOverrides ? { ...allFilters, ...nsOverrides } : allFilters;
+
+  // 일부 전역 스토어 타입에 좌표 필드가 없을 수 있어 any로 안전 분해
   const { lat, lng, south, west, north, east, radius_km, ...otherFilters } =
-    allFilters;
+    mergedFilters as any;
 
   // auction_ed에서는 좌표 기반 필터링 비활성화
   const filters = {
@@ -74,77 +95,155 @@ export default function AuctionEdSearchResults({
     east: undefined,
     radius_km: undefined,
   };
-  const setPage = useFilterStore((s) => s.setPage);
-  const setSize = useFilterStore((s) => s.setSize);
-  const page = useFilterStore((s) => s.page);
-  const size = useFilterStore((s) => s.size);
+  const setPage = useFilterStore((s: any) => s.setPage);
+  const setSize = useFilterStore((s: any) => s.setSize);
+  const page = useFilterStore((s: any) => s.page);
+  const size = useFilterStore((s: any) => s.size);
 
-  // auction_ed 데이터셋 사용
+  // 필터/정렬 활성 시에는 전체 집합을 받아와서(큰 size) 클라이언트에서 정렬/재페이징
+  const hasProvince = !!(filters as any)?.province;
+  const hasCity = !!(filters as any)?.cityDistrict;
+  const hasTown = !!(filters as any)?.town;
+  const regionReady = hasProvince && hasCity;
+  // 가격 필터는 서버에서 처리됨 (auction_ed)
+  const priceRange = (filters as any)?.priceRange;
+  const hasPrice = Array.isArray(priceRange); // 디버깅용으로만 유지
+
+  // 디버깅: 필터 상태 확인
+  if (process.env.NODE_ENV === "development") {
+    console.log("🔍 필터 상태 디버깅:", {
+      allFilters,
+      nsOverrides,
+      mergedFilters,
+      hasPrice,
+      priceRange,
+      priceChanged: Array.isArray(priceRange)
+        ? `${priceRange[0]} ~ ${priceRange[1]}`
+        : "not array",
+      serverFiltering: "매각가 필터와 지역 필터는 서버에서 처리됨",
+      clientFiltering: "면적, 입찰횟수, 날짜, 검색어는 클라이언트에서 처리됨",
+      needsClientProcessing:
+        Array.isArray((filters as any)?.areaRange) ||
+        Array.isArray((filters as any)?.bidCountRange) ||
+        Array.isArray((filters as any)?.dateRange) ||
+        Boolean((filters as any)?.searchQuery),
+    });
+  }
+  const hasArea = Array.isArray((filters as any)?.areaRange);
+  const hasBids = Array.isArray((filters as any)?.bidCountRange);
+  const hasDates = Array.isArray((filters as any)?.dateRange);
+  const hasSearch = Boolean((filters as any)?.searchQuery);
+  const hasSort = Boolean(
+    (filters as any)?.sortBy && (filters as any)?.sortOrder
+  );
+  // auction_ed는 지역 필터 + 매각가 필터를 서버에서 처리, 나머지는 클라이언트 필터링
+  // 지역 필터(province, cityDistrict, town)와 매각가 필터(priceRange)는 서버에서 처리되므로 클라이언트에서 제외
+  const needsClientProcessing = hasArea || hasBids || hasDates || hasSearch;
+
+  // 우측 필터 패널의 상세 필터가 적용되었는지 확인
+  const hasDetailFilters =
+    hasPrice ||
+    Array.isArray((filters as any)?.buildingAreaRange) ||
+    Array.isArray((filters as any)?.landAreaRange) ||
+    Array.isArray((filters as any)?.constructionYearRange) ||
+    Boolean((filters as any)?.floorConfirmation) ||
+    Boolean((filters as any)?.elevatorAvailable) ||
+    Boolean((filters as any)?.currentStatus) ||
+    Boolean((filters as any)?.specialConditions) ||
+    Boolean((filters as any)?.saleDateFrom) ||
+    Boolean((filters as any)?.saleDateTo);
+
+  // auction_ed는 지역 필터가 서버에서 처리되므로 항상 서버 페이지네이션 사용
+  // 클라이언트 필터링은 각 페이지 내에서만 적용
+  const requestPage = page;
+  const requestSize = size;
+
+  // auction_ed 데이터셋 사용 (요청 크기 동적 조정)
   const {
     items: rawItems,
-    total: totalCount,
+    total: serverTotal,
     isLoading,
     error,
     mutate: refetch,
-  } = useDataset("auction_ed", filters, page, size);
+  } = useDataset("auction_ed", mergedFilters, requestPage, requestSize);
 
-  // 클라이언트 사이드 지역 필터링 적용
-  const items =
-    rawItems?.filter((item: any) => {
-      // 지역 필터링 로직 (extra 객체에서 값 추출)
-      if (filters.province && filters.province !== "") {
-        // 시도 필터링
-        if (item.extra?.sido !== filters.province) {
-          return false;
-        }
-      }
+  // 전체 데이터 개수 조회 (지역 필터 없이)
+  const { total: totalAllData } = useDataset("auction_ed", {}, 1, 1);
 
-      if (filters.cityDistrict && filters.cityDistrict !== "") {
-        // 시군구 필터링 (addressCity 필드 사용)
-        if (item.extra?.addressCity !== filters.cityDistrict) {
-          return false;
-        }
-      }
+  // 상세 필터링 개수 계산을 위한 지역 필터링된 전체 데이터 조회
+  const regionOnlyFilters = {
+    province: filters.province,
+    cityDistrict: filters.cityDistrict,
+    town: filters.town,
+  };
+  // auction_ed는 항상 서버 페이지네이션만 사용 (클라이언트 필터링 비활성화)
+  const { items: allRegionItems, total: regionTotal } = useDataset(
+    "auction_ed",
+    regionOnlyFilters,
+    1,
+    1 // 항상 1개만 가져와서 총 개수만 확인
+  );
 
-      if (filters.town && filters.town !== "") {
-        // 읍면동 필터링 (eupMyeonDong 필드 사용)
-        if (item.extra?.eupMyeonDong !== filters.town) {
-          return false;
-        }
-      }
+  // auction_ed는 모든 필터를 서버에서 처리하므로 클라이언트 필터링 비활성화
+  const applyDetailFilters = (itemsToFilter: any[]) => {
+    // auction_ed는 항상 서버 필터링만 사용
+    return itemsToFilter || [];
+  };
 
-      return true;
-    }) || [];
+  // 현재 페이지 데이터에 상세 필터링 적용
+  const items = applyDetailFilters(rawItems) || [];
 
-  // auction_ed 전용 컴포넌트로 API 연동 완료
-  const mapItems = items;
+  // auction_ed는 서버에서 모든 필터링을 처리하므로 서버 총 개수를 사용
+  const detailFilteredTotal = serverTotal || 0;
+
+  // auction_ed는 서버에서 정렬과 페이징을 모두 처리하므로 클라이언트 처리 불필요
+  const processedItems = items; // 서버에서 이미 정렬된 데이터 사용
+  const effectiveTotal = serverTotal || 0;
+  const pagedItems = processedItems; // 서버에서 이미 페이지네이션된 데이터 사용
+
+  // 지도는 현재 페이지의 데이터 사용
+  const mapItems = pagedItems;
 
   // 테이블 기능을 위한 추가 상태들
-  const { sortBy, sortOrder, setSortConfig } = useSortableColumns("auction_ed");
-  const { useVirtual, areaDisplay } = useFeatureFlags();
-  const { selectedRowKeys, setSelectedRowKeys } = useFilterStore();
+  const {
+    sortableColumns,
+    isLoading: sortColsLoading,
+    error: sortColsError,
+  } = useSortableColumns("auction_ed");
+  // 분석 페이지와 동일한 전역 정렬 상태 사용
+  const setSortConfig = useFilterStore((s: any) => s.setSortConfig);
+  const sortBy = useFilterStore((s: any) => s.sortBy);
+  const sortOrder = useFilterStore((s: any) => s.sortOrder);
+  const featureFlags: any = useFeatureFlags();
+  const useVirtual: boolean = !!(featureFlags as any)?.useVirtual;
+  const areaDisplay = (featureFlags as any)?.areaDisplay;
+  const selectedRowKeys = useFilterStore(
+    (s: any) => s.selectedRowKeys ?? EMPTY_ARRAY
+  );
+  const setSelectedRowKeys = useFilterStore(
+    (s: any) => s.setSelectedRowKeys ?? NOOP
+  );
 
   // auction_ed 데이터셋 설정 가져오기
   const datasetConfig = datasetConfigs["auction_ed"];
   const schemaColumns = datasetConfig?.table?.columns;
 
-  // auction_ed에서 정렬 가능한 컬럼들
-  const sortableColumns: string[] = [
-    "price",
-    "area",
-    "buildYear",
-    "auctionDate",
-    "bidCount",
-    "id",
-    "address",
-  ];
+  // 서버에서 제공하는 정렬 가능 컬럼 목록은 위 useSortableColumns 호출로 수신
 
   // 정렬 핸들러
-  const handleSort = (key: string, order: "asc" | "desc") => {
-    if (sortableColumns.includes(key) || key === "area") {
-      setSortConfig(key, order);
-      setPage(1); // 정렬 시 첫 페이지로
+  const handleSort = (column?: string, direction?: "asc" | "desc"): void => {
+    const key = column ?? "";
+    const order = direction ?? "asc";
+    if (
+      !key ||
+      (Array.isArray(sortableColumns) &&
+        sortableColumns.length > 0 &&
+        !sortableColumns.includes(key))
+    ) {
+      return;
     }
+    setSortConfig(key, order);
+    setPage(1);
   };
 
   const handleExport = () => {
@@ -164,7 +263,33 @@ export default function AuctionEdSearchResults({
         <div className="mb-4 md:mb-0">
           <h2 className="text-2xl font-bold text-gray-900">과거 경매 결과</h2>
           <p className="text-gray-600 mt-1">
-            총 {(totalCount || 0).toLocaleString()}건의 경매 결과를 분석해보세요
+            <span className="inline-block">
+              전체{" "}
+              <span className="font-semibold text-blue-600">
+                {(totalAllData || 0).toLocaleString()}
+              </span>
+              건
+            </span>
+            {" → "}
+            <span className="inline-block">
+              지역필터{" "}
+              <span className="font-semibold text-green-600">
+                {(regionTotal || 0).toLocaleString()}
+              </span>
+              건
+            </span>
+            {hasDetailFilters && (
+              <>
+                {" → "}
+                <span className="inline-block">
+                  상세필터{" "}
+                  <span className="font-semibold text-purple-600">
+                    {(serverTotal || 0).toLocaleString()}
+                  </span>
+                  건
+                </span>
+              </>
+            )}
           </p>
         </div>
         <div className="flex gap-2">
@@ -228,7 +353,7 @@ export default function AuctionEdSearchResults({
                 <div className="space-y-4">
                   {useVirtual ? (
                     <ItemTableVirtual
-                      items={items as any}
+                      items={pagedItems as any}
                       isLoading={false}
                       error={undefined}
                       sortBy={sortBy as any}
@@ -242,7 +367,7 @@ export default function AuctionEdSearchResults({
                     />
                   ) : (
                     <ItemTable
-                      items={items as any}
+                      items={pagedItems as any}
                       isLoading={false}
                       error={undefined}
                       schemaColumns={schemaColumns}
@@ -277,7 +402,7 @@ export default function AuctionEdSearchResults({
                       onSort={handleSort}
                       selectedRowKeys={selectedRowKeys}
                       onSelectionChange={setSelectedRowKeys}
-                      totalCount={totalCount || 0}
+                      totalCount={effectiveTotal || 0}
                       page={page}
                       pageSize={size}
                       onPageChange={(p) => setPage(p)}
@@ -315,9 +440,9 @@ export default function AuctionEdSearchResults({
                         </div>
                       </div>
                       <div className="text-sm text-gray-600">
-                        전체 {(totalCount || 0).toLocaleString()}건 중{" "}
-                        {Math.min(size * (page - 1) + 1, totalCount || 0)}-
-                        {Math.min(size * page, totalCount || 0)}건 표시
+                        전체 {(effectiveTotal || 0).toLocaleString()}건 중{" "}
+                        {Math.min(size * (page - 1) + 1, effectiveTotal || 0)}-
+                        {Math.min(size * page, effectiveTotal || 0)}건 표시
                       </div>
                     </div>
                     <Pagination>
@@ -337,7 +462,7 @@ export default function AuctionEdSearchResults({
                         {(() => {
                           const totalPages = Math.max(
                             1,
-                            Math.ceil((totalCount || 0) / size)
+                            Math.ceil((effectiveTotal || 0) / size)
                           );
                           const pages: JSX.Element[] = [];
                           const startPage = Math.max(1, page - 2);
@@ -413,13 +538,16 @@ export default function AuctionEdSearchResults({
                               e.preventDefault();
                               const totalPages = Math.max(
                                 1,
-                                Math.ceil((totalCount || 0) / size)
+                                Math.ceil((effectiveTotal || 0) / size)
                               );
                               if (page < totalPages) setPage(page + 1);
                             }}
                             className={
                               page >=
-                              Math.max(1, Math.ceil((totalCount || 0) / size))
+                              Math.max(
+                                1,
+                                Math.ceil((effectiveTotal || 0) / size)
+                              )
                                 ? "pointer-events-none opacity-50"
                                 : ""
                             }
@@ -433,12 +561,7 @@ export default function AuctionEdSearchResults({
 
               {activeView === "map" && (
                 <div style={{ height: "600px" }}>
-                  <MapView
-                    items={mapItems}
-                    bounds={bounds}
-                    onBoundsChange={onBoundsChange}
-                    dataset="auction_ed"
-                  />
+                  <MapView items={mapItems} namespace="auction_ed" />
                 </div>
               )}
 
@@ -448,12 +571,7 @@ export default function AuctionEdSearchResults({
                   <div className="space-y-4">
                     <h3 className="text-lg font-semibold">지도 보기</h3>
                     <div style={{ height: "400px" }}>
-                      <MapView
-                        items={mapItems}
-                        bounds={bounds}
-                        onBoundsChange={onBoundsChange}
-                        dataset="auction_ed"
-                      />
+                      <MapView items={mapItems} namespace="auction_ed" />
                     </div>
                   </div>
 
@@ -462,7 +580,7 @@ export default function AuctionEdSearchResults({
                     <h3 className="text-lg font-semibold">목록 보기</h3>
                     {useVirtual ? (
                       <ItemTableVirtual
-                        items={items as any}
+                        items={pagedItems as any}
                         isLoading={false}
                         error={undefined}
                         sortBy={sortBy as any}
@@ -476,7 +594,7 @@ export default function AuctionEdSearchResults({
                       />
                     ) : (
                       <ItemTable
-                        items={items as any}
+                        items={pagedItems as any}
                         isLoading={false}
                         error={undefined}
                         schemaColumns={schemaColumns}
@@ -511,7 +629,7 @@ export default function AuctionEdSearchResults({
                         onSort={handleSort}
                         selectedRowKeys={selectedRowKeys}
                         onSelectionChange={setSelectedRowKeys}
-                        totalCount={totalCount || 0}
+                        totalCount={effectiveTotal || 0}
                         page={page}
                         pageSize={size}
                         onPageChange={(p) => setPage(p)}
@@ -549,9 +667,9 @@ export default function AuctionEdSearchResults({
                           </div>
                         </div>
                         <div className="text-sm text-gray-600">
-                          전체 {(totalCount || 0).toLocaleString()}건 중{" "}
-                          {Math.min(size * (page - 1) + 1, totalCount || 0)}-
-                          {Math.min(size * page, totalCount || 0)}건 표시
+                          전체 {(effectiveTotal || 0).toLocaleString()}건 중{" "}
+                          {Math.min(size * (page - 1) + 1, effectiveTotal || 0)}
+                          -{Math.min(size * page, effectiveTotal || 0)}건 표시
                         </div>
                       </div>
                       <Pagination>
@@ -573,7 +691,7 @@ export default function AuctionEdSearchResults({
                           {(() => {
                             const totalPages = Math.max(
                               1,
-                              Math.ceil((totalCount || 0) / size)
+                              Math.ceil((effectiveTotal || 0) / size)
                             );
                             const pages: JSX.Element[] = [];
                             const startPage = Math.max(1, page - 2);
@@ -649,13 +767,16 @@ export default function AuctionEdSearchResults({
                                 e.preventDefault();
                                 const totalPages = Math.max(
                                   1,
-                                  Math.ceil((totalCount || 0) / size)
+                                  Math.ceil((effectiveTotal || 0) / size)
                                 );
                                 if (page < totalPages) setPage(page + 1);
                               }}
                               className={
                                 page >=
-                                Math.max(1, Math.ceil((totalCount || 0) / size))
+                                Math.max(
+                                  1,
+                                  Math.ceil((effectiveTotal || 0) / size)
+                                )
                                   ? "pointer-events-none opacity-50"
                                   : ""
                               }

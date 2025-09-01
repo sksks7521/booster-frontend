@@ -934,6 +934,302 @@ interface TableSortState {
 
 ---
 
-**최종 업데이트**: 2025-08-20  
-**아키텍처 버전**: v1.2  
-**주요 성과**: 필터링 시스템 완성, 16개 컬럼 테이블 고도화, API 연동 방식 혁신적 개선
+## 11. 2025-09-02 아키텍처 업데이트 (동적 필터 시스템 및 검색 기능 고도화)
+
+### 11-1. 🎯 특수권리 필터 시스템 혁신
+
+**기존 정적 필터 → 동적 데이터 기반 필터 전환:**
+
+```typescript
+// Application/hooks/useSpecialRights.ts (신규 생성)
+export function useSpecialRights(options: UseSpecialRightsOptions = {}) {
+  const { address_area, address_city } = options;
+
+  // 실제 데이터 기반 특수권리 목록 동적 생성
+  const params = new URLSearchParams();
+  if (address_area) params.append("address_area", address_area);
+  if (address_city) params.append("address_city", address_city);
+
+  const url = `/api/v1/auction-completed/special-rights/unique${
+    params.toString() ? `?${params.toString()}` : ""
+  }`;
+
+  const { data, error, isLoading, mutate } = useSWR<SpecialRightsResponse>(
+    url,
+    fetcher,
+    {
+      revalidateOnFocus: false,
+      revalidateOnReconnect: false,
+      dedupingInterval: 300000, // 5분간 중복 요청 방지
+    }
+  );
+
+  return {
+    specialRights: data?.special_rights || [],
+    totalCount: data?.total_count || 0,
+    isLoading,
+    isError: error,
+    mutate,
+  };
+}
+```
+
+**"전체" 버튼 상호작용 로직:**
+
+```typescript
+// 특수권리 필터 상호작용 패턴
+const handleSpecialRightClick = (right: string) => {
+  const prev = filters.specialRights as string[] | undefined;
+
+  if (right === "전체") {
+    // "전체" 버튼 클릭 시 모든 개별 버튼 비활성화
+    setFilter("specialRights", []);
+  } else {
+    // 개별 버튼 클릭 시 OR 조건으로 추가/제거
+    const next = Array.isArray(prev)
+      ? prev.includes(right)
+        ? prev.filter((v) => v !== right) // 제거
+        : [...prev, right] // 추가
+      : [right]; // 첫 선택
+
+    setFilter("specialRights", next);
+  }
+};
+
+// 자동 "전체" 버튼 활성화 로직
+const isAllActive =
+  !Array.isArray(filters.specialRights) || filters.specialRights.length === 0;
+```
+
+### 11-2. 🔍 통합 검색 시스템 구현
+
+**주소 검색 + 사건번호 검색 표준화:**
+
+```typescript
+// Application/components/features/auction-ed/AuctionEdFilter.tsx
+// Analysis 페이지와 동일한 UI 패턴 적용
+
+{
+  /* 주소 검색 */
+}
+<div>
+  <Label className="text-sm font-medium">주소 검색</Label>
+  <Input
+    placeholder="주소를 입력하세요"
+    value={addressSearch}
+    onChange={(e) => setAddressSearch(e.target.value)}
+    onKeyPress={(e) => e.key === "Enter" && handleAddressSearch()}
+  />
+  <div className="flex space-x-2 mt-2">
+    <Button size="sm" onClick={handleAddressSearch}>
+      검색
+    </Button>
+    {addressSearch && (
+      <Button size="sm" variant="outline" onClick={handleClearAddressSearch}>
+        검색해제
+      </Button>
+    )}
+  </div>
+</div>;
+
+{
+  /* 사건번호 검색 */
+}
+<div>
+  <Label className="text-sm font-medium">사건번호 검색</Label>
+  <Input
+    placeholder="사건번호를 입력하세요"
+    value={caseNumberSearch}
+    onChange={(e) => setCaseNumberSearch(e.target.value)}
+    onKeyPress={(e) => e.key === "Enter" && handleCaseNumberSearch()}
+  />
+  <div className="flex space-x-2 mt-2">
+    <Button size="sm" onClick={handleCaseNumberSearch}>
+      검색
+    </Button>
+    {caseNumberSearch && (
+      <Button size="sm" variant="outline" onClick={handleClearCaseNumberSearch}>
+        검색해제
+      </Button>
+    )}
+  </div>
+</div>;
+```
+
+**백엔드 검색 파라미터 매핑:**
+
+```typescript
+// Application/datasets/registry.ts 확장
+const AUCTION_ED_SERVER_FILTERS = [
+  // ... 기존 필터들
+  "specialRights", // 동적 특수권리 필터
+  "searchQuery", // 검색어
+  "searchField", // 검색 대상 (address | case_number)
+] as const;
+
+// 검색 파라미터 변환 로직
+if (
+  Array.isArray(serverFilters?.specialRights) &&
+  serverFilters.specialRights.length > 0
+) {
+  mappedFilters.special_rights = serverFilters.specialRights.join(",");
+}
+
+if (serverFilters?.searchQuery && serverFilters?.searchField) {
+  mappedFilters.searchField = serverFilters.searchField;
+  mappedFilters.searchQuery = serverFilters.searchQuery;
+}
+```
+
+### 11-3. 🎨 UI/UX 접기펴기 시스템
+
+**현재상태 및 특수권리 섹션 최적화:**
+
+```typescript
+// 접기/펴기 상태 관리
+const [isCurrentStatusCollapsed, setIsCurrentStatusCollapsed] = useState(true);
+const [isSpecialRightsCollapsed, setIsSpecialRightsCollapsed] = useState(true);
+
+// 접기/펴기 UI 컴포넌트
+<div className="flex items-center justify-between">
+  <Label className="text-sm font-medium">현재상태</Label>
+  <button
+    onClick={() => setIsCurrentStatusCollapsed(!isCurrentStatusCollapsed)}
+    className="text-xs text-gray-500 hover:text-gray-700 flex items-center gap-1"
+  >
+    {isCurrentStatusCollapsed ? "펴기" : "접기"}
+    <span
+      className={`transform transition-transform ${
+        isCurrentStatusCollapsed ? "rotate-0" : "rotate-180"
+      }`}
+    >
+      ▼
+    </span>
+  </button>
+</div>;
+
+{
+  !isCurrentStatusCollapsed && (
+    <div className="flex flex-wrap gap-2">{/* 현재상태 버튼들 */}</div>
+  );
+}
+```
+
+### 11-4. 🤝 백엔드 협업 프로세스 고도화
+
+**체계적 요청서 작성 시스템:**
+
+```markdown
+# Communication/Backend/send/Request/ 구조
+
+├── 250902*Frontend_to_Backend*특수권리필터*개선요청.md
+├── 250902_Frontend_to_Backend*주소검색*사건번호검색*기능구현요청.md
+├── 250902*Frontend_to_Backend*주소검색기능*작동불가*긴급수정요청.md
+└── 250902*Frontend_to_Backend*주소검색기능*후속요청*여전히작동안함.md
+```
+
+**이슈 해결 프로세스:**
+
+1. **문제 발견**: 프론트엔드에서 기능 테스트 중 이슈 확인
+2. **구체적 재현**: 정확한 재현 단계 및 기대/실제 결과 문서화
+3. **기술적 분석**: 프론트엔드 관점에서의 원인 분석
+4. **요청서 작성**: 표준화된 템플릿으로 상세 요청서 작성
+5. **후속 검증**: 백엔드 수정 후 재테스트 및 피드백
+
+### 11-5. 📊 성능 최적화 및 캐싱 전략
+
+**SWR 캐싱 최적화:**
+
+```typescript
+// 특수권리 데이터 캐싱 전략
+const { data, error, isLoading, mutate } = useSWR<SpecialRightsResponse>(
+  url,
+  fetcher,
+  {
+    revalidateOnFocus: false, // 포커스 시 재검증 비활성화
+    revalidateOnReconnect: false, // 재연결 시 재검증 비활성화
+    dedupingInterval: 300000, // 5분간 중복 요청 방지
+  }
+);
+```
+
+**조건부 렌더링 최적화:**
+
+```typescript
+// 접기/펴기 상태에 따른 효율적 DOM 관리
+{
+  !isCurrentStatusCollapsed && (
+    <div className="flex flex-wrap gap-2">
+      {currentStatusOptions.map((status) => (
+        <StatusButton key={status} status={status} />
+      ))}
+    </div>
+  );
+}
+```
+
+### 11-6. 🧪 테스트 및 검증 시스템
+
+**다단계 검증 프로세스:**
+
+1. **기능 테스트**: 각 필터 및 검색 기능 개별 테스트
+2. **통합 테스트**: 여러 필터 조합 시나리오 테스트
+3. **사용자 시나리오**: 실제 사용 패턴 기반 테스트
+4. **성능 테스트**: API 응답 시간 및 UI 반응성 측정
+
+**검증 완료 기능:**
+
+- ✅ 특수권리 "전체" 버튼 상호작용
+- ✅ 동적 특수권리 목록 생성
+- ✅ 주소 검색 (덕양구, 화정동, 행신동)
+- ✅ 사건번호 검색 (2024)
+- ✅ 검색해제 기능
+- ✅ 접기/펴기 UI
+
+### 11-7. 🎯 아키텍처 패턴 진화
+
+**새로운 패턴 확립:**
+
+1. **동적 필터 생성**: 정적 하드코딩 → 실시간 데이터 기반 필터 생성
+2. **OR 조건 필터링**: 복수 선택 가능한 필터 시스템
+3. **상호작용 로직**: "전체" 버튼과 개별 버튼 간의 스마트한 상호작용
+4. **검색 표준화**: 일관된 검색 UI/UX 패턴 적용
+5. **접기펴기 시스템**: 복잡한 UI의 단계적 노출
+
+**코드 재사용성 향상:**
+
+```typescript
+// 재사용 가능한 접기/펴기 컴포넌트 패턴
+interface CollapsibleSectionProps {
+  title: string;
+  isCollapsed: boolean;
+  onToggle: () => void;
+  children: React.ReactNode;
+}
+
+const CollapsibleSection: React.FC<CollapsibleSectionProps> = ({
+  title,
+  isCollapsed,
+  onToggle,
+  children,
+}) => (
+  <div>
+    <div className="flex items-center justify-between">
+      <Label className="text-sm font-medium">{title}</Label>
+      <button
+        onClick={onToggle}
+        className="text-xs text-gray-500 hover:text-gray-700"
+      >
+        {isCollapsed ? "펴기" : "접기"} ▼
+      </button>
+    </div>
+    {!isCollapsed && children}
+  </div>
+);
+```
+
+---
+
+**최종 업데이트**: 2025-09-02  
+**아키텍처 버전**: v1.3  
+**주요 성과**: 동적 필터 시스템 구현, 통합 검색 기능 완성, UI/UX 접기펴기 시스템 도입, 백엔드 협업 프로세스 고도화

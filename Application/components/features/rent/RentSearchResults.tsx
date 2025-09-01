@@ -76,7 +76,10 @@ export default function RentSearchResults({
   const mapItems = items;
 
   // 테이블 기능을 위한 추가 상태들
-  const { sortBy, sortOrder, setSortConfig } = useSortableColumns("rent");
+  const { sortableColumns } = useSortableColumns("rent");
+  const setSortConfig = useFilterStore((s: any) => s.setSortConfig);
+  const sortBy = useFilterStore((s: any) => s.sortBy);
+  const sortOrder = useFilterStore((s: any) => s.sortOrder);
   const { useVirtual, areaDisplay } = useFeatureFlags();
   const { selectedRowKeys, setSelectedRowKeys } = useFilterStore();
 
@@ -84,26 +87,20 @@ export default function RentSearchResults({
   const datasetConfig = datasetConfigs["rent"];
   const schemaColumns = datasetConfig?.table?.columns;
 
-  // rent에서 정렬 가능한 컬럼들
-  const sortableColumns: string[] = [
-    "depositAmount",
-    "monthlyRent",
-    "exclusiveAreaSqm",
-    "constructionYearReal",
-    "contractYear",
-    "contractMonth",
-    "contractDay",
-    "rentalYieldMonthly",
-    "rentalYieldAnnual",
-    "id",
-  ];
-
-  // 정렬 핸들러
-  const handleSort = (key: string, order: "asc" | "desc") => {
-    if (sortableColumns.includes(key) || key === "area") {
-      setSortConfig(key, order);
-      setPage(1); // 정렬 시 첫 페이지로
+  // 정렬 핸들러(분석 페이지와 동일 시그니처)
+  const handleSort = (column?: string, direction?: "asc" | "desc") => {
+    const key = column ?? "";
+    const order = direction ?? "asc";
+    if (
+      !key ||
+      (Array.isArray(sortableColumns) &&
+        sortableColumns.length > 0 &&
+        !sortableColumns.includes(key))
+    ) {
+      return;
     }
+    setSortConfig(key, order);
+    setPage(1);
   };
 
   const handleExport = () => {
@@ -393,12 +390,7 @@ export default function RentSearchResults({
 
               {activeView === "map" && (
                 <div style={{ height: "600px" }}>
-                  <MapView
-                    items={mapItems}
-                    bounds={bounds}
-                    onBoundsChange={onBoundsChange}
-                    dataset="rent"
-                  />
+                  <MapView items={mapItems} namespace="rent" />
                 </div>
               )}
 
@@ -408,12 +400,7 @@ export default function RentSearchResults({
                   <div className="space-y-4">
                     <h3 className="text-lg font-semibold">지도 보기</h3>
                     <div style={{ height: "400px" }}>
-                      <MapView
-                        items={mapItems}
-                        bounds={bounds}
-                        onBoundsChange={onBoundsChange}
-                        dataset="rent"
-                      />
+                      <MapView items={mapItems} namespace="rent" />
                     </div>
                   </div>
 

@@ -34,15 +34,20 @@ export function useDataset(
       // bounds 간단 검증 실패 시 네트워크 요청 생략
       // 단, 중심+반경 모드일 때는 bounds 무효여도 요청을 진행한다.
       if (!hasCenterRadius && !isValidBounds(safeFilters)) {
+        console.log("bounds 검증 실패로 빈 결과 반환");
         return { items: [], total: 0, page, size } as any;
       }
-      return await cfg.api.fetchList({
+
+      const result = await cfg.api.fetchList({
         filters: filtersForQuery,
         page,
         size,
       });
+
+      return result;
     } catch (e) {
       // 백엔드 미구현/일시 오류 시에도 UI는 동작하도록 안전 결과 반환
+      console.error("=== API 요청 실패 ===", e);
       return { items: [], total: 0, page, size, _error: e } as any;
     }
   });

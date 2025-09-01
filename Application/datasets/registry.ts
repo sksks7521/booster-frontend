@@ -118,38 +118,198 @@ const ALLOWED_FILTERS_WITH_SORT = [
   "sortOrder",
 ] as const;
 
+// auction_ed 전용: 모든 필터를 서버로 전달
+const AUCTION_ED_SERVER_FILTERS = [
+  "province",
+  "cityDistrict",
+  "town",
+  "priceRange",
+  "salePriceRange",
+  "auctionDateFrom",
+  "auctionDateTo",
+  "buildingAreaRange",
+  "landAreaRange",
+  "buildYear",
+  "floorConfirmation",
+  "hasElevator",
+  "currentStatus",
+  "specialBooleanFlags",
+  "specialRights",
+  "searchQuery",
+  "searchField",
+] as const;
+
 export const datasetConfigs: Record<DatasetId, DatasetConfig> = {
   auction_ed: {
     id: "auction_ed",
     title: "과거경매결과",
     api: {
       buildListKey: ({ filters, page, size }) => {
-        const allowedFilters = pickAllowed(
+        // auction_ed는 지역 필터 + 매각가 필터를 서버로 전달, 나머지는 클라이언트 필터링
+        const serverFilters = pickAllowed(
           filters as any,
-          ALLOWED_FILTERS_WITH_SORT
+          AUCTION_ED_SERVER_FILTERS
         );
-        // auction_ed에서는 좌표 기반 필터링 비활성화
-        delete allowedFilters.lat;
-        delete allowedFilters.lng;
-        delete allowedFilters.south;
-        delete allowedFilters.west;
-        delete allowedFilters.north;
-        delete allowedFilters.east;
-        delete allowedFilters.radius_km;
 
         // 지역 필터를 auction_ed 백엔드 필드명으로 매핑
-        const mappedFilters = { ...allowedFilters };
-        if (filters?.province) {
-          mappedFilters.sido = filters.province;
-          delete mappedFilters.province;
+        const mappedFilters: Record<string, unknown> = {};
+        if (serverFilters?.province) {
+          // 시도 선택은 '주소(구역)' 컬럼과 연동 → address_area로 매핑
+          mappedFilters.address_area = serverFilters.province;
         }
-        if (filters?.cityDistrict) {
-          mappedFilters.address_city = filters.cityDistrict;
-          delete mappedFilters.cityDistrict;
+        if (serverFilters?.cityDistrict) {
+          // address_city는 "경기도 고양시"를 그대로 전달
+          mappedFilters.address_city = String(serverFilters.cityDistrict);
         }
-        if (filters?.town) {
-          mappedFilters.eup_myeon_dong = filters.town;
-          delete mappedFilters.town;
+        if (serverFilters?.town) {
+          mappedFilters.eup_myeon_dong = serverFilters.town;
+        }
+
+        // 매각가 필터 추가
+        if (Array.isArray(serverFilters?.priceRange)) {
+          const [minPrice, maxPrice] = serverFilters.priceRange as [
+            number,
+            number
+          ];
+          console.log("🔍 [DEBUG] priceRange 필터 처리:", {
+            minPrice,
+            maxPrice,
+            serverFilters,
+          });
+
+          if (typeof minPrice === "number" && minPrice > 0) {
+            mappedFilters.min_final_sale_price = minPrice;
+            console.log("✅ [DEBUG] 최소 매각가 설정:", minPrice);
+          }
+          if (
+            typeof maxPrice === "number" &&
+            maxPrice > 0 &&
+            maxPrice < 500000
+          ) {
+            mappedFilters.max_final_sale_price = maxPrice;
+            console.log("✅ [DEBUG] 최대 매각가 설정:", maxPrice);
+          }
+        }
+
+        // 매각기일 필터 추가
+        if (serverFilters?.auctionDateFrom) {
+          mappedFilters.sale_date_from = serverFilters.auctionDateFrom;
+        }
+        if (serverFilters?.auctionDateTo) {
+          mappedFilters.sale_date_to = serverFilters.auctionDateTo;
+        }
+
+        // 건축면적 필터 추가 (평 단위)
+        if (Array.isArray(serverFilters?.buildingAreaRange)) {
+          const [minArea, maxArea] = serverFilters.buildingAreaRange as [
+            number,
+            number
+          ];
+          if (typeof minArea === "number" && minArea > 0) {
+            mappedFilters.min_building_area_pyeong = minArea;
+          }
+          if (typeof maxArea === "number" && maxArea > 0) {
+            mappedFilters.max_building_area_pyeong = maxArea;
+          }
+        }
+
+        // 토지면적 필터 추가 (평 단위)
+        if (Array.isArray(serverFilters?.landAreaRange)) {
+          const [minArea, maxArea] = serverFilters.landAreaRange as [
+            number,
+            number
+          ];
+          if (typeof minArea === "number" && minArea > 0) {
+            mappedFilters.min_land_area_pyeong = minArea;
+          }
+          if (typeof maxArea === "number" && maxArea > 0) {
+            mappedFilters.max_land_area_pyeong = maxArea;
+          }
+        }
+
+        // 건축년도 필터 추가
+        if (Array.isArray(serverFilters?.buildYear)) {
+          const [minYear, maxYear] = serverFilters.buildYear as [
+            number,
+            number
+          ];
+          if (typeof minYear === "number" && minYear > 1900) {
+            mappedFilters.min_construction_year = minYear;
+          }
+          if (typeof maxYear === "number" && maxYear > 1900) {
+            mappedFilters.max_construction_year = maxYear;
+          }
+        }
+
+        // 층확인 필터 추가
+        if (
+          serverFilters?.floorConfirmation &&
+          serverFilters.floorConfirmation !== "all"
+        ) {
+          if (Array.isArray(serverFilters.floorConfirmation)) {
+            mappedFilters.floor_confirmation =
+              serverFilters.floorConfirmation.join(",");
+          } else {
+            mappedFilters.floor_confirmation = serverFilters.floorConfirmation;
+          }
+        }
+
+        // 엘리베이터 필터 추가
+        if (
+          serverFilters?.hasElevator !== undefined &&
+          serverFilters.hasElevator !== "all"
+        ) {
+          if (Array.isArray(serverFilters.hasElevator)) {
+            mappedFilters.elevator_available =
+              serverFilters.hasElevator.join(",");
+          } else {
+            mappedFilters.elevator_available = serverFilters.hasElevator;
+          }
+        }
+
+        // 현재상태 필터 추가
+        if (
+          serverFilters?.currentStatus &&
+          serverFilters.currentStatus !== "all"
+        ) {
+          if (Array.isArray(serverFilters.currentStatus)) {
+            mappedFilters.current_status =
+              serverFilters.currentStatus.join(",");
+          } else {
+            mappedFilters.current_status = serverFilters.currentStatus;
+          }
+        }
+
+        // 특수조건 필터 추가
+        if (
+          Array.isArray(serverFilters?.specialBooleanFlags) &&
+          serverFilters.specialBooleanFlags.length > 0
+        ) {
+          mappedFilters.special_conditions =
+            serverFilters.specialBooleanFlags.join(",");
+        }
+
+        // 특수권리 필터 추가 (동적 OR 조건)
+        if (
+          Array.isArray(serverFilters?.specialRights) &&
+          serverFilters.specialRights.length > 0
+        ) {
+          mappedFilters.special_rights = serverFilters.specialRights.join(",");
+        }
+
+        // 검색 필터 추가
+        if (serverFilters?.searchQuery && serverFilters?.searchField) {
+          if (serverFilters.searchField === "road_address") {
+            mappedFilters.road_address_search = serverFilters.searchQuery;
+          } else if (serverFilters.searchField === "case_number") {
+            mappedFilters.case_number_search = serverFilters.searchQuery;
+          }
+        }
+
+        // 정렬 파라미터 추가 (서버에서 처리)
+        if (filters?.sortBy && filters?.sortOrder) {
+          mappedFilters.sort_by = (filters as any).sortBy;
+          mappedFilters.sort_order = (filters as any).sortOrder;
         }
 
         return [
@@ -162,41 +322,188 @@ export const datasetConfigs: Record<DatasetId, DatasetConfig> = {
         ] as const;
       },
       fetchList: async ({ filters, page, size }) => {
-        const allowedFilters = pickAllowed(filters as any, ALLOWED_FILTERS);
-        // auction_ed에서는 좌표 기반 필터링 비활성화
-        delete allowedFilters.lat;
-        delete allowedFilters.lng;
-        delete allowedFilters.south;
-        delete allowedFilters.west;
-        delete allowedFilters.north;
-        delete allowedFilters.east;
-        delete allowedFilters.radius_km;
+        // auction_ed는 지역 필터 + 매각가 필터를 서버로 전달, 나머지는 클라이언트 필터링
+        const serverFilters = pickAllowed(
+          filters as any,
+          AUCTION_ED_SERVER_FILTERS
+        );
 
         // 지역 필터를 auction_ed 백엔드 필드명으로 매핑
-        const mappedFilters = { ...allowedFilters };
-        if (filters?.province) {
-          mappedFilters.sido = filters.province;
-          delete mappedFilters.province;
+        const mappedFilters: Record<string, unknown> = {};
+        if (serverFilters?.province) {
+          // 시도 선택은 '주소(구역)' 컬럼과 연동 → address_area로 매핑
+          mappedFilters.address_area = serverFilters.province;
         }
-        if (filters?.cityDistrict) {
-          mappedFilters.address_city = filters.cityDistrict;
-          delete mappedFilters.cityDistrict;
+        if (serverFilters?.cityDistrict) {
+          // address_city는 "경기도 고양시"를 그대로 전달
+          mappedFilters.address_city = String(serverFilters.cityDistrict);
         }
-        if (filters?.town) {
-          mappedFilters.eup_myeon_dong = filters.town;
-          delete mappedFilters.town;
+        if (serverFilters?.town) {
+          mappedFilters.eup_myeon_dong = serverFilters.town;
+        }
+
+        // 매각가 필터 추가 (기존 priceRange)
+        if (Array.isArray(serverFilters?.priceRange)) {
+          const [minPrice, maxPrice] = serverFilters.priceRange as [
+            number,
+            number
+          ];
+
+          if (typeof minPrice === "number" && minPrice > 0) {
+            mappedFilters.min_final_sale_price = minPrice;
+          }
+          if (
+            typeof maxPrice === "number" &&
+            maxPrice > 0 &&
+            maxPrice < 500000
+          ) {
+            mappedFilters.max_final_sale_price = maxPrice;
+          }
+        }
+
+        // 매각가 범위 필터 추가 (새로운 salePriceRange)
+        if (Array.isArray(serverFilters?.salePriceRange)) {
+          const [minPrice, maxPrice] = serverFilters.salePriceRange as [
+            number,
+            number
+          ];
+          if (typeof minPrice === "number" && minPrice > 0) {
+            mappedFilters.min_final_sale_price = minPrice;
+          }
+          if (
+            typeof maxPrice === "number" &&
+            maxPrice > 0 &&
+            maxPrice < 500000
+          ) {
+            mappedFilters.max_final_sale_price = maxPrice;
+          }
+        }
+
+        // 매각기일 필터 추가
+        if (serverFilters?.auctionDateFrom) {
+          mappedFilters.sale_date_from = serverFilters.auctionDateFrom;
+        }
+        if (serverFilters?.auctionDateTo) {
+          mappedFilters.sale_date_to = serverFilters.auctionDateTo;
+        }
+
+        // 건축면적 필터 추가 (평 단위)
+        if (Array.isArray(serverFilters?.buildingAreaRange)) {
+          const [minArea, maxArea] = serverFilters.buildingAreaRange as [
+            number,
+            number
+          ];
+          if (typeof minArea === "number" && minArea > 0) {
+            mappedFilters.min_building_area_pyeong = minArea;
+          }
+          if (typeof maxArea === "number" && maxArea > 0) {
+            mappedFilters.max_building_area_pyeong = maxArea;
+          }
+        }
+
+        // 토지면적 필터 추가 (평 단위)
+        if (Array.isArray(serverFilters?.landAreaRange)) {
+          const [minArea, maxArea] = serverFilters.landAreaRange as [
+            number,
+            number
+          ];
+          if (typeof minArea === "number" && minArea > 0) {
+            mappedFilters.min_land_area_pyeong = minArea;
+          }
+          if (typeof maxArea === "number" && maxArea > 0) {
+            mappedFilters.max_land_area_pyeong = maxArea;
+          }
+        }
+
+        // 건축년도 필터 추가
+        if (Array.isArray(serverFilters?.buildYear)) {
+          const [minYear, maxYear] = serverFilters.buildYear as [
+            number,
+            number
+          ];
+          if (typeof minYear === "number" && minYear > 1900) {
+            mappedFilters.min_construction_year = minYear;
+          }
+          if (typeof maxYear === "number" && maxYear > 1900) {
+            mappedFilters.max_construction_year = maxYear;
+          }
+        }
+
+        // 층확인 필터 추가
+        if (
+          serverFilters?.floorConfirmation &&
+          serverFilters.floorConfirmation !== "all"
+        ) {
+          if (Array.isArray(serverFilters.floorConfirmation)) {
+            mappedFilters.floor_confirmation =
+              serverFilters.floorConfirmation.join(",");
+          } else {
+            mappedFilters.floor_confirmation = serverFilters.floorConfirmation;
+          }
+        }
+
+        // 엘리베이터 필터 추가
+        if (
+          serverFilters?.hasElevator !== undefined &&
+          serverFilters.hasElevator !== "all"
+        ) {
+          if (Array.isArray(serverFilters.hasElevator)) {
+            mappedFilters.elevator_available =
+              serverFilters.hasElevator.join(",");
+          } else {
+            mappedFilters.elevator_available = serverFilters.hasElevator;
+          }
+        }
+
+        // 현재상태 필터 추가
+        if (
+          serverFilters?.currentStatus &&
+          serverFilters.currentStatus !== "all"
+        ) {
+          if (Array.isArray(serverFilters.currentStatus)) {
+            mappedFilters.current_status =
+              serverFilters.currentStatus.join(",");
+          } else {
+            mappedFilters.current_status = serverFilters.currentStatus;
+          }
+        }
+
+        // 특수조건 필터 추가
+        if (
+          Array.isArray(serverFilters?.specialBooleanFlags) &&
+          serverFilters.specialBooleanFlags.length > 0
+        ) {
+          mappedFilters.special_conditions =
+            serverFilters.specialBooleanFlags.join(",");
+        }
+
+        // 특수권리 필터 추가 (동적 OR 조건)
+        if (
+          Array.isArray(serverFilters?.specialRights) &&
+          serverFilters.specialRights.length > 0
+        ) {
+          mappedFilters.special_rights = serverFilters.specialRights.join(",");
+        }
+
+        // 검색 필터 추가
+        if (serverFilters?.searchQuery && serverFilters?.searchField) {
+          if (serverFilters.searchField === "road_address") {
+            mappedFilters.road_address_search = serverFilters.searchQuery;
+          } else if (serverFilters.searchField === "case_number") {
+            mappedFilters.case_number_search = serverFilters.searchQuery;
+          }
+        }
+
+        // 정렬 파라미터 추가 (서버에서 처리)
+        if (filters?.sortBy && filters?.sortOrder) {
+          mappedFilters.sort_by = (filters as any).sortBy;
+          mappedFilters.sort_order = (filters as any).sortOrder;
         }
 
         return auctionApi.getCompleted({
           ...mappedFilters,
           page,
           size,
-          ...(filters?.sortBy && filters?.sortOrder
-            ? {
-                sort_by: (filters as any).sortBy,
-                sort_order: (filters as any).sortOrder,
-              }
-            : {}),
         });
       },
     },

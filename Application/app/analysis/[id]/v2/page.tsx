@@ -52,6 +52,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import regions from "@/regions.json";
 import { useLocationsSimple } from "@/hooks/useLocations";
 import { Label } from "@/components/ui/label";
 
@@ -126,24 +127,37 @@ export default function PropertyDetailV2Page() {
   const [searchQuery, setSearchQuery] = useState("");
 
   // 지역 선택을 위한 상태 및 로직
-  const { locations } = useLocationsSimple();
+  // regions.json 기반 하드코딩 목록 사용
+  const provinces: string[] = (regions as any)["시도"] ?? [];
+  const districtsByProvince: Record<string, string[]> =
+    ((regions as any)["시군구"] as Record<string, string[]>) ?? {};
   const [selectedProvince, setSelectedProvince] = useState("");
   const [selectedCity, setSelectedCity] = useState("");
   const [selectedDistrict, setSelectedDistrict] = useState("");
   const [availableCities, setAvailableCities] = useState<string[]>([]);
+  const bootRef = useRef(true);
+  const pendingCityRef = useRef<string | null>(null);
   const [availableDistricts, setAvailableDistricts] = useState<string[]>([]);
   const setFilter = useFilterStore((s: any) => s.setFilter);
 
   // 지역 선택 로직 - 시도 변경 시
   useEffect(() => {
-    if (selectedProvince && locations?.cities) {
-      const cities = Object.keys(locations.cities).filter((city) => {
-        return locations.cities![city].some(
-          (item: any) => item.province === selectedProvince
-        );
-      });
-      setAvailableCities(cities);
-      if (!cities.includes(selectedCity)) {
+    // 시군구 원본 목록을 '시' 단위로 접어서(예: "경기도 고양시 덕양구" → "경기도 고양시") 중복 제거
+    const collapseCity = (full: string): string => {
+      // 예: "경상남도 창원시 의창구" → "경상남도 창원시"
+      const idx = full.indexOf("시 ");
+      if (idx >= 0) {
+        const cut = full.slice(0, idx + 1); // "…시"
+        return cut.trim();
+      }
+      return full;
+    };
+
+    if (selectedProvince) {
+      const raw = districtsByProvince[selectedProvince] || [];
+      const collapsed = Array.from(new Set(raw.map((v) => collapseCity(v))));
+      setAvailableCities(collapsed);
+      if (!collapsed.includes(selectedCity)) {
         setSelectedCity("");
         setSelectedDistrict("");
         setAvailableDistricts([]);
@@ -154,21 +168,14 @@ export default function PropertyDetailV2Page() {
       setSelectedDistrict("");
       setAvailableDistricts([]);
     }
-  }, [selectedProvince, selectedCity, locations]);
+  }, [selectedProvince, selectedCity]);
 
   // 지역 선택 로직 - 시군구 변경 시
   useEffect(() => {
-    if (selectedCity && locations?.districts) {
-      const districts = locations.districts[selectedCity] || [];
-      setAvailableDistricts(districts);
-      if (!districts.includes(selectedDistrict)) {
-        setSelectedDistrict("");
-      }
-    } else {
-      setAvailableDistricts([]);
-      setSelectedDistrict("");
-    }
-  }, [selectedCity, selectedDistrict, locations]);
+    // regions.json은 시군구까지 제공하므로 읍면동은 사용하지 않음(빈 리스트 유지)
+    setAvailableDistricts([]);
+    setSelectedDistrict("");
+  }, [selectedCity]);
 
   // 실제 필터 적용 - 값이 있을 때만 적용
   useEffect(() => {
@@ -188,15 +195,57 @@ export default function PropertyDetailV2Page() {
       setFilter("town", selectedDistrict);
     }
   }, [selectedDistrict, setFilter]);
+
+  // URL → 드롭다운 초기 동기화 (마운트 시 1회: province는 즉시, city/town은 옵션 로딩 후 적용)
+  useEffect(() => {
+    try {
+      const p = searchParams?.get("province") || "";
+      const c = searchParams?.get("cityDistrict") || "";
+      if (p) setSelectedProvince(p);
+      if (c) pendingCityRef.current = c;
+    } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    try {
+      if (
+        pendingCityRef.current &&
+        availableCities.includes(pendingCityRef.current)
+      ) {
+        setSelectedCity(pendingCityRef.current);
+        pendingCityRef.current = null;
+      }
+      // 초기 동기화가 끝났으면 부트스트랩 종료
+      if (bootRef.current) bootRef.current = false;
+    } catch {}
+  }, [availableCities]);
+
+  useEffect(() => {
+    try {
+      const t = searchParams?.get("town") || "";
+      if (t && availableDistricts.includes(t)) setSelectedDistrict(t);
+    } catch {}
+  }, [searchParams, availableDistricts]);
+
+  // 드롭다운 → URL 동기화 (선택 변경 시 쿼리 업데이트)
+  useEffect(() => {
+    try {
+      if (bootRef.current) return; // 초기 동기화 전에는 URL 갱신 금지
+      const current = new URLSearchParams(searchParams?.toString() || "");
+      if (selectedProvince) current.set("province", selectedProvince);
+      else current.delete("province");
+      if (selectedCity) current.set("cityDistrict", selectedCity);
+      else current.delete("cityDistrict");
+      if (selectedDistrict) current.set("town", selectedDistrict);
+      else current.delete("town");
+      router.replace(`?${current.toString()}`, { scroll: false });
+    } catch {}
+  }, [selectedProvince, selectedCity, selectedDistrict]);
   const handleSearch = () => {};
-  const initialPage = useMemo(() => {
-    const p = Number(searchParams?.get("p"));
-    return Number.isFinite(p) && p > 0 ? p : 1;
-  }, [searchParams]);
-  const initialSize = useMemo(() => {
-    const s = Number(searchParams?.get("s"));
-    return Number.isFinite(s) && s > 0 ? s : 20;
-  }, [searchParams]);
+  // URL p/s는 사용하지 않음: 내부 상태로만 관리
+  const initialPage = 1;
+  const initialSize = 20;
   const [pageNum, setPageNum] = useState(initialPage);
   const [pageSize, setPageSize] = useState(initialSize);
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
@@ -207,6 +256,8 @@ export default function PropertyDetailV2Page() {
     east: number;
   } | null>(null);
   const centerAndRadius = useMemo(() => {
+    // 시도 미선택 시 지도 중심/반경도 적용하지 않음(요청 억제)
+    if (!selectedProvince) return null;
     // 0) URL로 전달된 lat/lng/radius 우선 적용
     const qsLat = Number(searchParams?.get("lat"));
     const qsLng = Number(searchParams?.get("lng"));
@@ -260,7 +311,7 @@ export default function PropertyDetailV2Page() {
       return { lat: latNum, lng: lngNum, radius_km: 5 } as const;
     }
     return null;
-  }, [bounds, property, searchParams]);
+  }, [bounds, property, searchParams, selectedProvince]);
 
   // analysis → v2로 넘어올 때 URL의 지역 파라미터를 스토어에 1회 주입
   useEffect(() => {
@@ -296,13 +347,14 @@ export default function PropertyDetailV2Page() {
     province: zFilters?.province,
     cityDistrict: zFilters?.cityDistrict,
     town: zFilters?.town,
-    south: bounds?.south,
-    west: bounds?.west,
-    north: bounds?.north,
-    east: bounds?.east,
-    lat: centerAndRadius?.lat,
-    lng: centerAndRadius?.lng,
-    radius_km: centerAndRadius?.radius_km,
+    // auction_ed에서는 좌표 기반 필터링 비활성화 (지역 필터만 사용)
+    // south: bounds?.south,
+    // west: bounds?.west,
+    // north: bounds?.north,
+    // east: bounds?.east,
+    // lat: centerAndRadius?.lat,
+    // lng: centerAndRadius?.lng,
+    // radius_km: centerAndRadius?.radius_km,
     price_min: Array.isArray(zFilters?.priceRange)
       ? zFilters.priceRange[0]
       : undefined,
@@ -360,16 +412,14 @@ export default function PropertyDetailV2Page() {
     setActiveDataset(nextDs);
   };
 
-  // ✅ URL 동기화: ds, p, s만 반영 (view는 로컬 상태로만 유지하여 탭 전환 시 불필요한 URL 변경 방지)
+  // ✅ URL 동기화: ds만 반영 (p/s는 내부 상태로만 유지)
   useEffect(() => {
     try {
       const current = new URLSearchParams(searchParams?.toString() || "");
       current.set("ds", activeDataset);
-      current.set("p", String(pageNum));
-      current.set("s", String(pageSize));
       router.replace(`?${current.toString()}`, { scroll: false });
     } catch {}
-  }, [activeDataset, pageNum, pageSize]);
+  }, [activeDataset]);
 
   // 전환 직후 스크롤 복원
   useEffect(() => {
@@ -616,7 +666,7 @@ export default function PropertyDetailV2Page() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">전체</SelectItem>
-                      {(locations?.provinces || []).map((province) => (
+                      {provinces.map((province) => (
                         <SelectItem key={province} value={province}>
                           {province}
                         </SelectItem>
@@ -643,7 +693,7 @@ export default function PropertyDetailV2Page() {
                       <SelectValue placeholder="시군구 선택" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all">전체</SelectItem>
+                      <SelectItem value="all">선택</SelectItem>
                       {availableCities.map((city) => (
                         <SelectItem key={city} value={city}>
                           {city}
@@ -664,13 +714,13 @@ export default function PropertyDetailV2Page() {
                       const actualValue = value === "all" ? "" : value;
                       setSelectedDistrict(actualValue);
                     }}
-                    disabled={!selectedCity || availableDistricts.length === 0}
+                    disabled
                   >
                     <SelectTrigger className="h-9">
                       <SelectValue placeholder="읍면동 선택" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all">전체</SelectItem>
+                      <SelectItem value="all">선택</SelectItem>
                       {availableDistricts.map((district) => (
                         <SelectItem key={district} value={district}>
                           {district}
@@ -682,6 +732,14 @@ export default function PropertyDetailV2Page() {
               </div>
             </CardContent>
           </Card>
+
+          {/* 안내 배너: 지역 미선택 시 */}
+          {!(selectedProvince && selectedCity) && (
+            <div className="mb-4 rounded-md border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+              지역을 먼저 선택하세요. 시도와 시군구를 선택하면 결과가
+              표시됩니다.
+            </div>
+          )}
 
           {/* 선택된 필터 바 */}
           <SelectedFilterBar
@@ -707,27 +765,40 @@ export default function PropertyDetailV2Page() {
                     (ds) => (
                       <TabsContent key={ds} value={ds} className="mt-4">
                         {ds === "auction_ed" ? (
-                          <AuctionEdSearchResults
-                            activeView={
-                              activeView === "list"
-                                ? "table"
-                                : activeView === "integrated"
-                                ? "both"
-                                : (activeView as "table" | "map" | "both")
-                            }
-                            onViewChange={(view) => {
-                              const mappedView =
-                                view === "both"
-                                  ? "integrated"
-                                  : view === "table"
-                                  ? "list"
-                                  : view;
-                              handleChangeView(mappedView as ViewType);
-                              setPageNum(1);
-                              if (selectedRowKeys.length > 0)
-                                setSelectedRowKeys([]);
-                            }}
-                          />
+                          selectedProvince && selectedCity ? (
+                            <AuctionEdSearchResults
+                              activeView={
+                                activeView === "list"
+                                  ? "table"
+                                  : activeView === "integrated"
+                                  ? "both"
+                                  : (activeView as "table" | "map" | "both")
+                              }
+                              onViewChange={(view) => {
+                                const mappedView =
+                                  view === "both"
+                                    ? "integrated"
+                                    : view === "table"
+                                    ? "list"
+                                    : view;
+                                handleChangeView(mappedView as ViewType);
+                                setPageNum(1);
+                                if (selectedRowKeys.length > 0)
+                                  setSelectedRowKeys([]);
+                              }}
+                            />
+                          ) : (
+                            <ViewState
+                              isLoading={false}
+                              error={undefined}
+                              total={0}
+                              onRetry={() => {}}
+                            >
+                              <div className="py-8 text-center text-gray-500">
+                                표시할 데이터가 없습니다.
+                              </div>
+                            </ViewState>
+                          )
                         ) : ds === "sale" ? (
                           <SaleSearchResults
                             activeView={

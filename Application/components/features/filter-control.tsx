@@ -17,6 +17,7 @@ import {
 import { useFilterStore } from "@/store/filterStore";
 import { useLocationsSimple } from "@/hooks/useLocations";
 import { useItems } from "@/hooks/useItems";
+import { useSpecialRights } from "@/hooks/useSpecialRights";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import {
   ChevronDown,
@@ -127,6 +128,20 @@ export default function FilterControl({
   ) as any;
   const filters: any =
     namespace && nsOverrides ? { ...storeAll, ...nsOverrides } : storeAll;
+
+  // 특수권리 동적 로딩
+  const { specialRights, isLoading: isLoadingSpecialRights } = useSpecialRights(
+    {
+      address_area: filters.province,
+      address_city: filters.cityDistrict,
+    }
+  );
+
+  // 접기/펴기 상태
+  const [isCurrentStatusCollapsed, setIsCurrentStatusCollapsed] =
+    useState(true);
+  const [isSpecialRightsCollapsed, setIsSpecialRightsCollapsed] =
+    useState(true);
   // 네임스페이스 라우팅 래퍼
   const setFilter = (key: any, value: any) => {
     if (namespace && typeof setNsFilter === "function") {
@@ -1527,136 +1542,186 @@ export default function FilterControl({
 
               {/* 현재상태 */}
               <div>
-                <div className="flex items-center space-x-2 mb-3">
+                <div className="flex items-center justify-between mb-3">
                   <Label className="text-sm font-medium">현재상태</Label>
+                  <button
+                    onClick={() =>
+                      setIsCurrentStatusCollapsed(!isCurrentStatusCollapsed)
+                    }
+                    className="text-xs text-gray-500 hover:text-gray-700 flex items-center gap-1"
+                  >
+                    {isCurrentStatusCollapsed ? "펴기" : "접기"}
+                    <span
+                      className={`transform transition-transform ${
+                        isCurrentStatusCollapsed ? "rotate-0" : "rotate-180"
+                      }`}
+                    >
+                      ▼
+                    </span>
+                  </button>
                 </div>
-                <div className="flex flex-wrap gap-2">
-                  {[
-                    { value: "all", label: "전체" },
-                    { value: "신건", label: "신건" },
-                    { value: "유찰", label: "유찰" },
-                    { value: "재진행", label: "재진행" },
-                    { value: "변경", label: "변경" },
-                    { value: "재매각", label: "재매각" },
-                    { value: "취하", label: "취하" },
-                    { value: "낙찰", label: "낙찰" },
-                  ].map((option) => {
-                    const current = (filters as any).currentStatus as
-                      | string
-                      | string[]
-                      | undefined;
-                    const isAll = option.value === "all";
-                    const isActive = Array.isArray(current)
-                      ? current.includes(option.value)
-                      : current === option.value;
-                    return (
-                      <button
-                        key={option.value}
-                        onClick={() => {
-                          if (isAll) {
-                            setFilter("currentStatus" as any, "all");
-                            return;
-                          }
-                          const prev = (filters as any).currentStatus;
-                          if (Array.isArray(prev)) {
-                            const next = isActive
-                              ? prev.filter((v) => v !== option.value)
-                              : [...prev, option.value];
-                            setFilter(
-                              "currentStatus" as any,
-                              next.length === 0 ? ("all" as any) : (next as any)
-                            );
-                          } else if (!prev || prev === "all") {
-                            setFilter(
-                              "currentStatus" as any,
-                              [option.value] as any
-                            );
-                          } else {
-                            setFilter(
-                              "currentStatus" as any,
-                              [prev, option.value] as any
-                            );
-                          }
-                        }}
-                        disabled={!isLocationSelected}
-                        className={`px-2 py-1 text-xs rounded-md border transition-colors ${
-                          isActive
-                            ? "bg-blue-500 text-white border-blue-500"
-                            : "bg-white text-gray-700 border-gray-300 hover:border-blue-300 hover:bg-blue-50"
-                        } ${
-                          !isLocationSelected
-                            ? "opacity-50 cursor-not-allowed"
-                            : ""
-                        }`}
-                      >
-                        {option.label}
-                      </button>
-                    );
-                  })}
-                </div>
+                {!isCurrentStatusCollapsed && (
+                  <div className="flex flex-wrap gap-2">
+                    {[
+                      { value: "all", label: "전체" },
+                      { value: "신건", label: "신건" },
+                      { value: "유찰", label: "유찰" },
+                      { value: "재진행", label: "재진행" },
+                      { value: "변경", label: "변경" },
+                      { value: "재매각", label: "재매각" },
+                      { value: "취하", label: "취하" },
+                      { value: "낙찰", label: "낙찰" },
+                    ].map((option) => {
+                      const current = (filters as any).currentStatus as
+                        | string
+                        | string[]
+                        | undefined;
+                      const isAll = option.value === "all";
+                      const isActive = Array.isArray(current)
+                        ? current.includes(option.value)
+                        : current === option.value;
+                      return (
+                        <button
+                          key={option.value}
+                          onClick={() => {
+                            if (isAll) {
+                              setFilter("currentStatus" as any, "all");
+                              return;
+                            }
+                            const prev = (filters as any).currentStatus;
+                            if (Array.isArray(prev)) {
+                              const next = isActive
+                                ? prev.filter((v) => v !== option.value)
+                                : [...prev, option.value];
+                              setFilter(
+                                "currentStatus" as any,
+                                next.length === 0
+                                  ? ("all" as any)
+                                  : (next as any)
+                              );
+                            } else if (!prev || prev === "all") {
+                              setFilter(
+                                "currentStatus" as any,
+                                [option.value] as any
+                              );
+                            } else {
+                              setFilter(
+                                "currentStatus" as any,
+                                [prev, option.value] as any
+                              );
+                            }
+                          }}
+                          disabled={!isLocationSelected}
+                          className={`px-2 py-1 text-xs rounded-md border transition-colors ${
+                            isActive
+                              ? "bg-blue-500 text-white border-blue-500"
+                              : "bg-white text-gray-700 border-gray-300 hover:border-blue-300 hover:bg-blue-50"
+                          } ${
+                            !isLocationSelected
+                              ? "opacity-50 cursor-not-allowed"
+                              : ""
+                          }`}
+                        >
+                          {option.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
 
-              {/* 특수조건 (불리언) */}
+              {/* 특수권리 (동적) */}
               <div>
-                <div className="flex items-center space-x-2 mb-3">
-                  <Label className="text-sm font-medium">특수조건</Label>
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center space-x-2">
+                    <Label className="text-sm font-medium">특수권리</Label>
+                    {isLoadingSpecialRights && (
+                      <span className="text-xs text-gray-500">로딩 중...</span>
+                    )}
+                  </div>
+                  <button
+                    onClick={() =>
+                      setIsSpecialRightsCollapsed(!isSpecialRightsCollapsed)
+                    }
+                    className="text-xs text-gray-500 hover:text-gray-700 flex items-center gap-1"
+                  >
+                    {isSpecialRightsCollapsed ? "펴기" : "접기"}
+                    <span
+                      className={`transform transition-transform ${
+                        isSpecialRightsCollapsed ? "rotate-0" : "rotate-180"
+                      }`}
+                    >
+                      ▼
+                    </span>
+                  </button>
                 </div>
-                <div className="flex flex-wrap gap-2">
-                  {[
-                    {
-                      ko: "대항력있는임차인",
-                      key: "tenant_with_opposing_power",
-                    },
-                    {
-                      ko: "HUG인수조건변경",
-                      key: "hug_acquisition_condition_change",
-                    },
-                    { ko: "선순위임차권", key: "senior_lease_right" },
-                    { ko: "재매각", key: "resale" },
-                    { ko: "지분매각", key: "partial_sale" },
-                    { ko: "공동담보", key: "joint_collateral" },
-                    { ko: "별도등기", key: "separate_registration" },
-                    { ko: "유치권", key: "lien" },
-                    { ko: "위반건축물", key: "illegal_building" },
-                    { ko: "전세권매각", key: "lease_right_sale" },
-                    { ko: "대지권미등기", key: "land_right_unregistered" },
-                  ].map((opt) => {
-                    const current = (filters as any).specialBooleanFlags as
-                      | string[]
-                      | undefined;
-                    const isActive = Array.isArray(current)
-                      ? current.includes(opt.key)
-                      : false;
-                    return (
-                      <button
-                        key={opt.key}
-                        onClick={() => {
-                          const prev = (filters as any).specialBooleanFlags as
-                            | string[]
-                            | undefined;
-                          const next = Array.isArray(prev)
-                            ? isActive
-                              ? prev.filter((v) => v !== opt.key)
-                              : [...prev, opt.key]
-                            : [opt.key];
-                          setFilter("specialBooleanFlags" as any, next as any);
-                        }}
-                        disabled={!isLocationSelected}
-                        className={`px-2 py-1 text-xs rounded-md border transition-colors ${
-                          isActive
-                            ? "bg-blue-500 text-white border-blue-500"
-                            : "bg-white text-gray-700 border-gray-300 hover:border-blue-300 hover:bg-blue-50"
-                        } ${
-                          !isLocationSelected
-                            ? "opacity-50 cursor-not-allowed"
-                            : ""
-                        }`}
-                      >
-                        {opt.ko}
-                      </button>
-                    );
-                  })}
-                </div>
+                {!isSpecialRightsCollapsed && (
+                  <div className="flex flex-wrap gap-2">
+                    {/* 전체 버튼 */}
+                    <button
+                      onClick={() => {
+                        setFilter("specialRights" as any, [] as any);
+                      }}
+                      disabled={!isLocationSelected}
+                      className={`px-2 py-1 text-xs rounded-md border transition-colors ${
+                        !Array.isArray((filters as any).specialRights) || 
+                        ((filters as any).specialRights as string[]).length === 0
+                          ? "bg-purple-500 text-white border-purple-500"
+                          : "bg-white text-gray-700 border-gray-300 hover:border-purple-300 hover:bg-purple-50"
+                      } ${
+                        !isLocationSelected
+                          ? "opacity-50 cursor-not-allowed"
+                          : ""
+                      }`}
+                    >
+                      전체
+                    </button>
+                    {specialRights && specialRights.length > 0 ? (
+                      specialRights.map((right) => {
+                        const current = (filters as any).specialRights as
+                          | string[]
+                          | undefined;
+                        const isActive = Array.isArray(current)
+                          ? current.includes(right)
+                          : false;
+                        return (
+                          <button
+                            key={right}
+                            onClick={() => {
+                              const prev = (filters as any).specialRights as
+                                | string[]
+                                | undefined;
+                              const next = Array.isArray(prev)
+                                ? isActive
+                                  ? prev.filter((v) => v !== right)
+                                  : [...prev, right]
+                                : [right];
+                              setFilter("specialRights" as any, next as any);
+                            }}
+                            disabled={!isLocationSelected}
+                            className={`px-2 py-1 text-xs rounded-md border transition-colors ${
+                              isActive
+                                ? "bg-purple-500 text-white border-purple-500"
+                                : "bg-white text-gray-700 border-gray-300 hover:border-purple-300 hover:bg-purple-50"
+                            } ${
+                              !isLocationSelected
+                                ? "opacity-50 cursor-not-allowed"
+                                : ""
+                            }`}
+                          >
+                            {right}
+                          </button>
+                        );
+                      })
+                    ) : (
+                      !isLoadingSpecialRights && (
+                        <span className="text-xs text-gray-500">
+                          특수권리 없음
+                        </span>
+                      )
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* 검색바 */}
