@@ -8,15 +8,19 @@ import dynamic from "next/dynamic";
 const ItemTable = dynamic(() => import("@/components/features/item-table"), {
   ssr: false,
 });
-const ItemTableVirtual = dynamic(
-  () => import("@/components/features/item-table-virtual"),
-  { ssr: false }
-);
+// 가상 테이블 사용 제거
 import MapView from "@/components/features/map-view";
 
 import { useFilterStore } from "@/store/filterStore";
 import { useSortableColumns } from "@/hooks/useSortableColumns";
 import { useFeatureFlags } from "@/lib/featureFlags";
+import { MAP_GUARD, BACKEND_MAX_PAGE_SIZE } from "@/lib/map/config";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+  TooltipProvider,
+} from "@/components/ui/tooltip";
 import { formatArea, m2ToPyeong } from "@/lib/units";
 import { useDataset } from "@/hooks/useDataset";
 import { datasetConfigs } from "@/datasets/registry";
@@ -83,7 +87,7 @@ export default function AuctionEdSearchResults({
   const { lat, lng, south, west, north, east, radius_km, ...otherFilters } =
     mergedFilters as any;
 
-  // auction_ed에서는 좌표 기반 필터링 비활성화
+  // auction_ed에서는 좌표 기반 필터링 비활성화하되 정렬 파라미터는 유지
   const filters = {
     ...otherFilters,
     // 좌표 관련 값들을 명시적으로 undefined로 설정
@@ -94,6 +98,9 @@ export default function AuctionEdSearchResults({
     north: undefined,
     east: undefined,
     radius_km: undefined,
+    // 정렬 파라미터는 명시적으로 포함
+    sortBy: (mergedFilters as any)?.sortBy,
+    sortOrder: (mergedFilters as any)?.sortOrder,
   };
   const setPage = useFilterStore((s: any) => s.setPage);
   const setSize = useFilterStore((s: any) => s.setSize);
@@ -127,6 +134,8 @@ export default function AuctionEdSearchResults({
         Array.isArray((filters as any)?.bidCountRange) ||
         Array.isArray((filters as any)?.dateRange) ||
         Boolean((filters as any)?.searchQuery),
+      sortBy: filters?.sortBy,
+      sortOrder: filters?.sortOrder,
     });
   }
   const hasArea = Array.isArray((filters as any)?.areaRange);
@@ -136,9 +145,10 @@ export default function AuctionEdSearchResults({
   const hasSort = Boolean(
     (filters as any)?.sortBy && (filters as any)?.sortOrder
   );
-  // auction_ed는 지역 필터 + 매각가 필터를 서버에서 처리, 나머지는 클라이언트 필터링
-  // 지역 필터(province, cityDistrict, town)와 매각가 필터(priceRange)는 서버에서 처리되므로 클라이언트에서 제외
-  const needsClientProcessing = hasArea || hasBids || hasDates || hasSearch;
+  // auction_ed는 지역/가격은 서버 처리, 그 외(또는 정렬 활성 시)는 클라이언트 처리
+  // 정렬 활성 시에는 전역 정렬을 보장하기 위해 클라이언트 파이프라인을 사용
+  const needsClientProcessing =
+    hasSort || hasArea || hasBids || hasDates || hasSearch;
 
   // 우측 필터 패널의 상세 필터가 적용되었는지 확인
   const hasDetailFilters =
@@ -153,8 +163,8 @@ export default function AuctionEdSearchResults({
     Boolean((filters as any)?.saleDateFrom) ||
     Boolean((filters as any)?.saleDateTo);
 
-  // auction_ed는 지역 필터가 서버에서 처리되므로 항상 서버 페이지네이션 사용
-  // 클라이언트 필터링은 각 페이지 내에서만 적용
+  // 지도 추가 수집은 별도 처리하고, 기본 데이터는 항상 현재 페이지/사이즈로 요청
+  const wantAllForMap = activeView !== "table";
   const requestPage = page;
   const requestSize = size;
 
@@ -184,25 +194,108 @@ export default function AuctionEdSearchResults({
     1 // 항상 1개만 가져와서 총 개수만 확인
   );
 
-  // auction_ed는 모든 필터를 서버에서 처리하므로 클라이언트 필터링 비활성화
+  // 필요 시 클라이언트 필터링 (현재 상세필터는 서버 위임, 유지)
   const applyDetailFilters = (itemsToFilter: any[]) => {
-    // auction_ed는 항상 서버 필터링만 사용
     return itemsToFilter || [];
   };
 
   // 현재 페이지 데이터에 상세 필터링 적용
   const items = applyDetailFilters(rawItems) || [];
 
-  // auction_ed는 서버에서 모든 필터링을 처리하므로 서버 총 개수를 사용
-  const detailFilteredTotal = serverTotal || 0;
+  // 정렬은 서버에서 처리하므로 클라이언트에서는 그대로 사용
+  const processedItems = items;
 
-  // auction_ed는 서버에서 정렬과 페이징을 모두 처리하므로 클라이언트 처리 불필요
-  const processedItems = items; // 서버에서 이미 정렬된 데이터 사용
+  // 총 개수는 항상 서버 total 사용 (정렬 시에도 유지)
   const effectiveTotal = serverTotal || 0;
-  const pagedItems = processedItems; // 서버에서 이미 페이지네이션된 데이터 사용
+  const pagedItems = processedItems;
 
-  // 지도는 현재 페이지의 데이터 사용
-  const mapItems = pagedItems;
+  // 지도는 전체(요청된 범위 내) 데이터 사용 + 필요 시 추가 페이지 병합
+  const [extraMapItems, setExtraMapItems] = useState<any[]>([]);
+  const [isFetchingMore, setIsFetchingMore] = useState<boolean>(false);
+  const markerCaps = [100, 500, 1000, 3000] as const;
+  const [maxMarkersCap, setMaxMarkersCap] = useState<number>(500);
+  const nextCap = () => {
+    const idx = markerCaps.indexOf(maxMarkersCap as any);
+    const next = markerCaps[(idx + 1) % markerCaps.length];
+    setMaxMarkersCap(next);
+  };
+
+  useEffect(() => {
+    // 추가 페이지 병합 로직: 지도/통합 뷰에서만, 첫 요청 완료 후 수행
+    let ignore = false;
+    async function loadMorePages() {
+      try {
+        if (!wantAllForMap) return;
+        if (!Array.isArray(items) || items.length === 0) {
+          setExtraMapItems([]);
+          return;
+        }
+        const maxToCollect = Math.min(
+          MAP_GUARD.maxMarkers,
+          maxMarkersCap,
+          typeof effectiveTotal === "number" && effectiveTotal > 0
+            ? effectiveTotal
+            : items.length
+        );
+        const pageSize = BACKEND_MAX_PAGE_SIZE;
+        const totalPages = Math.ceil(maxToCollect / pageSize);
+        if (totalPages <= 1) {
+          setExtraMapItems([]);
+          return;
+        }
+        setIsFetchingMore(true);
+        const api = datasetConfigs["auction_ed"].api;
+        const all: any[] = [];
+        // 페이지 2..N 요청 (직렬로 안정성 우선)
+        for (let p = 2; p <= totalPages; p++) {
+          const res = await (api as any).fetchList({
+            filters: mergedFilters,
+            page: p,
+            size: pageSize,
+          });
+          if (ignore) return;
+          const batch: any[] = Array.isArray(res)
+            ? res
+            : res?.results ?? res?.items ?? [];
+          all.push(...batch);
+          // 상한을 넘지 않도록 조기 종료
+          if (items.length + all.length >= maxToCollect) break;
+        }
+        if (!ignore) setExtraMapItems(all);
+      } catch {
+        if (!ignore) setExtraMapItems([]);
+      } finally {
+        if (!ignore) setIsFetchingMore(false);
+      }
+    }
+    loadMorePages();
+    return () => {
+      ignore = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    wantAllForMap,
+    JSON.stringify(mergedFilters),
+    requestSize,
+    effectiveTotal,
+    items?.length,
+    maxMarkersCap,
+  ]);
+
+  // 지도 전용 아이템(표시 상한/추가 페이지 병합)과 테이블 전용 아이템(전체)을 분리
+  const tableItemsAll = processedItems; // 목록은 상한 없이 전체
+  const mapItemsAll = wantAllForMap
+    ? [...processedItems, ...extraMapItems]
+    : processedItems;
+  const mapItems = (() => {
+    const list = [...mapItemsAll];
+    list.sort((a: any, b: any) => {
+      const at = a?.sale_date ? new Date(a.sale_date).getTime() : 0;
+      const bt = b?.sale_date ? new Date(b.sale_date).getTime() : 0;
+      return bt - at;
+    });
+    return list.slice(0, Math.min(MAP_GUARD.maxMarkers, maxMarkersCap));
+  })();
 
   // 테이블 기능을 위한 추가 상태들
   const {
@@ -215,13 +308,12 @@ export default function AuctionEdSearchResults({
   const sortBy = useFilterStore((s: any) => s.sortBy);
   const sortOrder = useFilterStore((s: any) => s.sortOrder);
   const featureFlags: any = useFeatureFlags();
-  const useVirtual: boolean = !!(featureFlags as any)?.useVirtual;
+  const useVirtual: boolean = false;
   const areaDisplay = (featureFlags as any)?.areaDisplay;
-  const selectedRowKeys = useFilterStore(
-    (s: any) => s.selectedRowKeys ?? EMPTY_ARRAY
-  );
-  const setSelectedRowKeys = useFilterStore(
-    (s: any) => s.setSelectedRowKeys ?? NOOP
+  const selectedIds = useFilterStore((s: any) => s.selectedIds ?? EMPTY_ARRAY);
+  const setSelectedIds = useFilterStore((s: any) => s.setSelectedIds ?? NOOP);
+  const setPendingMapTarget = useFilterStore(
+    (s: any) => s.setPendingMapTarget ?? NOOP
   );
 
   // auction_ed 데이터셋 설정 가져오기
@@ -230,20 +322,18 @@ export default function AuctionEdSearchResults({
 
   // 서버에서 제공하는 정렬 가능 컬럼 목록은 위 useSortableColumns 호출로 수신
 
-  // 정렬 핸들러
+  // 정렬 핸들러: 서버에 위임(상태만 갱신)
   const handleSort = (column?: string, direction?: "asc" | "desc"): void => {
     const key = column ?? "";
     const order = direction ?? "asc";
-    if (
-      !key ||
-      (Array.isArray(sortableColumns) &&
-        sortableColumns.length > 0 &&
-        !sortableColumns.includes(key))
-    ) {
+    if (process.env.NODE_ENV === "development") {
+      console.log("[v2 SortClick] 요청:", { key, order });
+    }
+    if (!key) {
+      setSortConfig(undefined as any, undefined as any);
       return;
     }
     setSortConfig(key, order);
-    setPage(1);
   };
 
   const handleExport = () => {
@@ -328,13 +418,54 @@ export default function AuctionEdSearchResults({
               </TabsTrigger>
             </TabsList>
           </Tabs>
+          {activeView !== "table" && (
+            <div className="mt-3 flex items-center gap-3 text-xs text-gray-600">
+              <div className="flex items-center gap-2">
+                <span className="text-gray-700">표시 상한</span>
+                <select
+                  className="h-7 rounded border px-2 bg-white"
+                  value={String(maxMarkersCap)}
+                  onChange={(e) => setMaxMarkersCap(parseInt(e.target.value))}
+                >
+                  {[100, 300, 500, 1000, 2000, 3000].map((v) => (
+                    <option key={v} value={v}>
+                      {v.toLocaleString()}개
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <TooltipProvider delayDuration={0}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span
+                      className="inline-flex h-5 w-5 items-center justify-center rounded-full border text-gray-600 cursor-help select-none"
+                      aria-label="도움말"
+                    >
+                      ?
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent
+                    side="bottom"
+                    align="start"
+                    className="bg-white text-gray-800 border border-gray-200 shadow-md max-w-[280px]"
+                  >
+                    최대 마커 개수를 설정합니다.
+                    <br />
+                    너무 크게 선택하면 브라우저가 느려질 수 있어요.
+                    <br />
+                    최신 매각기일부터 우선 표시합니다.
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
+          )}
         </div>
 
         <div className="p-4">
           {/* 로딩, 에러, 빈 상태 처리 */}
-          {isLoading || error || items.length === 0 ? (
+          {(isLoading && items.length === 0) || error || items.length === 0 ? (
             <ViewState
-              isLoading={isLoading}
+              isLoading={isLoading && items.length === 0}
               error={error}
               total={items.length}
               onRetry={refetch}
@@ -351,21 +482,7 @@ export default function AuctionEdSearchResults({
             <>
               {activeView === "table" && (
                 <div className="space-y-4">
-                  {useVirtual ? (
-                    <ItemTableVirtual
-                      items={pagedItems as any}
-                      isLoading={false}
-                      error={undefined}
-                      sortBy={sortBy as any}
-                      sortOrder={sortOrder as any}
-                      onSort={handleSort}
-                      selectedRowKeys={selectedRowKeys}
-                      onSelectionChange={setSelectedRowKeys}
-                      containerHeight={560}
-                      rowHeight={44}
-                      overscan={8}
-                    />
-                  ) : (
+                  {
                     <ItemTable
                       items={pagedItems as any}
                       isLoading={false}
@@ -400,14 +517,16 @@ export default function AuctionEdSearchResults({
                       sortBy={sortBy as any}
                       sortOrder={sortOrder as any}
                       onSort={handleSort}
-                      selectedRowKeys={selectedRowKeys}
-                      onSelectionChange={setSelectedRowKeys}
+                      selectedRowKeys={selectedIds as any}
+                      onSelectionChange={(keys) =>
+                        setSelectedIds(keys.map((k) => String(k)))
+                      }
                       totalCount={effectiveTotal || 0}
                       page={page}
                       pageSize={size}
                       onPageChange={(p) => setPage(p)}
                     />
-                  )}
+                  }
 
                   {/* 테이블 뷰 페이지네이션 컨트롤 */}
                   <div className="mt-6 space-y-4">
@@ -560,8 +679,14 @@ export default function AuctionEdSearchResults({
               )}
 
               {activeView === "map" && (
-                <div style={{ height: "600px" }}>
-                  <MapView items={mapItems} namespace="auction_ed" />
+                <div className="h-[calc(100vh-240px)]">
+                  <MapView
+                    items={mapItems}
+                    namespace="auction_ed"
+                    highlightIds={(selectedIds || []).map((k: any) =>
+                      String(k)
+                    )}
+                  />
                 </div>
               )}
 
@@ -570,29 +695,21 @@ export default function AuctionEdSearchResults({
                   {/* 지도 섹션 */}
                   <div className="space-y-4">
                     <h3 className="text-lg font-semibold">지도 보기</h3>
-                    <div style={{ height: "400px" }}>
-                      <MapView items={mapItems} namespace="auction_ed" />
+                    <div className="h-[calc(100vh-360px)]">
+                      <MapView
+                        items={mapItems}
+                        namespace="auction_ed"
+                        highlightIds={(selectedIds || []).map((k: any) =>
+                          String(k)
+                        )}
+                      />
                     </div>
                   </div>
 
                   {/* 테이블 섹션 */}
                   <div className="space-y-4">
                     <h3 className="text-lg font-semibold">목록 보기</h3>
-                    {useVirtual ? (
-                      <ItemTableVirtual
-                        items={pagedItems as any}
-                        isLoading={false}
-                        error={undefined}
-                        sortBy={sortBy as any}
-                        sortOrder={sortOrder as any}
-                        onSort={handleSort}
-                        selectedRowKeys={selectedRowKeys}
-                        onSelectionChange={setSelectedRowKeys}
-                        containerHeight={400}
-                        rowHeight={44}
-                        overscan={8}
-                      />
-                    ) : (
+                    {
                       <ItemTable
                         items={pagedItems as any}
                         isLoading={false}
@@ -627,14 +744,73 @@ export default function AuctionEdSearchResults({
                         sortBy={sortBy as any}
                         sortOrder={sortOrder as any}
                         onSort={handleSort}
-                        selectedRowKeys={selectedRowKeys}
-                        onSelectionChange={setSelectedRowKeys}
+                        selectedRowKeys={selectedIds as any}
+                        onSelectionChange={(keys) => {
+                          const prev = new Set(
+                            (selectedIds || []).map((k: any) => String(k))
+                          );
+                          const now = new Set(keys.map((k) => String(k)));
+                          let added: string | undefined;
+                          now.forEach((k) => {
+                            if (!prev.has(String(k))) added = String(k);
+                          });
+                          setSelectedIds(Array.from(now));
+                          if (added && activeView === "both") {
+                            // 최신 선택 항목을 지도 중심으로 이동 (통합 탭에서 지도도 렌더링 중)
+                            const id = added;
+                            const sources: any[] = [
+                              ...mapItemsAll, // 지도에 표시되는 집합(상한 적용)
+                              ...tableItemsAll, // 목록 전체(상한 없음)
+                              ...extraMapItems,
+                              ...items,
+                            ];
+                            const found = sources.find(
+                              (r: any) => String(r?.id ?? "") === id
+                            );
+                            const latRaw =
+                              found?.lat ??
+                              found?.latitude ??
+                              (found as any)?.lat_y ??
+                              (found as any)?.y;
+                            const lngRaw =
+                              found?.lng ??
+                              found?.longitude ??
+                              (found as any)?.lon ??
+                              (found as any)?.x;
+                            const lat =
+                              typeof latRaw === "number"
+                                ? latRaw
+                                : parseFloat(String(latRaw));
+                            const lng =
+                              typeof lngRaw === "number"
+                                ? lngRaw
+                                : parseFloat(String(lngRaw));
+                            if (Number.isFinite(lat) && Number.isFinite(lng)) {
+                              setPendingMapTarget({ lat, lng });
+                            } else {
+                              // 지도 상한/좌표 결측으로 마커가 없을 수 있음
+                              try {
+                                // 동적 임포트 없이 직접 불러오기
+                                // eslint-disable-next-line @typescript-eslint/no-var-requires
+                                const mod = require("@/components/ui/use-toast");
+                                const show = mod?.toast as
+                                  | ((opts: any) => any)
+                                  | undefined;
+                                show?.({
+                                  title: "지도의 마커를 찾을 수 없습니다",
+                                  description:
+                                    "표시 상한 또는 좌표 결측으로 지도에 보이지 않을 수 있어요. 상한을 늘리거나 필터를 좁혀보세요.",
+                                });
+                              } catch {}
+                            }
+                          }
+                        }}
                         totalCount={effectiveTotal || 0}
                         page={page}
                         pageSize={size}
                         onPageChange={(p) => setPage(p)}
                       />
-                    )}
+                    }
 
                     {/* 통합 뷰 페이지네이션 컨트롤 */}
                     <div className="mt-6 space-y-4">

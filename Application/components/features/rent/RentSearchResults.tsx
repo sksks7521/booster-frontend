@@ -100,7 +100,6 @@ export default function RentSearchResults({
       return;
     }
     setSortConfig(key, order);
-    setPage(1);
   };
 
   const handleExport = () => {

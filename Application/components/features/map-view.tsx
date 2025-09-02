@@ -981,8 +981,14 @@ function MapView({
 
     // 최대 N개만 표시(성능 보호) - 면적 상한과 분리된 표시 상한 사용
     const MAX = MAP_GUARD.maxMarkers;
-    const slice = items.slice(0, MAX);
+    // 좌표 결측 제외 + 상한 적용
+    const filtered = items.filter(
+      (it: any) =>
+        (it?.lat ?? it?.latitude) != null && (it?.lng ?? it?.longitude) != null
+    );
+    const slice = filtered.slice(0, MAX);
     const toAdd: any[] = [];
+    let missingCoords = items.length - filtered.length;
     slice.forEach((it: any) => {
       const latRaw = it?.lat ?? it?.latitude;
       const lngRaw = it?.lng ?? it?.longitude;
@@ -1446,6 +1452,37 @@ function MapView({
     } catch {}
   }, [mapReady, provider]);
 
+  // 외부에서 설정한 pendingMapTarget으로 지도 중심 이동 (즉시 반응)
+  const pendingMapTarget = (useFilterStore as any)?.(
+    (s: any) => s.pendingMapTarget
+  );
+  const clearPendingMapTarget = (useFilterStore as any)?.(
+    (s: any) => s.setPendingMapTarget
+  );
+  useEffect(() => {
+    if (!mapReady || provider !== "kakao") return;
+    if (!pendingMapTarget) return;
+    try {
+      const map = kakaoMapRef.current as any;
+      if (!map) return;
+      const w = window as any;
+      const latlng = new w.kakao.maps.LatLng(
+        pendingMapTarget.lat,
+        pendingMapTarget.lng
+      );
+      map.setCenter(latlng);
+      if (typeof map.setLevel === "function") map.setLevel(4);
+      lastCenterRef.current = {
+        lat: pendingMapTarget.lat,
+        lng: pendingMapTarget.lng,
+      };
+      setCenterCoord({ lat: pendingMapTarget.lat, lng: pendingMapTarget.lng });
+      if (typeof clearPendingMapTarget === "function") {
+        clearPendingMapTarget(null);
+      }
+    } catch {}
+  }, [pendingMapTarget, mapReady, provider]);
+
   // mapReady 시 마지막 중심 좌표로 초기 표시 (provider 무관)
   useEffect(() => {
     if (!mapReady) return;
@@ -1499,7 +1536,7 @@ function MapView({
 
   const containerClass = isFullscreen
     ? "fixed inset-0 z-50 bg-white"
-    : "relative w-full h-[1000px]";
+    : "relative w-full h-full overflow-hidden";
 
   return (
     <div className={containerClass}>
@@ -1629,9 +1666,33 @@ function MapView({
           VWorld 키 누락: NEXT_PUBLIC_VWORLD_API_KEY 설정 필요
         </div>
       )}
-      {/* 임시: 우상단에 아이템 개수/선택 안내 */}
+      {/* 우하단 안내: 지도 표시/총/좌표없음 */}
       <div className="absolute bottom-2 right-2 rounded bg-white/90 px-2 py-1 text-xs text-gray-700 shadow">
-        항목 {items.length}개
+        표시{" "}
+        {Math.min(
+          items.filter(
+            (it: any) =>
+              (it?.lat ?? it?.latitude) != null &&
+              (it?.lng ?? it?.longitude) != null
+          ).length,
+          MAP_GUARD.maxMarkers
+        )}{" "}
+        / 총 {items.length}
+        {items.length > 0 && (
+          <span className="ml-2 text-gray-500">
+            좌표없음{" "}
+            {Math.max(
+              0,
+              items.length -
+                items.filter(
+                  (it: any) =>
+                    (it?.lat ?? it?.latitude) != null &&
+                    (it?.lng ?? it?.longitude) != null
+                ).length
+            )}
+            개
+          </span>
+        )}
       </div>
       {/* 우하단: 중심/마우스 좌표 표시 + 줌 버튼 */}
       <div className="absolute right-2 bottom-[21px] z-10">

@@ -54,6 +54,12 @@ const extractBuildYear = (r: any): number | undefined =>
     )
   );
 
+// 정렬 키 매핑: camelCase → snake_case (백엔드 정렬 파라미터 요구 형식)
+const camelToSnake = (value: unknown): string | undefined => {
+  if (typeof value !== "string") return undefined;
+  return value.replace(/([A-Z])/g, "_$1").toLowerCase();
+};
+
 const extractLatLng = (r: any): { lat?: number; lng?: number } => {
   const latRaw = pickFirst(
     r?.lat,
@@ -191,12 +197,18 @@ export const datasetConfigs: Record<DatasetId, DatasetConfig> = {
           }
         }
 
-        // 매각기일 필터 추가
-        if (serverFilters?.auctionDateFrom) {
-          mappedFilters.sale_date_from = serverFilters.auctionDateFrom;
-        }
-        if (serverFilters?.auctionDateTo) {
-          mappedFilters.sale_date_to = serverFilters.auctionDateTo;
+        // 매각년도(saleYear) 또는 매각기일 범위 매핑
+        if ((filters as any)?.saleYear) {
+          const y = String((filters as any).saleYear);
+          mappedFilters.sale_date_from = `${y}-01-01`;
+          mappedFilters.sale_date_to = `${y}-12-31`;
+        } else {
+          if (serverFilters?.auctionDateFrom) {
+            mappedFilters.sale_date_from = serverFilters.auctionDateFrom;
+          }
+          if (serverFilters?.auctionDateTo) {
+            mappedFilters.sale_date_to = serverFilters.auctionDateTo;
+          }
         }
 
         // 건축면적 필터 추가 (평 단위)
@@ -303,13 +315,27 @@ export const datasetConfigs: Record<DatasetId, DatasetConfig> = {
             mappedFilters.road_address_search = serverFilters.searchQuery;
           } else if (serverFilters.searchField === "case_number") {
             mappedFilters.case_number_search = serverFilters.searchQuery;
+          } else if (serverFilters.searchField === "address") {
+            // 주소 검색 - 백엔드에서 지원하는 파라미터명 확인 필요
+            mappedFilters.address_search = serverFilters.searchQuery;
           }
         }
 
         // 정렬 파라미터 추가 (서버에서 처리)
         if (filters?.sortBy && filters?.sortOrder) {
-          mappedFilters.sort_by = (filters as any).sortBy;
-          mappedFilters.sort_order = (filters as any).sortOrder;
+          const serverKey = camelToSnake((filters as any).sortBy);
+          if (serverKey) {
+            const order: string = (filters as any).sortOrder;
+            const ordering = `${order === "desc" ? "-" : ""}${serverKey}`;
+            (mappedFilters as any).ordering = ordering;
+            if (process.env.NODE_ENV === "development") {
+              console.log("[buildListKey] sort params:", {
+                ordering,
+                page,
+                size,
+              });
+            }
+          }
         }
 
         return [
@@ -379,12 +405,18 @@ export const datasetConfigs: Record<DatasetId, DatasetConfig> = {
           }
         }
 
-        // 매각기일 필터 추가
-        if (serverFilters?.auctionDateFrom) {
-          mappedFilters.sale_date_from = serverFilters.auctionDateFrom;
-        }
-        if (serverFilters?.auctionDateTo) {
-          mappedFilters.sale_date_to = serverFilters.auctionDateTo;
+        // 매각년도(saleYear) 또는 매각기일 범위 매핑
+        if ((filters as any)?.saleYear) {
+          const y = String((filters as any).saleYear);
+          mappedFilters.sale_date_from = `${y}-01-01`;
+          mappedFilters.sale_date_to = `${y}-12-31`;
+        } else {
+          if (serverFilters?.auctionDateFrom) {
+            mappedFilters.sale_date_from = serverFilters.auctionDateFrom;
+          }
+          if (serverFilters?.auctionDateTo) {
+            mappedFilters.sale_date_to = serverFilters.auctionDateTo;
+          }
         }
 
         // 건축면적 필터 추가 (평 단위)
@@ -491,13 +523,27 @@ export const datasetConfigs: Record<DatasetId, DatasetConfig> = {
             mappedFilters.road_address_search = serverFilters.searchQuery;
           } else if (serverFilters.searchField === "case_number") {
             mappedFilters.case_number_search = serverFilters.searchQuery;
+          } else if (serverFilters.searchField === "address") {
+            // 주소 검색 - 백엔드에서 지원하는 파라미터명 확인 필요
+            mappedFilters.address_search = serverFilters.searchQuery;
           }
         }
 
         // 정렬 파라미터 추가 (서버에서 처리)
         if (filters?.sortBy && filters?.sortOrder) {
-          mappedFilters.sort_by = (filters as any).sortBy;
-          mappedFilters.sort_order = (filters as any).sortOrder;
+          const serverKey = camelToSnake((filters as any).sortBy);
+          if (serverKey) {
+            const order: string = (filters as any).sortOrder;
+            const ordering = `${order === "desc" ? "-" : ""}${serverKey}`;
+            (mappedFilters as any).ordering = ordering;
+            if (process.env.NODE_ENV === "development") {
+              console.log("[fetchList] sort params:", {
+                ordering,
+                page,
+                size,
+              });
+            }
+          }
         }
 
         return auctionApi.getCompleted({

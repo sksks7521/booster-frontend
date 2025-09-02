@@ -54,3 +54,9 @@ export const MAP_GUARD = {
     process.env.NEXT_PUBLIC_MAP_CLUSTER_DEBOUNCE_MS ?? 200
   ),
 } as const;
+
+// 백엔드가 허용하는 페이지 사이즈(한 요청당 최대 개수) 상한
+// 대량 로딩 시 이 값 이내로 분할 요청 권장
+export const BACKEND_MAX_PAGE_SIZE: number = Number(
+  process.env.NEXT_PUBLIC_MAP_BACKEND_MAX_PAGE_SIZE ?? 500
+);

@@ -5,6 +5,22 @@ const PAGE = "analysis";
 const KEY = "column_order";
 
 export function useColumnOrder(defaultOrder: string[]) {
+  // 로컬스토리지 키
+  const LS_KEY = `${PAGE}:${KEY}`;
+
+  // 로컬 우선 값
+  let localInitial: string[] | null = null;
+  try {
+    const raw =
+      typeof window !== "undefined" ? localStorage.getItem(LS_KEY) : null;
+    if (raw) {
+      const arr = JSON.parse(raw);
+      if (Array.isArray(arr) && arr.every((x: any) => typeof x === "string")) {
+        localInitial = arr as string[];
+      }
+    }
+  } catch {}
+
   const { data, isLoading, mutate, error } = useSWR(
     [PAGE, KEY, "user-preferences"],
     async () => {
@@ -63,7 +79,9 @@ export function useColumnOrder(defaultOrder: string[]) {
     Array.isArray(serverValue) &&
     serverValue.every((x: any) => typeof x === "string");
   const order: string[] =
-    isArray && (serverValue as string[]).length > 0
+    localInitial && localInitial.length > 0
+      ? localInitial
+      : isArray && (serverValue as string[]).length > 0
       ? (serverValue as string[])
       : defaultOrder;
 
@@ -78,6 +96,12 @@ export function useColumnOrder(defaultOrder: string[]) {
   (globalThis as any).__col_order_lock_ref = saveLockRef;
 
   const save = async (next: string[]) => {
+    // 로컬스토리지 즉시 반영으로 리마운트 레이스 방지
+    try {
+      if (typeof window !== "undefined") {
+        localStorage.setItem(LS_KEY, JSON.stringify(next));
+      }
+    } catch {}
     if (saveTimerRef.current) {
       clearTimeout(saveTimerRef.current);
     }

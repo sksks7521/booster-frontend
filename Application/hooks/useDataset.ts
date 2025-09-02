@@ -45,9 +45,28 @@ export function useDataset(
       });
 
       return result;
-    } catch (e) {
+    } catch (e: any) {
       // 백엔드 미구현/일시 오류 시에도 UI는 동작하도록 안전 결과 반환
-      console.error("=== API 요청 실패 ===", e);
+      try {
+        const normalizedError = {
+          message: e?.message ?? String(e),
+          status: e?.status ?? e?.response?.status,
+          statusText: e?.statusText ?? e?.response?.statusText,
+          url: e?.url ?? e?.config?.url,
+          code: e?.code,
+          data: e?.data ?? e?.response?.data,
+        };
+        console.error("=== API 요청 실패 ===", {
+          datasetId,
+          key,
+          filters: filtersForQuery,
+          page,
+          size,
+          error: normalizedError,
+        });
+      } catch (logErr) {
+        console.error("=== API 요청 실패(로그중 오류) ===", logErr);
+      }
       return { items: [], total: 0, page, size, _error: e } as any;
     }
   });

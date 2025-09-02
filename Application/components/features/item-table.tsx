@@ -157,10 +157,14 @@ const createColumns = (
   onSort?: (column?: string, direction?: "asc" | "desc") => void,
   getWidth?: (id: string) => number | undefined,
   onResizeColumn?: (id: string, deltaX: number) => void,
-  onAddressClick?: (item: Item) => void
+  onAddressClick?: (item: Item) => void,
+  onBeforeSort?: () => void
 ): ColumnWithId[] => {
   // 🔄 3단계 순환 정렬 로직
   const getNextSortState = (column: string) => {
+    try {
+      onBeforeSort?.();
+    } catch {}
     if (sortBy !== column) {
       // 정렬 없음 → 오름차순
       onSort?.(column, "asc");
@@ -197,6 +201,9 @@ const createColumns = (
   );
 
   const safeHeaderClick = (column: string) => {
+    try {
+      onBeforeSort?.();
+    } catch {}
     if (Date.now() < suppressSortUntil) return;
     getNextSortState(column);
   };
@@ -797,11 +804,71 @@ const ItemTable: React.FC<ItemTableProps> = ({
   getValueForKey,
 }) => {
   // 🎯 컬럼 순서 상태 관리 (드래그앤드롭용)
-  const [columnOrder, setColumnOrder] =
-    React.useState<string[]>(DEFAULT_COLUMN_ORDER);
+  const [columnOrder, setColumnOrder] = React.useState<string[]>(() => {
+    try {
+      if (typeof window !== "undefined") {
+        const raw = localStorage.getItem("analysis:column_order");
+        if (raw) {
+          const arr = JSON.parse(raw);
+          if (
+            Array.isArray(arr) &&
+            arr.every((x: any) => typeof x === "string")
+          ) {
+            return arr as string[];
+          }
+        }
+      }
+    } catch {}
+    return DEFAULT_COLUMN_ORDER as unknown as string[];
+  });
   const { order: serverOrder, save: saveOrder } = useColumnOrder(
     DEFAULT_COLUMN_ORDER as unknown as string[]
   );
+  // 서버/스키마로부터 초기화는 딱 1회만 수행하고, 이후에는 사용자 드래그 우선
+  const didInitOrderRef = React.useRef<boolean>(false);
+  // 로컬 초기화 플래그 (리마운트 시에도 유지)
+  React.useEffect(() => {
+    try {
+      const flag =
+        typeof window !== "undefined" &&
+        localStorage.getItem("it_order_inited");
+      if (flag === "1") didInitOrderRef.current = true;
+    } catch {}
+  }, []);
+
+  // 🔄 수평 스크롤 위치 보존을 위한 참조들
+  const tableContainerRef = React.useRef<HTMLDivElement | null>(null);
+  const lastScrollLeftRef = React.useRef<number | null>(null);
+  const getScrollElement = React.useCallback((): HTMLElement | null => {
+    const root = tableContainerRef.current;
+    if (!root) return null;
+    // Try common antd scroll containers in order
+    const candidates = Array.from(
+      root.querySelectorAll(
+        ".ant-table-body, .ant-table-content, .ant-table-container"
+      )
+    ) as HTMLElement[];
+    for (const el of candidates) {
+      const style = getComputedStyle(el);
+      const hasXScroll =
+        el.scrollWidth > el.clientWidth ||
+        style.overflowX === "auto" ||
+        style.overflowX === "scroll";
+      if (hasXScroll) return el;
+    }
+    return (root.querySelector(".ant-table-body") as HTMLElement) || null;
+  }, []);
+  const saveScrollPosition = React.useCallback(() => {
+    const el = getScrollElement();
+    if (el) lastScrollLeftRef.current = el.scrollLeft;
+  }, [getScrollElement]);
+  const restoreScrollPosition = React.useCallback(() => {
+    const el = getScrollElement();
+    const val = lastScrollLeftRef.current;
+    if (el && typeof val === "number") {
+      el.scrollLeft = val;
+    }
+  }, [getScrollElement]);
 
   // 🔍 도로명주소 팝업 상태
   const [addressDialogOpen, setAddressDialogOpen] = React.useState(false);
@@ -906,6 +973,10 @@ const ItemTable: React.FC<ItemTableProps> = ({
           }}
           onClick={() => {
             if (!onSort) return;
+            // 정렬 전 스크롤 위치 저장 (헤더 셀 클릭 경로)
+            try {
+              saveScrollPosition();
+            } catch {}
             if (sortBy !== id) onSort(id, "asc");
             else if (sortOrder === "asc") onSort(id, "desc");
             else onSort(undefined, undefined);
@@ -963,6 +1034,10 @@ const ItemTable: React.FC<ItemTableProps> = ({
       onHeaderCell: () => ({
         onClick: () => {
           if (!onSort) return;
+          // 정렬 전 스크롤 위치 저장 (헤더 셀 클릭 경로)
+          try {
+            saveScrollPosition();
+          } catch {}
           if (sortBy !== c.key) onSort?.(c.key, "asc");
           else if (sortOrder === "asc") onSort?.(c.key, "desc");
           else onSort?.(undefined, undefined);
@@ -988,33 +1063,58 @@ const ItemTable: React.FC<ItemTableProps> = ({
         onSort,
         getWidth,
         onResizeColumn,
-        handleAddressClick
+        handleAddressClick,
+        () => {
+          try {
+            const el = getScrollElement();
+            if (el) lastScrollLeftRef.current = el.scrollLeft;
+          } catch {}
+        }
       ),
-    [sortBy, sortOrder, onSort, getWidth, onResizeColumn]
+    [sortBy, sortOrder, onSort, getWidth, onResizeColumn, getScrollElement]
   );
 
-  // 서버 저장 컬럼 순서를 안전하게 적용(허용 컬럼만 유지 + 누락 컬럼 보강)
-  React.useEffect(() => {
-    try {
-      const allowed = new Set((baseColumns || []).map((c) => c.id));
-      const safeServer = (serverOrder || []).filter((k) => allowed.has(k));
-      const rest = (baseColumns || [])
-        .map((c) => c.id)
-        .filter((k) => !safeServer.includes(k));
-      const next = [...safeServer, ...rest];
-      if (next.length > 0) setColumnOrder(next);
-    } catch {}
-  }, [serverOrder, baseColumns]);
+  // 서버/스키마 순서 적용 이펙트 제거: 사용자 순서 최우선 유지
 
   const orderedColumns = React.useMemo(() => {
     if (schemaBasedColumns) {
-      // 동적 모드: 순서 = 스키마 순서
-      return schemaBasedColumns;
+      // 동적(스키마) 모드에서도 DnD로 바뀐 columnOrder를 우선 적용
+      const byId = new Map(schemaBasedColumns.map((c) => [c.id, c] as const));
+      const fromOrder = columnOrder
+        .map((id) => byId.get(id))
+        .filter(Boolean) as ColumnWithId[];
+      const rest = schemaBasedColumns.filter(
+        (c) => !columnOrder.includes(c.id)
+      );
+      return [...fromOrder, ...rest];
     }
     return columnOrder
       .map((id) => baseColumns.find((col) => col.id === id))
       .filter(Boolean) as ColumnWithId[];
   }, [schemaBasedColumns, columnOrder, baseColumns]);
+
+  // 테이블 본문 스크롤 이벤트로 항상 최신 scrollLeft를 추적 (orderedColumns 이후로 이동)
+  React.useEffect(() => {
+    const el = getScrollElement();
+    if (!el) return;
+    const onScroll = () => {
+      lastScrollLeftRef.current = el.scrollLeft;
+    };
+    el.addEventListener("scroll", onScroll, { passive: true } as any);
+    return () => {
+      el.removeEventListener("scroll", onScroll as any);
+    };
+  }, [getScrollElement, orderedColumns, items, sortBy, sortOrder]);
+
+  // 정렬/열 순서/데이터 변경 후 스크롤 위치 복원 (DOM 갱신 타이밍 대응)
+  React.useLayoutEffect(() => {
+    const restore = () => restoreScrollPosition();
+    restore();
+    if (typeof window !== "undefined") {
+      requestAnimationFrame(restore);
+      setTimeout(restore, 0);
+    }
+  }, [sortBy, sortOrder, orderedColumns, items]);
 
   // ✅ 행 선택(체크박스) - 맨 앞 고정
   const [selectedRowKeysState, setSelectedRowKeysState] = React.useState<
@@ -1185,44 +1285,88 @@ const ItemTable: React.FC<ItemTableProps> = ({
           white-space: nowrap !important;
         }
       `}</style>
-      <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
+      <DndContext
+        sensors={sensors}
+        onDragEnd={(evt: DragEndEvent) => {
+          const { active, over } = evt;
+          if (!over || active.id === over.id) return;
+          // 현재 화면에 표시 중인 순서를 기준으로 재배열
+          const displayedIds = orderedColumns.map((c) => c.id);
+          const activeIndex = displayedIds.indexOf(active.id as string);
+          const overIndex = displayedIds.indexOf(over.id as string);
+          if (activeIndex < 0 || overIndex < 0) return;
+          const next = arrayMove(displayedIds, activeIndex, overIndex);
+          try {
+            const allowed = new Set(
+              (schemaBasedColumns ?? baseColumns ?? []).map((c) => c.id)
+            );
+            const payload = next.filter((k) => allowed.has(k));
+            setColumnOrder(payload);
+            void saveOrder(payload);
+            didInitOrderRef.current = true;
+            try {
+              if (typeof window !== "undefined") {
+                localStorage.setItem(
+                  "analysis:column_order",
+                  JSON.stringify(payload)
+                );
+                localStorage.setItem("it_order_inited", "1");
+              }
+            } catch {}
+          } catch {
+            setColumnOrder(next);
+            didInitOrderRef.current = true;
+            try {
+              if (typeof window !== "undefined") {
+                localStorage.setItem(
+                  "analysis:column_order",
+                  JSON.stringify(next)
+                );
+                localStorage.setItem("it_order_inited", "1");
+              }
+            } catch {}
+          }
+        }}
+      >
         <SortableContext
-          items={columnOrder}
+          items={orderedColumns.map((c) => c.id)}
           strategy={horizontalListSortingStrategy}
         >
-          <Table<Item>
-            // 🎯 기본 설정
-            dataSource={items}
-            columns={orderedColumns}
-            rowKey="id"
-            rowSelection={rowSelection}
-            // 🔥 서버사이드 설정 - 핵심 기능들!
-            loading={isLoading}
-            onChange={handleTableChange}
-            // 🎯 내부 페이지네이션 제거 (외부 페이지네이션 사용)
-            pagination={false}
-            // 🎨 테이블 설정: 세로 스크롤 제거, 가로만 유지
-            scroll={{ x: 1500 }}
-            size="middle"
-            bordered
-            // 🚫 줄바꿈 방지 설정
-            className="no-wrap-table"
-            // 🖱️ 행 이벤트
-            onRow={(rec, idx) => handleRowClick(rec, idx)}
-            // 🎯 빈 상태 처리
-            locale={{
-              emptyText: (
-                <div style={{ padding: "24px" }}>
-                  <Typography.Title level={5} type="secondary">
-                    표시할 데이터가 없습니다
-                  </Typography.Title>
-                  <Typography.Text type="secondary">
-                    필터를 조정하거나 조건을 변경해보세요.
-                  </Typography.Text>
-                </div>
-              ),
-            }}
-          />
+          <div ref={tableContainerRef}>
+            <Table<Item>
+              // 🎯 기본 설정
+              dataSource={items}
+              columns={orderedColumns}
+              rowKey="id"
+              rowSelection={rowSelection}
+              // 🔥 서버사이드 설정 - 핵심 기능들!
+              loading={isLoading}
+              onChange={handleTableChange}
+              // 🎯 내부 페이지네이션 제거 (외부 페이지네이션 사용)
+              pagination={false}
+              // 🎨 테이블 설정: 세로 스크롤 제거, 가로만 유지
+              scroll={{ x: 1500 }}
+              size="middle"
+              bordered
+              // 🚫 줄바꿈 방지 설정
+              className="no-wrap-table"
+              // 🖱️ 행 이벤트
+              onRow={(rec, idx) => handleRowClick(rec, idx)}
+              // 🎯 빈 상태 처리
+              locale={{
+                emptyText: (
+                  <div style={{ padding: "24px" }}>
+                    <Typography.Title level={5} type="secondary">
+                      표시할 데이터가 없습니다
+                    </Typography.Title>
+                    <Typography.Text type="secondary">
+                      필터를 조정하거나 조건을 변경해보세요.
+                    </Typography.Text>
+                  </div>
+                ),
+              }}
+            />
+          </div>
           {/* 도로명주소 팝업 */}
           <PropertyDetailDialog
             open={addressDialogOpen}

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Card, CardHeader, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,11 +21,30 @@ import { useSpecialRights } from "@/hooks/useSpecialRights";
 
 interface AuctionEdFilterProps {
   className?: string;
+  isCollapsed?: boolean;
+  onToggleCollapse?: () => void;
+  searchQuery?: string;
+  setSearchQuery?: (query: string) => void;
+  handleSearch?: () => void;
+  showLocationOnly?: boolean;
+  showDetailsOnly?: boolean;
+  namespace?: string;
 }
 
-export default function AuctionEdFilter({ className }: AuctionEdFilterProps) {
+export default function AuctionEdFilter({
+  className,
+  isCollapsed: externalIsCollapsed,
+  onToggleCollapse,
+  searchQuery,
+  setSearchQuery,
+  handleSearch,
+  showLocationOnly = false,
+  showDetailsOnly = false,
+  namespace,
+}: AuctionEdFilterProps) {
   const filters = useFilterStore((state) => state);
-  const { setFilter, setPage } = useFilterStore();
+  const { setFilter, setPage, resetFilters, resetNsFilters } =
+    useFilterStore() as any;
 
   // 특수권리 동적 로딩
   const { specialRights, isLoading: isLoadingSpecialRights } = useSpecialRights(
@@ -54,15 +73,28 @@ export default function AuctionEdFilter({ className }: AuctionEdFilterProps) {
     "slider" | "input"
   >("input");
 
-  // 검색 상태
-  const [addressSearch, setAddressSearch] = useState("");
+  // 검색 상태 - 외부 props와 동기화
+  const [addressSearch, setAddressSearch] = useState(searchQuery || "");
   const [caseNumberSearch, setCaseNumberSearch] = useState("");
+
+  // 외부 searchQuery props 변경 시 내부 state 동기화
+  useEffect(() => {
+    if (searchQuery !== undefined) {
+      setAddressSearch(searchQuery);
+    }
+  }, [searchQuery]);
 
   // 검색 핸들러
   const handleAddressSearch = () => {
+    if (setSearchQuery) {
+      setSearchQuery(addressSearch);
+    }
     setFilter("searchField", addressSearch ? "address" : "all");
     setFilter("searchQuery", addressSearch);
     setPage(1);
+    if (handleSearch) {
+      handleSearch();
+    }
   };
 
   const handleCaseNumberSearch = () => {
@@ -73,6 +105,9 @@ export default function AuctionEdFilter({ className }: AuctionEdFilterProps) {
 
   const handleClearAddressSearch = () => {
     setAddressSearch("");
+    if (setSearchQuery) {
+      setSearchQuery("");
+    }
     setFilter("searchField", "all");
     setFilter("searchQuery", "");
     setPage(1);
@@ -88,10 +123,59 @@ export default function AuctionEdFilter({ className }: AuctionEdFilterProps) {
   const handleClearSearch = () => {
     setAddressSearch("");
     setCaseNumberSearch("");
+    if (setSearchQuery) {
+      setSearchQuery("");
+    }
     setFilter("searchField", "all");
     setFilter("searchQuery", "");
     setPage(1);
   };
+
+  // 섹션 활성화 상태 판단 (제목 스타일링용)
+  const isSaleDateActive = Boolean(
+    (filters as any).auctionDateFrom ||
+      (filters as any).auctionDateTo ||
+      (filters as any).saleYear
+  );
+  const isPriceActive = Array.isArray((filters as any).priceRange)
+    ? !(
+        (filters as any).priceRange[0] === 0 &&
+        (filters as any).priceRange[1] === 500000
+      )
+    : false;
+  const isBuildingAreaActive = Array.isArray((filters as any).buildingAreaRange)
+    ? !(
+        (filters as any).buildingAreaRange[0] === 0 &&
+        (filters as any).buildingAreaRange[1] === 100
+      )
+    : false;
+  const isLandAreaActive = Array.isArray((filters as any).landAreaRange)
+    ? !(
+        (filters as any).landAreaRange[0] === 0 &&
+        (filters as any).landAreaRange[1] === 200
+      )
+    : false;
+  const isBuildYearActive = Array.isArray((filters as any).buildYear)
+    ? !(
+        (filters as any).buildYear[0] === 1980 &&
+        (filters as any).buildYear[1] === 2024
+      )
+    : false;
+  const isFloorConfirmationActive = Array.isArray(
+    (filters as any).floorConfirmation
+  )
+    ? (filters as any).floorConfirmation.length > 0
+    : false;
+  const isElevatorActive =
+    (filters as any).hasElevator === true ||
+    (filters as any).hasElevator === false;
+  const isCurrentStatusActive = Array.isArray((filters as any).currentStatus)
+    ? (filters as any).currentStatus.length > 0
+    : false;
+  const isSpecialRightsActive = Array.isArray((filters as any).specialRights)
+    ? (filters as any).specialRights.length > 0
+    : false;
+  const isAddressSearchActive = Boolean((filters as any).searchQuery);
 
   return (
     <Card className={className}>
@@ -135,22 +219,55 @@ export default function AuctionEdFilter({ className }: AuctionEdFilterProps) {
               variant="outline"
               size="sm"
               onClick={() => {
-                // TODO: 설정 초기화 기능 구현
-                console.log("설정 초기화 클릭");
+                // 지역값은 유지하고 필터링 항목만 기본값으로 초기화
+                setFilter("auctionDateFrom" as any, undefined);
+                setFilter("auctionDateTo" as any, undefined);
+                setFilter("saleYear" as any, undefined);
+                setFilter("priceRange" as any, [0, 500000]);
+                setFilter("buildingAreaRange" as any, [0, 100]);
+                setFilter("landAreaRange" as any, [0, 200]);
+                setFilter("buildYear" as any, [1980, 2024]);
+                setFilter("floorConfirmation" as any, []);
+                setFilter("hasElevator" as any, undefined);
+                setFilter("currentStatus" as any, []);
+                setFilter("specialRights" as any, []);
+                setFilter("specialConditions" as any, []);
+                setFilter("specialBooleanFlags" as any, []);
+                setFilter("searchField" as any, "all");
+                setFilter("searchQuery" as any, "");
+                // 네임스페이스 오버라이드도 있으면 해당 영역만 초기화
+                if (namespace && typeof resetNsFilters === "function") {
+                  resetNsFilters(namespace);
+                }
+                // 로컬 입력 상태 및 페이지 리셋
+                setAddressSearch("");
+                setCaseNumberSearch("");
+                setPage(1);
               }}
               className="text-xs"
             >
-              <AlertTriangle className="w-3 h-3 mr-1" />
               설정 초기화
             </Button>
           </div>
 
           {/* 매각기일 */}
           <div className="space-y-3">
-            <Label className="text-sm font-medium">매각기일</Label>
+            <Label
+              className={`text-sm font-medium ${
+                isSaleDateActive ? "text-blue-700 font-semibold" : ""
+              }`}
+            >
+              매각기일
+            </Label>
             <div className="grid grid-cols-2 gap-2">
               <div className="space-y-1">
-                <Label className="text-xs text-gray-600">시작일</Label>
+                <Label
+                  className={`text-xs ${
+                    isSaleDateActive ? "text-blue-600" : "text-gray-600"
+                  }`}
+                >
+                  시작일
+                </Label>
                 <Input
                   type="date"
                   value={filters.auctionDateFrom || ""}
@@ -160,7 +277,13 @@ export default function AuctionEdFilter({ className }: AuctionEdFilterProps) {
                 />
               </div>
               <div className="space-y-1">
-                <Label className="text-xs text-gray-600">종료일</Label>
+                <Label
+                  className={`text-xs ${
+                    isSaleDateActive ? "text-blue-600" : "text-gray-600"
+                  }`}
+                >
+                  종료일
+                </Label>
                 <Input
                   type="date"
                   value={filters.auctionDateTo || ""}
@@ -170,13 +293,54 @@ export default function AuctionEdFilter({ className }: AuctionEdFilterProps) {
                 />
               </div>
             </div>
+            {/* 매각년도 빠른 필터 */}
+            <div className="pt-2">
+              <Label
+                className={`text-xs ${
+                  isSaleDateActive ? "text-blue-600" : "text-gray-600"
+                }`}
+              >
+                매각년도(빠른 선택)
+              </Label>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {[2020, 2021, 2022, 2023, 2024, 2025].map((y) => (
+                  <Button
+                    key={y}
+                    variant={
+                      (filters as any).saleYear === y ? "default" : "outline"
+                    }
+                    size="sm"
+                    className="h-7 px-2 text-xs"
+                    onClick={() => {
+                      // 토글: 같은 연도 클릭 시 해제
+                      if ((filters as any).saleYear === y) {
+                        setFilter("saleYear" as any, undefined);
+                      } else {
+                        setFilter("saleYear" as any, y);
+                        // 연도 버튼을 쓰면 개별 시작/종료일은 비움
+                        setFilter("auctionDateFrom" as any, undefined);
+                        setFilter("auctionDateTo" as any, undefined);
+                      }
+                    }}
+                  >
+                    {y}년
+                  </Button>
+                ))}
+              </div>
+            </div>
           </div>
 
           {/* 매각가 범위 */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Label className="text-sm font-medium text-gray-700">
+                <Label
+                  className={`text-sm font-medium ${
+                    isPriceActive
+                      ? "text-blue-700 font-semibold"
+                      : "text-gray-700"
+                  }`}
+                >
                   매각가 (만원)
                 </Label>
               </div>
@@ -252,7 +416,13 @@ export default function AuctionEdFilter({ className }: AuctionEdFilterProps) {
           {/* 건축면적 범위 */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <Label className="text-sm font-medium">건축면적 (평)</Label>
+              <Label
+                className={`text-sm font-medium ${
+                  isBuildingAreaActive ? "text-blue-700 font-semibold" : ""
+                }`}
+              >
+                건축면적 (평)
+              </Label>
               <Button
                 variant="ghost"
                 size="sm"
@@ -324,7 +494,13 @@ export default function AuctionEdFilter({ className }: AuctionEdFilterProps) {
           {/* 토지면적 범위 */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <Label className="text-sm font-medium">토지면적 (평)</Label>
+              <Label
+                className={`text-sm font-medium ${
+                  isLandAreaActive ? "text-blue-700 font-semibold" : ""
+                }`}
+              >
+                토지면적 (평)
+              </Label>
               <Button
                 variant="ghost"
                 size="sm"
@@ -396,7 +572,13 @@ export default function AuctionEdFilter({ className }: AuctionEdFilterProps) {
           {/* 건축년도 */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <Label className="text-sm font-medium">건축년도</Label>
+              <Label
+                className={`text-sm font-medium ${
+                  isBuildYearActive ? "text-blue-700 font-semibold" : ""
+                }`}
+              >
+                건축년도
+              </Label>
               <Button
                 variant="ghost"
                 size="sm"
@@ -468,7 +650,13 @@ export default function AuctionEdFilter({ className }: AuctionEdFilterProps) {
 
           {/* 층확인 */}
           <div className="space-y-3">
-            <Label className="text-sm font-medium">층확인</Label>
+            <Label
+              className={`text-sm font-medium ${
+                isFloorConfirmationActive ? "text-blue-700 font-semibold" : ""
+              }`}
+            >
+              층확인
+            </Label>
             <div className="flex flex-wrap gap-2">
               <button
                 onClick={() => setFilter("floorConfirmation", [])}
@@ -493,7 +681,11 @@ export default function AuctionEdFilter({ className }: AuctionEdFilterProps) {
                   <button
                     key={option.value}
                     onClick={() => {
-                      const current = filters.floorConfirmation || [];
+                      const raw = (filters as any).floorConfirmation as
+                        | string
+                        | string[]
+                        | undefined;
+                      const current: string[] = Array.isArray(raw) ? raw : [];
                       if (isActive) {
                         setFilter(
                           "floorConfirmation",
@@ -521,14 +713,23 @@ export default function AuctionEdFilter({ className }: AuctionEdFilterProps) {
 
           {/* 엘리베이터 */}
           <div className="space-y-3">
-            <Label className="text-sm font-medium">엘리베이터</Label>
+            <Label
+              className={`text-sm font-medium ${
+                isElevatorActive ? "text-blue-700 font-semibold" : ""
+              }`}
+            >
+              엘리베이터
+            </Label>
             <div className="flex flex-wrap gap-2">
               {[
                 { value: undefined, label: "전체" },
                 { value: true, label: "있음" },
                 { value: false, label: "없음" },
               ].map((option) => {
-                const isActive = filters.hasElevator === option.value;
+                const currentElevator = (filters as any).hasElevator as
+                  | boolean
+                  | undefined;
+                const isActive = currentElevator === option.value;
                 return (
                   <button
                     key={option.label}
@@ -549,7 +750,13 @@ export default function AuctionEdFilter({ className }: AuctionEdFilterProps) {
           {/* 현재상태 */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <Label className="text-sm font-medium">현재상태</Label>
+              <Label
+                className={`text-sm font-medium ${
+                  isCurrentStatusActive ? "text-blue-700 font-semibold" : ""
+                }`}
+              >
+                현재상태
+              </Label>
               <button
                 onClick={() =>
                   setIsCurrentStatusCollapsed(!isCurrentStatusCollapsed)
@@ -604,7 +811,11 @@ export default function AuctionEdFilter({ className }: AuctionEdFilterProps) {
                     <button
                       key={option.value}
                       onClick={() => {
-                        const current = filters.currentStatus || [];
+                        const raw = (filters as any).currentStatus as
+                          | string
+                          | string[]
+                          | undefined;
+                        const current: string[] = Array.isArray(raw) ? raw : [];
                         if (isActive) {
                           setFilter(
                             "currentStatus",
@@ -635,7 +846,13 @@ export default function AuctionEdFilter({ className }: AuctionEdFilterProps) {
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-2">
-                <Label className="text-sm font-medium">특수권리</Label>
+                <Label
+                  className={`text-sm font-medium ${
+                    isSpecialRightsActive ? "text-blue-700 font-semibold" : ""
+                  }`}
+                >
+                  특수권리
+                </Label>
                 {isLoadingSpecialRights && (
                   <span className="text-xs text-gray-500">로딩 중...</span>
                 )}
@@ -670,8 +887,9 @@ export default function AuctionEdFilter({ className }: AuctionEdFilterProps) {
                         setFilter("specialRights" as any, [] as any);
                       }}
                       className={`px-2 py-1 text-xs rounded-md border transition-colors ${
-                        !Array.isArray((filters as any).specialRights) || 
-                        ((filters as any).specialRights as string[]).length === 0
+                        !Array.isArray((filters as any).specialRights) ||
+                        ((filters as any).specialRights as string[]).length ===
+                          0
                           ? "bg-blue-500 text-white border-blue-500"
                           : "bg-white text-gray-700 border-gray-300 hover:border-blue-300 hover:bg-blue-50"
                       }`}
@@ -717,7 +935,13 @@ export default function AuctionEdFilter({ className }: AuctionEdFilterProps) {
 
           {/* 주소 검색 */}
           <div className="space-y-3">
-            <Label className="text-sm font-medium">주소 검색</Label>
+            <Label
+              className={`text-sm font-medium ${
+                isAddressSearchActive ? "text-blue-700 font-semibold" : ""
+              }`}
+            >
+              주소 검색
+            </Label>
             <Input
               placeholder="주소를 입력하세요"
               value={addressSearch}
@@ -742,7 +966,13 @@ export default function AuctionEdFilter({ className }: AuctionEdFilterProps) {
 
           {/* 사건번호 검색 */}
           <div className="space-y-3">
-            <Label className="text-sm font-medium">사건번호 검색</Label>
+            <Label
+              className={`text-sm font-medium ${
+                isAddressSearchActive ? "text-blue-700 font-semibold" : ""
+              }`}
+            >
+              사건번호 검색
+            </Label>
             <Input
               placeholder="사건번호를 입력하세요"
               value={caseNumberSearch}

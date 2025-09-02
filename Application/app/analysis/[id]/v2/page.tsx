@@ -32,10 +32,6 @@ import { useSortableColumns } from "@/hooks/useSortableColumns";
 import dynamic from "next/dynamic";
 import { useFeatureFlags } from "@/lib/featureFlags";
 import { formatArea, m2ToPyeong } from "@/lib/units";
-const ItemTableVirtual = dynamic(
-  () => import("@/components/features/item-table-virtual"),
-  { ssr: false }
-);
 import {
   Pagination,
   PaginationContent,
@@ -347,6 +343,11 @@ export default function PropertyDetailV2Page() {
     province: zFilters?.province,
     cityDistrict: zFilters?.cityDistrict,
     town: zFilters?.town,
+    // 정렬 상태 전달 (서버 정렬 반영)
+    sortBy: (typeof (zFilters?.sortBy as any) === "string"
+      ? (zFilters?.sortBy as any).replace(/([A-Z])/g, "_$1").toLowerCase()
+      : (zFilters?.sortBy as any)) as any,
+    sortOrder: zFilters?.sortOrder,
     // auction_ed에서는 좌표 기반 필터링 비활성화 (지역 필터만 사용)
     // south: bounds?.south,
     // west: bounds?.west,
@@ -379,7 +380,7 @@ export default function PropertyDetailV2Page() {
 
   // 가상 스크롤 사용 조건: 전역 플래그 또는 총 건수 임계치 초과
   const { virtualTable, areaDisplay } = useFeatureFlags();
-  const useVirtual = virtualTable || (dsTotal ?? 0) > 500;
+  const useVirtual = false;
 
   // 정렬 상태/설정
   const setSortConfig = useFilterStore((s: any) => s.setSortConfig);
@@ -388,18 +389,21 @@ export default function PropertyDetailV2Page() {
   const { sortableColumns } = useSortableColumns(activeDataset as any);
 
   const handleSort = (column?: string, direction?: "asc" | "desc") => {
+    const serverKey =
+      typeof (column || "") === "string"
+        ? (column || "").replace(/([A-Z])/g, "_$1").toLowerCase()
+        : (column as any);
     if (
-      column &&
+      serverKey &&
       Array.isArray(sortableColumns) &&
       sortableColumns.length > 0 &&
-      !sortableColumns.includes(column)
+      !sortableColumns.includes(serverKey)
     ) {
-      console.warn(`[v2 Sort] 금지된 컬럼 무시: ${column}`);
+      console.warn(`[v2 Sort] 금지된 컬럼 무시: ${column} → ${serverKey}`);
       return;
     }
+    // 전역 스토어는 프론트 키로 유지, 서버 전송은 queryFilters 단계에서 snake로 변환
     setSortConfig(column || undefined, direction);
-    // 정렬 변경 시 페이지 초기화
-    setPageNum(1);
   };
 
   const handleChangeView = (next: ViewType) => {
@@ -894,26 +898,18 @@ export default function PropertyDetailV2Page() {
                               forceMount
                             >
                               <ViewState
-                                isLoading={Boolean(dsLoading)}
+                                isLoading={Boolean(
+                                  dsLoading &&
+                                    !(
+                                      Array.isArray(dsItems) &&
+                                      dsItems.length > 0
+                                    )
+                                )}
                                 error={dsError as any}
                                 total={dsTotal as number}
                                 onRetry={() => dsRefetch?.()}
                               >
-                                {useVirtual ? (
-                                  <ItemTableVirtual
-                                    items={dsItems as any}
-                                    isLoading={false}
-                                    error={undefined}
-                                    sortBy={sortBy as any}
-                                    sortOrder={sortOrder as any}
-                                    onSort={handleSort}
-                                    selectedRowKeys={selectedRowKeys}
-                                    onSelectionChange={setSelectedRowKeys}
-                                    containerHeight={560}
-                                    rowHeight={44}
-                                    overscan={8}
-                                  />
-                                ) : (
+                                {
                                   <ItemTable
                                     items={dsItems as any}
                                     isLoading={false}
@@ -960,7 +956,7 @@ export default function PropertyDetailV2Page() {
                                     pageSize={pageSize}
                                     onPageChange={(p) => setPageNum(p)}
                                   />
-                                )}
+                                }
                               </ViewState>
                               {/* External pagination controls */}
                               <div className="mt-6 space-y-4">
@@ -1140,7 +1136,13 @@ export default function PropertyDetailV2Page() {
                               forceMount
                             >
                               <ViewState
-                                isLoading={Boolean(dsLoading)}
+                                isLoading={Boolean(
+                                  dsLoading &&
+                                    !(
+                                      Array.isArray(dsItems) &&
+                                      dsItems.length > 0
+                                    )
+                                )}
                                 error={dsError as any}
                                 total={dsTotal as number}
                                 onRetry={() => dsRefetch?.()}
@@ -1211,21 +1213,7 @@ export default function PropertyDetailV2Page() {
                                   total={dsTotal as number}
                                   onRetry={() => dsRefetch?.()}
                                 >
-                                  {useVirtual ? (
-                                    <ItemTableVirtual
-                                      items={dsItems as any}
-                                      isLoading={false}
-                                      error={undefined}
-                                      sortBy={sortBy as any}
-                                      sortOrder={sortOrder as any}
-                                      onSort={handleSort}
-                                      selectedRowKeys={selectedRowKeys}
-                                      onSelectionChange={setSelectedRowKeys}
-                                      containerHeight={560}
-                                      rowHeight={44}
-                                      overscan={8}
-                                    />
-                                  ) : (
+                                  {
                                     <ItemTable
                                       items={dsItems as any}
                                       isLoading={false}
@@ -1278,7 +1266,7 @@ export default function PropertyDetailV2Page() {
                                       pageSize={pageSize}
                                       onPageChange={(p) => setPageNum(p)}
                                     />
-                                  )}
+                                  }
                                 </ViewState>
                                 {/* External pagination controls for integrated list */}
                                 <div className="mt-6 space-y-4">
