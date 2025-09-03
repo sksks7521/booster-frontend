@@ -1,0 +1,5 @@
+f9622991b2c5eb4951b7a6f519668e12884833bc
+sksks7521
+hsksks7521@gmail.com
+2025-09-02 16:21:13 +0800
+feat(v2-sort): 서버 정렬 파라미터 통일(ordering) 및 정렬 파이프라인 안정화\n- AuctionEdSearchResults: 정렬 상태 갱신/해제 로직 정리, 디버그 로그 추가\n- datasets/registry: camelCasesnake_case 변환 후 ordering 단일 파라미터 전송\n- ItemTable/Scroll: 정렬 전 스크롤 위치 보존 및 리스토어 유지\n- Docs: FRONTEND_ARCHITECTURE.md에 정렬 아키텍처(섹션 12) 추가\n- Logs: 250103.md 일지 추가

@@ -158,7 +158,8 @@ const createColumns = (
   getWidth?: (id: string) => number | undefined,
   onResizeColumn?: (id: string, deltaX: number) => void,
   onAddressClick?: (item: Item) => void,
-  onBeforeSort?: () => void
+  onBeforeSort?: () => void,
+  isSorting?: boolean
 ): ColumnWithId[] => {
   // 🔄 3단계 순환 정렬 로직
   const getNextSortState = (column: string) => {
@@ -180,7 +181,8 @@ const createColumns = (
   // 📊 정렬 아이콘 표시 헬퍼
   const getSortIcon = (column: string) => {
     if (sortBy === column) {
-      return sortOrder === "asc" ? " ▲" : " ▼";
+      const arrow = sortOrder === "asc" ? " ▲" : " ▼";
+      return isSorting ? `${arrow} ⏳` : arrow;
     }
     return "";
   };
@@ -204,6 +206,7 @@ const createColumns = (
     try {
       onBeforeSort?.();
     } catch {}
+    if (isSorting) return; // 정렬 진행 중에는 중복 클릭 방지
     if (Date.now() < suppressSortUntil) return;
     getNextSortState(column);
   };
@@ -781,6 +784,13 @@ interface ItemTableProps {
   // 🆕 데이터셋 동적 컬럼 모드(옵션)
   schemaColumns?: { key: string; header: string }[];
   getValueForKey?: (row: any, key: string) => any;
+  // 🆕 데이터셋별 컬럼 순서 저장/초기값 제어
+  columnOrderStorageKey?: string;
+  defaultColumnOrder?: string[];
+  // 🆕 행 키 커스터마이즈 (중복 키 회피용)
+  rowKeyProp?: string | ((row: any) => React.Key);
+  // 🆕 정렬 진행 상태(헤더에 모래시계 표시)
+  isSorting?: boolean;
 }
 
 // 🚀 Ant Design Table 컴포넌트 - 완전 새로운 구현!
@@ -802,12 +812,21 @@ const ItemTable: React.FC<ItemTableProps> = ({
   onSelectionChange,
   schemaColumns,
   getValueForKey,
+  columnOrderStorageKey,
+  defaultColumnOrder,
+  rowKeyProp,
+  isSorting,
 }) => {
   // 🎯 컬럼 순서 상태 관리 (드래그앤드롭용)
+  const storageKey = columnOrderStorageKey || "analysis:column_order";
+  const initialDefaultOrder =
+    Array.isArray(defaultColumnOrder) && defaultColumnOrder.length > 0
+      ? (defaultColumnOrder as string[])
+      : (DEFAULT_COLUMN_ORDER as unknown as string[]);
   const [columnOrder, setColumnOrder] = React.useState<string[]>(() => {
     try {
       if (typeof window !== "undefined") {
-        const raw = localStorage.getItem("analysis:column_order");
+        const raw = localStorage.getItem(storageKey);
         if (raw) {
           const arr = JSON.parse(raw);
           if (
@@ -819,10 +838,10 @@ const ItemTable: React.FC<ItemTableProps> = ({
         }
       }
     } catch {}
-    return DEFAULT_COLUMN_ORDER as unknown as string[];
+    return initialDefaultOrder as unknown as string[];
   });
   const { order: serverOrder, save: saveOrder } = useColumnOrder(
-    DEFAULT_COLUMN_ORDER as unknown as string[]
+    initialDefaultOrder as unknown as string[]
   );
   // 서버/스키마로부터 초기화는 딱 1회만 수행하고, 이후에는 사용자 드래그 우선
   const didInitOrderRef = React.useRef<boolean>(false);
@@ -1032,16 +1051,7 @@ const ItemTable: React.FC<ItemTableProps> = ({
         return text;
       },
       onHeaderCell: () => ({
-        onClick: () => {
-          if (!onSort) return;
-          // 정렬 전 스크롤 위치 저장 (헤더 셀 클릭 경로)
-          try {
-            saveScrollPosition();
-          } catch {}
-          if (sortBy !== c.key) onSort?.(c.key, "asc");
-          else if (sortOrder === "asc") onSort?.(c.key, "desc");
-          else onSort?.(undefined, undefined);
-        },
+        // 클릭 핸들러는 title(span) 쪽에서만 처리 → 중복 토글 방지
         style: { cursor: "pointer" },
       }),
     })) as unknown as ColumnWithId[];
@@ -1069,9 +1079,18 @@ const ItemTable: React.FC<ItemTableProps> = ({
             const el = getScrollElement();
             if (el) lastScrollLeftRef.current = el.scrollLeft;
           } catch {}
-        }
+        },
+        isSorting
       ),
-    [sortBy, sortOrder, onSort, getWidth, onResizeColumn, getScrollElement]
+    [
+      sortBy,
+      sortOrder,
+      onSort,
+      getWidth,
+      onResizeColumn,
+      getScrollElement,
+      isSorting,
+    ]
   );
 
   // 서버/스키마 순서 적용 이펙트 제거: 사용자 순서 최우선 유지
@@ -1113,8 +1132,11 @@ const ItemTable: React.FC<ItemTableProps> = ({
     if (typeof window !== "undefined") {
       requestAnimationFrame(restore);
       setTimeout(restore, 0);
+      // antd Table 내부 레이아웃 지연에 대비한 보정 호출
+      setTimeout(restore, 50);
+      setTimeout(restore, 120);
     }
-  }, [sortBy, sortOrder, orderedColumns, items]);
+  }, [sortBy, sortOrder, orderedColumns, items, isLoading]);
 
   // ✅ 행 선택(체크박스) - 맨 앞 고정
   const [selectedRowKeysState, setSelectedRowKeysState] = React.useState<
@@ -1306,10 +1328,7 @@ const ItemTable: React.FC<ItemTableProps> = ({
             didInitOrderRef.current = true;
             try {
               if (typeof window !== "undefined") {
-                localStorage.setItem(
-                  "analysis:column_order",
-                  JSON.stringify(payload)
-                );
+                localStorage.setItem(storageKey, JSON.stringify(payload));
                 localStorage.setItem("it_order_inited", "1");
               }
             } catch {}
@@ -1318,10 +1337,7 @@ const ItemTable: React.FC<ItemTableProps> = ({
             didInitOrderRef.current = true;
             try {
               if (typeof window !== "undefined") {
-                localStorage.setItem(
-                  "analysis:column_order",
-                  JSON.stringify(next)
-                );
+                localStorage.setItem(storageKey, JSON.stringify(next));
                 localStorage.setItem("it_order_inited", "1");
               }
             } catch {}
@@ -1337,7 +1353,7 @@ const ItemTable: React.FC<ItemTableProps> = ({
               // 🎯 기본 설정
               dataSource={items}
               columns={orderedColumns}
-              rowKey="id"
+              rowKey={rowKeyProp ?? "id"}
               rowSelection={rowSelection}
               // 🔥 서버사이드 설정 - 핵심 기능들!
               loading={isLoading}

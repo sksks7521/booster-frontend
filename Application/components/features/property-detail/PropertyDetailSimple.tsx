@@ -12,6 +12,7 @@ import {
 import PropertyDetailHeader from "./sections/Header";
 import KeyBadges from "./sections/KeyBadges";
 import LocationMiniMap from "./sections/LocationMiniMap";
+import regions from "@/regions.json";
 
 function Card({
   title,
@@ -112,9 +113,36 @@ export default function PropertyDetailSimple({
     try {
       const id = String(vm?.id ?? "");
       if (!id) return;
-      router.push(`/analysis/${id}`);
+      const address = String(
+        vm?.roadAddress || vm?.locationAddress || ""
+      ).trim();
+      const extract = (
+        addr: string
+      ): { province?: string; cityDistrict?: string } => {
+        if (!addr) return {};
+        const provs = ((regions as any)["시도"] as string[]) || [];
+        const byProv: Record<string, string[]> =
+          ((regions as any)["시군구"] as any) || {};
+        const province = provs.find((p) => addr.startsWith(p));
+        if (!province) return {};
+        const fulls = byProv[province] || [];
+        const foundFull = fulls.find((f) => addr.includes(f));
+        const collapseCity = (full: string): string => {
+          const idx = full.indexOf("시 ");
+          return idx >= 0 ? full.slice(0, idx + 1).trim() : full;
+        };
+        const cityDistrict = foundFull ? collapseCity(foundFull) : province;
+        return { province, cityDistrict };
+      };
+      const { province, cityDistrict } = extract(address);
+      const qs = new URLSearchParams();
+      if (province) qs.set("province", province);
+      if (cityDistrict) qs.set("cityDistrict", cityDistrict);
+      router.push(
+        `/analysis/${id}/v2${qs.toString() ? `?${qs.toString()}` : ""}`
+      );
     } catch {}
-  }, [vm?.id, router]);
+  }, [vm?.id, vm?.roadAddress, vm?.locationAddress, router]);
   return (
     <>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

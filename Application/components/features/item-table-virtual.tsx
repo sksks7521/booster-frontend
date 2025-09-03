@@ -115,6 +115,7 @@ const ItemTableVirtual: React.FC<ItemTableVirtualProps> = ({
   overscan,
 }) => {
   const containerRef = React.useRef<HTMLDivElement | null>(null);
+  const lastScrollLeftRef = React.useRef<number | null>(null);
   const [scrollTop, setScrollTop] = React.useState(0);
 
   const RH = rowHeight ?? ROW_HEIGHT;
@@ -140,6 +141,10 @@ const ItemTableVirtual: React.FC<ItemTableVirtualProps> = ({
 
   const toggleSort = React.useCallback(
     (key: string) => {
+      try {
+        const el = containerRef.current as HTMLDivElement | null;
+        if (el) lastScrollLeftRef.current = el.scrollLeft;
+      } catch {}
       if (!onSort) return;
       if (sortBy !== key) {
         onSort(key, "asc");
@@ -183,6 +188,30 @@ const ItemTableVirtual: React.FC<ItemTableVirtualProps> = ({
     () => items.slice(startIndex, endIndex + 1),
     [items, startIndex, endIndex]
   );
+
+  // 정렬/데이터 변경 후 수평 스크롤 복원
+  React.useLayoutEffect(() => {
+    const el = containerRef.current as HTMLDivElement | null;
+    const val = lastScrollLeftRef.current;
+    if (el && typeof val === "number") {
+      try {
+        el.scrollLeft = val;
+      } catch {}
+      // DOM 갱신 타이밍 보정
+      if (typeof window !== "undefined") {
+        requestAnimationFrame(() => {
+          try {
+            el.scrollLeft = val;
+          } catch {}
+        });
+        setTimeout(() => {
+          try {
+            el.scrollLeft = val;
+          } catch {}
+        }, 0);
+      }
+    }
+  }, [sortBy, sortOrder, items]);
 
   if (error) {
     return (

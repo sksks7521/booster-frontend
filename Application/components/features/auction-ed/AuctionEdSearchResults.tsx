@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/tooltip";
 import { formatArea, m2ToPyeong } from "@/lib/units";
 import { useDataset } from "@/hooks/useDataset";
+import { useGlobalDataset } from "@/hooks/useGlobalDataset";
 import { datasetConfigs } from "@/datasets/registry";
 import { ViewState } from "@/components/ui/view-state";
 import { List, Map, Layers, Download, Bell } from "lucide-react";
@@ -168,14 +169,30 @@ export default function AuctionEdSearchResults({
   const requestPage = page;
   const requestSize = size;
 
-  // auction_ed 데이터셋 사용 (요청 크기 동적 조정)
-  const {
-    items: rawItems,
-    total: serverTotal,
-    isLoading,
-    error,
-    mutate: refetch,
-  } = useDataset("auction_ed", mergedFilters, requestPage, requestSize);
+  // 정렬 활성 시 전역 정렬 모드로 전환, 아니면 기존 페이지 모드 사용
+  const sortByGlobal = useFilterStore((s: any) => s.sortBy);
+  const sortOrderGlobal = useFilterStore((s: any) => s.sortOrder);
+  const useGlobal = Boolean(sortByGlobal && sortOrderGlobal);
+  const pageHook = useDataset(
+    "auction_ed",
+    mergedFilters,
+    requestPage,
+    requestSize
+  );
+  const globalHook = useGlobalDataset(
+    "auction_ed",
+    mergedFilters,
+    requestPage,
+    requestSize,
+    sortByGlobal,
+    sortOrderGlobal,
+    5000
+  );
+  const isLoading = useGlobal ? globalHook.isLoading : pageHook.isLoading;
+  const error = useGlobal ? globalHook.error : pageHook.error;
+  const refetch = useGlobal ? globalHook.mutate : pageHook.mutate;
+  const rawItems = useGlobal ? globalHook.items : pageHook.items;
+  const serverTotal = useGlobal ? globalHook.total : pageHook.total;
 
   // 전체 데이터 개수 조회 (지역 필터 없이)
   const { total: totalAllData } = useDataset("auction_ed", {}, 1, 1);
@@ -336,6 +353,13 @@ export default function AuctionEdSearchResults({
     setSortConfig(key, order);
   };
 
+  // 정렬 진행 상태(낙관적 UI): 헤더 클릭 즉시 활성 → 데이터 완료 시 해제
+  const [isSorting, setIsSorting] = useState(false);
+  useEffect(() => {
+    if (isLoading && (sortBy || sortOrder)) setIsSorting(true);
+    if (!isLoading) setIsSorting(false);
+  }, [isLoading, sortBy, sortOrder]);
+
   const handleExport = () => {
     // TODO: 내보내기 기능 구현
     console.log("경매 데이터 내보내기");
@@ -487,6 +511,16 @@ export default function AuctionEdSearchResults({
                       items={pagedItems as any}
                       isLoading={false}
                       error={undefined}
+                      rowKeyProp={(row: any) =>
+                        String(
+                          row?.case_number ??
+                            row?.id ??
+                            row?.doc_id ??
+                            row?.uuid ??
+                            Math.random()
+                        )
+                      }
+                      isSorting={isSorting}
                       schemaColumns={schemaColumns}
                       getValueForKey={(row: any, key: string) => {
                         // area 컬럼 전역 플래그 기반 포맷
@@ -525,6 +559,12 @@ export default function AuctionEdSearchResults({
                       page={page}
                       pageSize={size}
                       onPageChange={(p) => setPage(p)}
+                      columnOrderStorageKey={"table:order:auction_ed"}
+                      defaultColumnOrder={
+                        Array.isArray(schemaColumns)
+                          ? schemaColumns.map((c: any) => c.key)
+                          : undefined
+                      }
                     />
                   }
 
@@ -714,6 +754,15 @@ export default function AuctionEdSearchResults({
                         items={pagedItems as any}
                         isLoading={false}
                         error={undefined}
+                        rowKeyProp={(row: any) =>
+                          String(
+                            row?.case_number ??
+                              row?.id ??
+                              row?.doc_id ??
+                              row?.uuid ??
+                              Math.random()
+                          )
+                        }
                         schemaColumns={schemaColumns}
                         getValueForKey={(row: any, key: string) => {
                           // area 컬럼 전역 플래그 기반 포맷

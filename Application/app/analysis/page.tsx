@@ -12,10 +12,7 @@ import dynamic from "next/dynamic";
 const ItemTable = dynamic(() => import("@/components/features/item-table"), {
   ssr: false,
 });
-const ItemTableVirtual = dynamic(
-  () => import("@/components/features/item-table-virtual"),
-  { ssr: false }
-);
+// 가상 테이블 제거: 항상 일반 테이블 사용
 import MapView from "@/components/features/map-view";
 import PropertyDetailDialog from "@/components/features/property-detail/PropertyDetailDialog";
 import { useFilterStore } from "@/store/filterStore";
@@ -68,6 +65,11 @@ export default function AnalysisPage() {
     baseTotalCount,
     refetch,
   } = useItems();
+  // 로딩 표시 최적화: 기존 데이터가 있을 때는 로딩 오버레이를 숨겨 테이블/스크롤을 유지
+  const hasListData = Array.isArray(items) && items.length > 0;
+  const hasMapData = Array.isArray(mapItems) && mapItems.length > 0;
+  const showLoadingList = isLoading && !hasListData;
+  const showLoadingMap = isLoading && !hasMapData && !hasListData;
   const setPage = useFilterStore((s) => s.setPage);
   const setSize = useFilterStore((s) => s.setSize);
   const page = useFilterStore((s) => s.page);
@@ -143,9 +145,7 @@ export default function AnalysisPage() {
     ? useDataset(dsIdParam, queryFilters, page, size)
     : ({ total: 0 } as any);
 
-  // 가상 스크롤 사용 조건: 전역 플래그 또는 총 건수 임계치 초과
-  const { virtualTable } = useFeatureFlags();
-  const useVirtual = virtualTable || (totalCount ?? 0) > 500;
+  // 가상 스크롤 제거: 항상 일반 테이블 사용
 
   // 사용자 정보
   const user = {
@@ -487,27 +487,12 @@ export default function AnalysisPage() {
               <CardContent>
                 {activeView === "table" && (
                   <ViewState
-                    isLoading={isLoading}
+                    isLoading={showLoadingList}
                     error={error}
                     total={totalCount}
                     onRetry={refetch}
                   >
-                    {useVirtual ? (
-                      <ItemTableVirtual
-                        items={items}
-                        isLoading={false}
-                        error={undefined}
-                        onRetry={undefined}
-                        sortBy={sortBy}
-                        sortOrder={sortOrder}
-                        onSort={handleSort}
-                        selectedRowKeys={selectedRowKeys}
-                        onSelectionChange={setSelectedRowKeys}
-                        containerHeight={560}
-                        rowHeight={44}
-                        overscan={8}
-                      />
-                    ) : (
+                    {
                       <ItemTable
                         items={items}
                         isLoading={false}
@@ -519,30 +504,34 @@ export default function AnalysisPage() {
                         selectedRowKeys={selectedRowKeys}
                         onSelectionChange={setSelectedRowKeys}
                       />
-                    )}
+                    }
                   </ViewState>
                 )}
                 {activeView === "map" && (
                   <ViewState
-                    isLoading={isLoading}
+                    isLoading={showLoadingMap}
                     error={error}
                     total={totalCount}
                     onRetry={refetch}
                   >
-                    <MapView
-                      key={`${filters.sido_code || filters.province}-${
-                        filters.city_code || filters.cityDistrict
-                      }-${filters.town_code || filters.town || ""}`}
-                      locationKey={`${filters.sido_code || filters.province}-${
-                        filters.city_code || filters.cityDistrict
-                      }-${filters.town_code || filters.town || ""}`}
-                      items={mapItems || items}
-                      isLoading={false}
-                      error={undefined}
-                      onRetry={undefined}
-                      highlightIds={selectedRowKeys.map((k) => String(k))}
-                      onBoundsChange={(b) => setBounds(b)}
-                    />
+                    <div className="h-[calc(100vh-240px)]">
+                      <MapView
+                        key={`${filters.sido_code || filters.province}-${
+                          filters.city_code || filters.cityDistrict
+                        }-${filters.town_code || filters.town || ""}`}
+                        locationKey={`${
+                          filters.sido_code || filters.province
+                        }-${filters.city_code || filters.cityDistrict}-${
+                          filters.town_code || filters.town || ""
+                        }`}
+                        items={mapItems || items}
+                        isLoading={false}
+                        error={undefined}
+                        onRetry={undefined}
+                        highlightIds={selectedRowKeys.map((k) => String(k))}
+                        onBoundsChange={(b) => setBounds(b)}
+                      />
+                    </div>
                   </ViewState>
                 )}
                 {activeView === "both" && (
@@ -550,53 +539,40 @@ export default function AnalysisPage() {
                     <div>
                       <h3 className="text-lg font-semibold mb-3">지도</h3>
                       <ViewState
-                        isLoading={isLoading}
+                        isLoading={showLoadingMap}
                         error={error}
                         total={totalCount}
                         onRetry={refetch}
                       >
-                        <MapView
-                          key={`${filters.sido_code || filters.province}-${
-                            filters.city_code || filters.cityDistrict
-                          }-${filters.town_code || filters.town || ""}-both`}
-                          locationKey={`${
-                            filters.sido_code || filters.province
-                          }-${filters.city_code || filters.cityDistrict}-${
-                            filters.town_code || filters.town || ""
-                          }`}
-                          items={mapItems || items}
-                          isLoading={false}
-                          error={undefined}
-                          onRetry={undefined}
-                          highlightIds={selectedRowKeys.map((k) => String(k))}
-                          onBoundsChange={(b) => setBounds(b)}
-                        />
+                        <div className="h-[calc(100vh-360px)]">
+                          <MapView
+                            key={`${filters.sido_code || filters.province}-${
+                              filters.city_code || filters.cityDistrict
+                            }-${filters.town_code || filters.town || ""}-both`}
+                            locationKey={`${
+                              filters.sido_code || filters.province
+                            }-${filters.city_code || filters.cityDistrict}-${
+                              filters.town_code || filters.town || ""
+                            }`}
+                            items={mapItems || items}
+                            isLoading={false}
+                            error={undefined}
+                            onRetry={undefined}
+                            highlightIds={selectedRowKeys.map((k) => String(k))}
+                            onBoundsChange={(b) => setBounds(b)}
+                          />
+                        </div>
                       </ViewState>
                     </div>
                     <div>
                       <h3 className="text-lg font-semibold mb-3">목록</h3>
                       <ViewState
-                        isLoading={isLoading}
+                        isLoading={showLoadingList}
                         error={error}
                         total={totalCount}
                         onRetry={refetch}
                       >
-                        {useVirtual ? (
-                          <ItemTableVirtual
-                            items={items}
-                            isLoading={false}
-                            error={undefined}
-                            onRetry={undefined}
-                            sortBy={sortBy}
-                            sortOrder={sortOrder}
-                            onSort={handleSort}
-                            selectedRowKeys={selectedRowKeys}
-                            onSelectionChange={setSelectedRowKeys}
-                            containerHeight={560}
-                            rowHeight={44}
-                            overscan={8}
-                          />
-                        ) : (
+                        {
                           <ItemTable
                             items={items}
                             isLoading={false}
@@ -608,7 +584,7 @@ export default function AnalysisPage() {
                             selectedRowKeys={selectedRowKeys}
                             onSelectionChange={setSelectedRowKeys}
                           />
-                        )}
+                        }
                       </ViewState>
                     </div>
                   </div>
