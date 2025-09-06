@@ -5,6 +5,8 @@ import { loadKakaoSdk } from "@/lib/map/kakaoLoader";
 import MapLegend from "./MapLegend";
 import { captureError } from "@/lib/monitoring";
 import { DEFAULT_THRESHOLDS, MAP_GUARD } from "@/lib/map/config";
+import { renderBasePopup } from "@/components/map/popup/BasePopup";
+import { auctionSchema } from "@/components/map/popup/schemas/auction";
 import { useFilterStore } from "@/store/filterStore";
 import {
   Sheet,
@@ -344,6 +346,14 @@ function MapView({
     };
 
     const buildPopupHTML = (it: any) => {
+      // 🆕 auction_ed 전용 팝업: 공통 베이스 + 경매 스키마로 렌더링
+      if (namespace === "auction_ed") {
+        const item = it || {};
+        // 안전 매핑: snake_case 원본과 extra의 camelCase 모두 허용하도록 스키마가 처리
+        const { title, subtitle, rows, actions } = auctionSchema(item);
+        return renderBasePopup({ title, subtitle, rows, actions });
+      }
+
       const useDiv = document.createElement("div");
       useDiv.style.width = "270px";
       useDiv.style.maxWidth = "270px";

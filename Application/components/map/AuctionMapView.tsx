@@ -5,6 +5,8 @@ import { loadKakaoSdk } from "@/lib/map/kakaoLoader";
 import MapLegend from "../features/MapLegend";
 import { captureError } from "@/lib/monitoring";
 import { DEFAULT_THRESHOLDS, MAP_GUARD } from "@/lib/map/config";
+import { renderBasePopup } from "./popup/BasePopup";
+import { auctionSchema } from "./popup/schemas/auction";
 import { useFilterStore } from "@/store/filterStore";
 import {
   Sheet,
@@ -77,7 +79,8 @@ function AuctionMapView({
   const [isMobile, setIsMobile] = useState(false);
   const isPopupLockedRef = useRef<boolean>(false);
   const badgeImageCacheRef = useRef<Map<string, any>>(new Map());
-  const thresholdsState = useFilterStore((s: any) => s.thresholds) ?? DEFAULT_THRESHOLDS;
+  const thresholdsState =
+    useFilterStore((s: any) => s.thresholds) ?? DEFAULT_THRESHOLDS;
   const lastCenterRef = useRef<{ lat: number; lng: number } | null>(null);
   const hasPerformedInitialFitRef = useRef<boolean>(false);
   const mapRef = useRef<HTMLDivElement>(null);
@@ -86,7 +89,7 @@ function AuctionMapView({
   const getAuctionMarkerColor = (item: any): string => {
     const ratio = item?.min_to_appraisal_ratio || 0;
     if (ratio <= 60) return "#ef4444"; // 빨간색: ≤ 6,000만원
-    if (ratio <= 80) return "#f97316"; // 주황색: ≤ 8,000만원  
+    if (ratio <= 80) return "#f97316"; // 주황색: ≤ 8,000만원
     if (ratio <= 100) return "#eab308"; // 노란색: ≤ 10,000만원
     if (ratio <= 130) return "#22c55e"; // 초록색: ≤ 13,000만원
     return "#3b82f6"; // 파란색: > 13,000만원
@@ -111,48 +114,10 @@ function AuctionMapView({
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
 
-  // 🆕 경매 결과 전용 팝업 내용 생성
-  const createAuctionPopupContent = (item: any): string => {
-    return `
-      <div style="min-width: 280px; max-width: 320px; padding: 12px; background: white; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
-        <div style="font-size: 14px; font-weight: 600; color: #1f2937; margin-bottom: 8px; line-height: 1.4;">
-          ${item?.road_address || item?.address || "주소 정보 없음"}
-        </div>
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 12px;">
-          <div>
-            <span style="color: #6b7280;">사건번호:</span><br>
-            <span style="color: #111827; font-weight: 500;">${item?.case_number || "-"}</span>
-          </div>
-          <div>
-            <span style="color: #6b7280;">현재상태:</span><br>
-            <span style="color: #111827; font-weight: 500;">${item?.current_status || "-"}</span>
-          </div>
-          <div>
-            <span style="color: #6b7280;">감정가:</span><br>
-            <span style="color: #dc2626; font-weight: 600;">${item?.appraisal_price ? Number(item.appraisal_price).toLocaleString() : "-"}만원</span>
-          </div>
-          <div>
-            <span style="color: #6b7280;">최저가:</span><br>
-            <span style="color: #dc2626; font-weight: 600;">${item?.min_price ? Number(item.min_price).toLocaleString() : "-"}만원</span>
-          </div>
-          <div>
-            <span style="color: #6b7280;">매각기일:</span><br>
-            <span style="color: #111827; font-weight: 500;">${item?.sale_date || "-"}</span>
-          </div>
-          <div>
-            <span style="color: #6b7280;">최저가/감정가:</span><br>
-            <span style="color: #059669; font-weight: 600;">${item?.min_to_appraisal_ratio || 0}%</span>
-          </div>
-        </div>
-        <div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid #e5e7eb;">
-          <div style="font-size: 11px; color: #6b7280;">
-            ${item?.building_area_pyeong ? `건물 ${item.building_area_pyeong}평` : ""} 
-            ${item?.land_area_pyeong ? `· 토지 ${item.land_area_pyeong}평` : ""}
-            ${item?.floor_info ? `· ${item.floor_info}` : ""}
-          </div>
-        </div>
-      </div>
-    `;
+  // 🆕 경매 결과 전용 팝업 내용 생성 (공통 베이스 + 경매 스키마)
+  const createAuctionPopupContent = (item: any): HTMLElement => {
+    const { title, subtitle, rows, actions } = auctionSchema(item);
+    return renderBasePopup({ title, subtitle, rows, actions });
   };
 
   // 카카오 맵 초기화
@@ -164,7 +129,7 @@ function AuctionMapView({
     const initMap = async () => {
       try {
         console.log("🔍 [AuctionMapView] 카카오 맵 초기화 시작");
-        
+
         await loadKakaoSdk();
         if (!isMounted) return;
 
@@ -221,7 +186,6 @@ function AuctionMapView({
 
         setMapReady(true);
         console.log("✅ [AuctionMapView] 카카오 맵 초기화 완료");
-
       } catch (error) {
         console.error("❌ [AuctionMapView] 맵 초기화 실패:", error);
         captureError(error);
@@ -259,12 +223,13 @@ function AuctionMapView({
 
     // 유효한 아이템만 필터링 (좌표가 있는)
     const validItems = items
-      .filter((item: any) => 
-        item && 
-        typeof item.latitude === "number" && 
-        typeof item.longitude === "number" &&
-        !isNaN(item.latitude) && 
-        !isNaN(item.longitude)
+      .filter(
+        (item: any) =>
+          item &&
+          typeof item.latitude === "number" &&
+          typeof item.longitude === "number" &&
+          !isNaN(item.latitude) &&
+          !isNaN(item.longitude)
       )
       .slice(0, maxMarkers); // 최대 개수 제한
 
@@ -275,7 +240,7 @@ function AuctionMapView({
       try {
         const position = new kakao.maps.LatLng(item.latitude, item.longitude);
         const color = getAuctionMarkerColor(item);
-        
+
         // 마커 이미지 생성 (간단한 원형)
         const imageSize = new kakao.maps.Size(24, 24);
         const markerImage = new kakao.maps.MarkerImage(
@@ -340,7 +305,6 @@ function AuctionMapView({
           item,
         });
         markerToItemRef.current.set(marker, item);
-
       } catch (error) {
         console.error("❌ [AuctionMapView] 마커 생성 실패:", error, item);
       }
@@ -360,7 +324,6 @@ function AuctionMapView({
       map.setBounds(bounds);
       hasPerformedInitialFitRef.current = true;
     }
-
   }, [mapReady, items, maxMarkers, locationKey, onItemSelect, isMobile]);
 
   // 전체화면 토글
@@ -371,7 +334,7 @@ function AuctionMapView({
   // 지도 타입 변경
   const changeMapType = (type: "ROADMAP" | "SATELLITE" | "HYBRID") => {
     if (!kakaoMapRef.current) return;
-    
+
     const { kakao } = window as any;
     let mapTypeId;
     switch (type) {
@@ -399,13 +362,13 @@ function AuctionMapView({
   return (
     <div className={containerClass}>
       <div ref={mapRef} className="absolute inset-0 bg-gray-100" />
-      
+
       {isLoading && (
         <div className="absolute top-2 right-2 rounded bg-white/90 px-2 py-1 text-xs text-gray-600 shadow z-20">
           지도를 불러오는 중...
         </div>
       )}
-      
+
       {!!error && (
         <div className="absolute top-2 left-1/2 -translate-x-1/2 rounded bg-red-50 px-3 py-2 text-xs text-red-700 shadow z-20 flex items-center gap-2">
           <span>지도 로딩 오류</span>
@@ -423,8 +386,24 @@ function AuctionMapView({
       {/* 지도 중앙 크로스헤어 */}
       <div className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-10">
         <svg width="22" height="22" viewBox="0 0 22 22">
-          <line x1="11" y1="0" x2="11" y2="22" stroke="#111827" strokeOpacity="0.45" strokeWidth="1" />
-          <line x1="0" y1="11" x2="22" y2="11" stroke="#111827" strokeOpacity="0.45" strokeWidth="1" />
+          <line
+            x1="11"
+            y1="0"
+            x2="11"
+            y2="22"
+            stroke="#111827"
+            strokeOpacity="0.45"
+            strokeWidth="1"
+          />
+          <line
+            x1="0"
+            y1="11"
+            x2="22"
+            y2="11"
+            stroke="#111827"
+            strokeOpacity="0.45"
+            strokeWidth="1"
+          />
           <circle cx="11" cy="11" r="2" fill="#2563eb" fillOpacity="0.9" />
         </svg>
       </div>
@@ -437,7 +416,7 @@ function AuctionMapView({
         <div className="space-y-1">
           {auctionLegendItems.map((item, index) => (
             <div key={index} className="flex items-center gap-2 text-xs">
-              <div 
+              <div
                 className="w-3 h-3 rounded-full border border-white"
                 style={{ backgroundColor: item.color }}
               />
@@ -498,7 +477,10 @@ function AuctionMapView({
       )}
 
       {/* 모바일 팝업 시트 */}
-      <Sheet open={!!mobilePopupItem} onOpenChange={() => setMobilePopupItem(null)}>
+      <Sheet
+        open={!!mobilePopupItem}
+        onOpenChange={() => setMobilePopupItem(null)}
+      >
         <SheetContent side="bottom" className="h-[60vh]">
           <SheetHeader>
             <SheetTitle>상세 정보</SheetTitle>
@@ -508,28 +490,40 @@ function AuctionMapView({
               <div>
                 <div className="text-sm text-gray-600">주소</div>
                 <div className="font-medium">
-                  {mobilePopupItem.road_address || mobilePopupItem.address || "주소 정보 없음"}
+                  {mobilePopupItem.road_address ||
+                    mobilePopupItem.address ||
+                    "주소 정보 없음"}
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <div className="text-sm text-gray-600">사건번호</div>
-                  <div className="font-medium">{mobilePopupItem.case_number || "-"}</div>
+                  <div className="font-medium">
+                    {mobilePopupItem.case_number || "-"}
+                  </div>
                 </div>
                 <div>
                   <div className="text-sm text-gray-600">현재상태</div>
-                  <div className="font-medium">{mobilePopupItem.current_status || "-"}</div>
+                  <div className="font-medium">
+                    {mobilePopupItem.current_status || "-"}
+                  </div>
                 </div>
                 <div>
                   <div className="text-sm text-gray-600">감정가</div>
                   <div className="font-medium text-red-600">
-                    {mobilePopupItem.appraisal_price ? Number(mobilePopupItem.appraisal_price).toLocaleString() : "-"}만원
+                    {mobilePopupItem.appraisal_price
+                      ? Number(mobilePopupItem.appraisal_price).toLocaleString()
+                      : "-"}
+                    만원
                   </div>
                 </div>
                 <div>
                   <div className="text-sm text-gray-600">최저가</div>
                   <div className="font-medium text-red-600">
-                    {mobilePopupItem.min_price ? Number(mobilePopupItem.min_price).toLocaleString() : "-"}만원
+                    {mobilePopupItem.min_price
+                      ? Number(mobilePopupItem.min_price).toLocaleString()
+                      : "-"}
+                    만원
                   </div>
                 </div>
               </div>
