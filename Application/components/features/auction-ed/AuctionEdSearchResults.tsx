@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -65,6 +65,17 @@ interface AuctionEdSearchResultsProps {
     east: number;
   } | null;
   onBoundsChange?: (bounds: any) => void;
+  // 🆕 외부에서 전달받을 데이터 (v2 페이지에서 전달)
+  items?: any[];
+  total?: number;
+  isLoading?: boolean;
+  error?: any;
+  // 🆕 처리된 데이터를 상위로 전달하는 콜백 (하위 호환용)
+  onProcessedDataChange?: (data: {
+    tableItems: any[];
+    mapItems: any[];
+    total: number;
+  }) => void;
 }
 
 export default function AuctionEdSearchResults({
@@ -72,6 +83,11 @@ export default function AuctionEdSearchResults({
   onViewChange,
   bounds,
   onBoundsChange,
+  items: externalItems,
+  total: externalTotal,
+  isLoading: externalLoading,
+  error: externalError,
+  onProcessedDataChange,
 }: AuctionEdSearchResultsProps) {
   // 필터 상태 가져오기 (네임스페이스 필터 포함)
   const allFilters: any = useFilterStore();
@@ -188,11 +204,15 @@ export default function AuctionEdSearchResults({
     sortOrderGlobal,
     5000
   );
-  const isLoading = useGlobal ? globalHook.isLoading : pageHook.isLoading;
-  const error = useGlobal ? globalHook.error : pageHook.error;
+  // 🆕 외부 데이터가 있으면 우선 사용, 없으면 기존 훅 사용
+  const isLoading =
+    externalLoading ?? (useGlobal ? globalHook.isLoading : pageHook.isLoading);
+  const error =
+    externalError ?? (useGlobal ? globalHook.error : pageHook.error);
   const refetch = useGlobal ? globalHook.mutate : pageHook.mutate;
   const rawItems = useGlobal ? globalHook.items : pageHook.items;
-  const serverTotal = useGlobal ? globalHook.total : pageHook.total;
+  const serverTotal =
+    externalTotal ?? (useGlobal ? globalHook.total : pageHook.total);
 
   // 전체 데이터 개수 조회 (지역 필터 없이)
   const { total: totalAllData } = useDataset("auction_ed", {}, 1, 1);
@@ -216,8 +236,8 @@ export default function AuctionEdSearchResults({
     return itemsToFilter || [];
   };
 
-  // 현재 페이지 데이터에 상세 필터링 적용
-  const items = applyDetailFilters(rawItems) || [];
+  // 🆕 외부에서 전달받은 데이터가 있으면 우선 사용, 없으면 기존 방식
+  const items = externalItems ?? (applyDetailFilters(rawItems) || []);
 
   // 정렬은 서버에서 처리하므로 클라이언트에서는 그대로 사용
   const processedItems = items;
@@ -237,58 +257,32 @@ export default function AuctionEdSearchResults({
     setMaxMarkersCap(next);
   };
 
+  // 지도 전용 대용량 요청: 지도 활성 시에만 큰 사이즈로 1페이지 조회해 지도 데이터 소스로 사용
+  const mapRequestSize = wantAllForMap
+    ? Math.min(BACKEND_MAX_PAGE_SIZE, MAP_GUARD.maxMarkers, maxMarkersCap)
+    : requestSize;
+  const mapPage = 1;
+  const mapPageHook = useDataset(
+    "auction_ed",
+    mergedFilters,
+    mapPage,
+    mapRequestSize
+  );
+  const mapGlobalHook = useGlobalDataset(
+    "auction_ed",
+    mergedFilters,
+    mapPage,
+    mapRequestSize,
+    sortByGlobal,
+    sortOrderGlobal,
+    5000
+  );
+  const mapRawItems = useGlobal ? mapGlobalHook.items : mapPageHook.items;
+
   useEffect(() => {
-    // 추가 페이지 병합 로직: 지도/통합 뷰에서만, 첫 요청 완료 후 수행
-    let ignore = false;
-    async function loadMorePages() {
-      try {
-        if (!wantAllForMap) return;
-        if (!Array.isArray(items) || items.length === 0) {
-          setExtraMapItems([]);
-          return;
-        }
-        const maxToCollect = Math.min(
-          MAP_GUARD.maxMarkers,
-          maxMarkersCap,
-          typeof effectiveTotal === "number" && effectiveTotal > 0
-            ? effectiveTotal
-            : items.length
-        );
-        const pageSize = BACKEND_MAX_PAGE_SIZE;
-        const totalPages = Math.ceil(maxToCollect / pageSize);
-        if (totalPages <= 1) {
-          setExtraMapItems([]);
-          return;
-        }
-        setIsFetchingMore(true);
-        const api = datasetConfigs["auction_ed"].api;
-        const all: any[] = [];
-        // 페이지 2..N 요청 (직렬로 안정성 우선)
-        for (let p = 2; p <= totalPages; p++) {
-          const res = await (api as any).fetchList({
-            filters: mergedFilters,
-            page: p,
-            size: pageSize,
-          });
-          if (ignore) return;
-          const batch: any[] = Array.isArray(res)
-            ? res
-            : res?.results ?? res?.items ?? [];
-          all.push(...batch);
-          // 상한을 넘지 않도록 조기 종료
-          if (items.length + all.length >= maxToCollect) break;
-        }
-        if (!ignore) setExtraMapItems(all);
-      } catch {
-        if (!ignore) setExtraMapItems([]);
-      } finally {
-        if (!ignore) setIsFetchingMore(false);
-      }
-    }
-    loadMorePages();
-    return () => {
-      ignore = true;
-    };
+    // 지도는 별도의 대용량 1페이지 요청을 사용하므로 추가 병합은 비활성화
+    setExtraMapItems([]);
+    setIsFetchingMore(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     wantAllForMap,
@@ -301,9 +295,12 @@ export default function AuctionEdSearchResults({
 
   // 지도 전용 아이템(표시 상한/추가 페이지 병합)과 테이블 전용 아이템(전체)을 분리
   const tableItemsAll = processedItems; // 목록은 상한 없이 전체
-  const mapItemsAll = wantAllForMap
-    ? [...processedItems, ...extraMapItems]
+  const mapSource = wantAllForMap
+    ? Array.isArray(mapRawItems) && mapRawItems.length > 0
+      ? (mapRawItems as any[])
+      : processedItems
     : processedItems;
+  const mapItemsAll = mapSource;
   const mapItems = (() => {
     const list = [...mapItemsAll];
     list.sort((a: any, b: any) => {
@@ -313,6 +310,40 @@ export default function AuctionEdSearchResults({
     });
     return list.slice(0, Math.min(MAP_GUARD.maxMarkers, maxMarkersCap));
   })();
+
+  // 🆕 처리된 데이터를 상위로 전달 (useMemo로 참조 안정성 확보하여 무한루프 방지)
+  const processedDataMemo = useMemo(() => {
+    console.log("🔍 [AuctionEdSearchResults] 데이터 전달:", {
+      tableItemsLength: tableItemsAll?.length,
+      mapItemsLength: mapItems?.length,
+      total: effectiveTotal,
+      hasExternalItems: !!externalItems,
+      externalItemsLength: externalItems?.length,
+      wantAllForMap,
+      activeView,
+      extraMapItemsLength: extraMapItems?.length,
+      processedItemsLength: processedItems?.length,
+    });
+    return {
+      tableItems: tableItemsAll,
+      mapItems: mapItems,
+      total: effectiveTotal,
+    };
+  }, [
+    // 🔍 실제 데이터 길이와 첫번째 아이템 ID만 비교 (참조 변경 무시)
+    tableItemsAll?.length,
+    mapItems?.length,
+    effectiveTotal,
+    tableItemsAll?.[0]?.id,
+    mapItems?.[0]?.id,
+  ]);
+
+  useEffect(() => {
+    if (onProcessedDataChange) {
+      onProcessedDataChange(processedDataMemo);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [processedDataMemo]);
 
   // 테이블 기능을 위한 추가 상태들
   const {

@@ -1,7 +1,8 @@
 "use client";
 import MapView from "@/components/features/map-view";
+import AuctionMapView from "@/components/map/AuctionMapView";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Header from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
@@ -243,7 +244,20 @@ export default function PropertyDetailV2Page() {
   const initialPage = 1;
   const initialSize = 20;
   const [pageNum, setPageNum] = useState(initialPage);
-  const [pageSize, setPageSize] = useState(initialSize);
+  // 🆕 auction_ed는 지도용으로 큰 사이즈 사용
+  const getPageSize = () => {
+    if (activeDataset === "auction_ed") {
+      return 1000; // 경매 결과는 지도에서 더 많은 데이터 표시
+    }
+    return initialSize;
+  };
+  const [pageSize, setPageSize] = useState(getPageSize());
+  
+  // 🆕 데이터셋 변경 시 pageSize 업데이트
+  useEffect(() => {
+    setPageSize(getPageSize());
+  }, [activeDataset]);
+  
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
   const [bounds, setBounds] = useState<{
     south: number;
@@ -251,6 +265,28 @@ export default function PropertyDetailV2Page() {
     north: number;
     east: number;
   } | null>(null);
+
+  // 🆕 처리된 데이터를 받을 상태 (AuctionEdSearchResults에서 전달받음)
+  const [processedData, setProcessedData] = useState<{
+    tableItems: any[];
+    mapItems: any[];
+    total: number;
+  } | null>(null);
+
+  // 🆕 콜백 함수를 useCallback으로 안정화 (무한루프 방지)
+  const handleProcessedDataChange = useCallback(
+    (data: { tableItems: any[]; mapItems: any[]; total: number }) => {
+      console.log("🔍 [v2 Page] 처리된 데이터 수신:", {
+        tableItemsLength: data.tableItems?.length,
+        mapItemsLength: data.mapItems?.length,
+        total: data.total,
+        activeDataset,
+        activeView, // activeView 상태도 로깅
+      });
+      setProcessedData(data);
+    },
+    [activeDataset, activeView]
+  );
   const centerAndRadius = useMemo(() => {
     // 시도 미선택 시 지도 중심/반경도 적용하지 않음(요청 억제)
     if (!selectedProvince) return null;
@@ -779,17 +815,26 @@ export default function PropertyDetailV2Page() {
                                   : (activeView as "table" | "map" | "both")
                               }
                               onViewChange={(view) => {
+                                console.log("🔍 [onViewChange] 뷰 변경:", {
+                                  view,
+                                  currentActiveView: activeView,
+                                  activeDataset,
+                                });
                                 const mappedView =
                                   view === "both"
                                     ? "integrated"
                                     : view === "table"
                                     ? "list"
                                     : view;
+                                console.log("🔍 [onViewChange] 매핑된 뷰:", {
+                                  mappedView,
+                                });
                                 handleChangeView(mappedView as ViewType);
                                 setPageNum(1);
                                 if (selectedRowKeys.length > 0)
                                   setSelectedRowKeys([]);
                               }}
+                              onProcessedDataChange={handleProcessedDataChange}
                             />
                           ) : (
                             <ViewState
@@ -1147,12 +1192,36 @@ export default function PropertyDetailV2Page() {
                                 total={dsTotal as number}
                                 onRetry={() => dsRefetch?.()}
                               >
-                                <MapView
-                                  enabled={activeView === "map"}
-                                  key={`${activeDataset}-map`}
-                                  items={dsItems as any}
-                                  isLoading={false}
-                                  error={undefined}
+                                {(() => {
+                                  console.log("🔍 [Map 렌더링 조건]:", { 
+                                    activeDataset, 
+                                    isAuction: activeDataset === "auction_ed",
+                                    dsItemsLength: (dsItems as any[])?.length,
+                                    dsTotal 
+                                  });
+                                  return activeDataset === "auction_ed";
+                                })() ? (
+                                  <AuctionMapView
+                                    enabled={activeView === "map"}
+                                    key={`${activeDataset}-map`}
+                                    items={dsItems as any}
+                                    isLoading={false}
+                                    error={undefined}
+                                    maxMarkers={500}
+                                    displayInfo={{
+                                      shown: Math.min(500, (dsItems as any[])?.length || 0),
+                                      total: dsTotal || 0,
+                                    }}
+                                    onBoundsChange={(b) => setBounds(b)}
+                                    locationKey={`${selectedProvince}-${selectedCity}`}
+                                  />
+                                ) : (
+                                  <MapView
+                                    enabled={activeView === "map"}
+                                    key={`${activeDataset}-map`}
+                                    items={dsItems as any}
+                                    isLoading={false}
+                                    error={undefined}
                                   markerColorFn={
                                     datasetConfigs[
                                       activeDataset as keyof typeof datasetConfigs
@@ -1165,6 +1234,7 @@ export default function PropertyDetailV2Page() {
                                   )}
                                   onBoundsChange={(b) => setBounds(b)}
                                 />
+                                )}
                               </ViewState>
                             </TabsContent>
 
@@ -1187,12 +1257,28 @@ export default function PropertyDetailV2Page() {
                                       total={dsTotal as number}
                                       onRetry={() => dsRefetch?.()}
                                     >
-                                      <MapView
-                                        enabled={activeView === "integrated"}
-                                        key={`${activeDataset}-integrated`}
-                                        items={dsItems as any}
-                                        isLoading={false}
-                                        error={undefined}
+                                      {activeDataset === "auction_ed" ? (
+                                        <AuctionMapView
+                                          enabled={activeView === "integrated"}
+                                          key={`${activeDataset}-integrated`}
+                                          items={dsItems as any}
+                                          isLoading={false}
+                                          error={undefined}
+                                          maxMarkers={500}
+                                          displayInfo={{
+                                            shown: Math.min(500, (dsItems as any[])?.length || 0),
+                                            total: dsTotal || 0,
+                                          }}
+                                          onBoundsChange={(b) => setBounds(b)}
+                                          locationKey={`${selectedProvince}-${selectedCity}`}
+                                        />
+                                      ) : (
+                                        <MapView
+                                          enabled={activeView === "integrated"}
+                                          key={`${activeDataset}-integrated`}
+                                          items={dsItems as any}
+                                          isLoading={false}
+                                          error={undefined}
                                         markerColorFn={
                                           datasetConfigs[
                                             activeDataset as keyof typeof datasetConfigs
@@ -1204,6 +1290,7 @@ export default function PropertyDetailV2Page() {
                                         )}
                                         onBoundsChange={(b) => setBounds(b)}
                                       />
+                                      )}
                                     </ViewState>
                                   </CardContent>
                                 </Card>
