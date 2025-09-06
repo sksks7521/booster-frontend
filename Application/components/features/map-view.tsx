@@ -7,6 +7,7 @@ import { captureError } from "@/lib/monitoring";
 import { DEFAULT_THRESHOLDS, MAP_GUARD } from "@/lib/map/config";
 import { renderBasePopup } from "@/components/map/popup/BasePopup";
 import { auctionSchema } from "@/components/map/popup/schemas/auction";
+import { analysisSchema } from "@/components/map/popup/schemas/analysis";
 import { useFilterStore } from "@/store/filterStore";
 import {
   Sheet,
@@ -353,6 +354,12 @@ function MapView({
         const { title, subtitle, rows, actions } = auctionSchema(item);
         return renderBasePopup({ title, subtitle, rows, actions });
       }
+
+      // 기본(분석 등) 팝업: 공통 베이스 + 분석 스키마로 렌더링
+      try {
+        const { title, subtitle, rows, actions } = analysisSchema(it || {});
+        return renderBasePopup({ title, subtitle, rows, actions });
+      } catch {}
 
       const useDiv = document.createElement("div");
       useDiv.style.width = "270px";

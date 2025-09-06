@@ -112,6 +112,11 @@ export function renderBasePopup({
     const tdValue = document.createElement("td");
     tdValue.style.padding = "2px 0";
     tdValue.style.textAlign = "right";
+    // 긴 값이 팝업을 넘어가지 않도록 줄바꿈/단어 단위 개행 적용
+    tdValue.style.whiteSpace = "normal";
+    tdValue.style.wordBreak = "break-word";
+    (tdValue.style as any).overflowWrap = "anywhere";
+    tdValue.style.lineHeight = "1.4";
     if (r.ariaLabel) tdValue.setAttribute("aria-label", r.ariaLabel);
     tdValue.textContent = r.value ?? "";
     tr.appendChild(tdLabel);
