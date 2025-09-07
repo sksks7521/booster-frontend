@@ -1,6 +1,6 @@
 "use client";
 import MapView from "@/components/features/map-view";
-import AuctionMapView from "@/components/map/AuctionMapView";
+import { AuctionEdMap } from "@/components/features/auction-ed";
 
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
@@ -252,12 +252,12 @@ export default function PropertyDetailV2Page() {
     return initialSize;
   };
   const [pageSize, setPageSize] = useState(getPageSize());
-  
+
   // 🆕 데이터셋 변경 시 pageSize 업데이트
   useEffect(() => {
     setPageSize(getPageSize());
   }, [activeDataset]);
-  
+
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
   const [bounds, setBounds] = useState<{
     south: number;
@@ -1193,27 +1193,25 @@ export default function PropertyDetailV2Page() {
                                 onRetry={() => dsRefetch?.()}
                               >
                                 {(() => {
-                                  console.log("🔍 [Map 렌더링 조건]:", { 
-                                    activeDataset, 
+                                  console.log("🔍 [Map 렌더링 조건]:", {
+                                    activeDataset,
                                     isAuction: activeDataset === "auction_ed",
                                     dsItemsLength: (dsItems as any[])?.length,
-                                    dsTotal 
+                                    dsTotal,
                                   });
                                   return activeDataset === "auction_ed";
                                 })() ? (
-                                  <AuctionMapView
+                                  <AuctionEdMap
                                     enabled={activeView === "map"}
                                     key={`${activeDataset}-map`}
                                     items={dsItems as any}
                                     isLoading={false}
                                     error={undefined}
-                                    maxMarkers={500}
-                                    displayInfo={{
-                                      shown: Math.min(500, (dsItems as any[])?.length || 0),
-                                      total: dsTotal || 0,
-                                    }}
                                     onBoundsChange={(b) => setBounds(b)}
                                     locationKey={`${selectedProvince}-${selectedCity}`}
+                                    highlightIds={selectedRowKeys.map((k) =>
+                                      String(k)
+                                    )}
                                   />
                                 ) : (
                                   <MapView
@@ -1222,18 +1220,16 @@ export default function PropertyDetailV2Page() {
                                     items={dsItems as any}
                                     isLoading={false}
                                     error={undefined}
-                                  markerColorFn={
-                                    datasetConfigs[
-                                      activeDataset as keyof typeof datasetConfigs
-                                    ]?.map?.marker as any
-                                  }
-                                  // 범례는 현재 내부 공통 레전드 사용. 필요 시 legendItems 전달
-                                  namespace={activeDataset}
-                                  highlightIds={selectedRowKeys.map((k) =>
-                                    String(k)
-                                  )}
-                                  onBoundsChange={(b) => setBounds(b)}
-                                />
+                                    markerColorFn={
+                                      datasetConfigs[
+                                        activeDataset as keyof typeof datasetConfigs
+                                      ]?.map?.marker as any
+                                    }
+                                    highlightIds={selectedRowKeys.map((k) =>
+                                      String(k)
+                                    )}
+                                    onBoundsChange={(b) => setBounds(b)}
+                                  />
                                 )}
                               </ViewState>
                             </TabsContent>
@@ -1258,19 +1254,17 @@ export default function PropertyDetailV2Page() {
                                       onRetry={() => dsRefetch?.()}
                                     >
                                       {activeDataset === "auction_ed" ? (
-                                        <AuctionMapView
+                                        <AuctionEdMap
                                           enabled={activeView === "integrated"}
                                           key={`${activeDataset}-integrated`}
                                           items={dsItems as any}
                                           isLoading={false}
                                           error={undefined}
-                                          maxMarkers={500}
-                                          displayInfo={{
-                                            shown: Math.min(500, (dsItems as any[])?.length || 0),
-                                            total: dsTotal || 0,
-                                          }}
                                           onBoundsChange={(b) => setBounds(b)}
                                           locationKey={`${selectedProvince}-${selectedCity}`}
+                                          highlightIds={selectedRowKeys.map(
+                                            (k) => String(k)
+                                          )}
                                         />
                                       ) : (
                                         <MapView
@@ -1279,17 +1273,16 @@ export default function PropertyDetailV2Page() {
                                           items={dsItems as any}
                                           isLoading={false}
                                           error={undefined}
-                                        markerColorFn={
-                                          datasetConfigs[
-                                            activeDataset as keyof typeof datasetConfigs
-                                          ]?.map?.marker as any
-                                        }
-                                        namespace={activeDataset}
-                                        highlightIds={selectedRowKeys.map((k) =>
-                                          String(k)
-                                        )}
-                                        onBoundsChange={(b) => setBounds(b)}
-                                      />
+                                          markerColorFn={
+                                            datasetConfigs[
+                                              activeDataset as keyof typeof datasetConfigs
+                                            ]?.map?.marker as any
+                                          }
+                                          highlightIds={selectedRowKeys.map(
+                                            (k) => String(k)
+                                          )}
+                                          onBoundsChange={(b) => setBounds(b)}
+                                        />
                                       )}
                                     </ViewState>
                                   </CardContent>

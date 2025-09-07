@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { loadKakaoSdk } from "@/lib/map/kakaoLoader";
 import MapLegend from "../features/MapLegend";
 import { captureError } from "@/lib/monitoring";
-import { DEFAULT_THRESHOLDS, MAP_GUARD } from "@/lib/map/config";
+import { DEFAULT_THRESHOLDS, MAP_GUARD, PALETTE } from "@/lib/map/config";
 import { renderBasePopup } from "./popup/BasePopup";
 import { auctionSchema } from "./popup/schemas/auction";
 import { useFilterStore } from "@/store/filterStore";
@@ -100,8 +100,8 @@ function AuctionMapView({
     { label: "≤ 6,000 만원", color: "#ef4444" },
     { label: "≤ 8,000 만원", color: "#f97316" },
     { label: "≤ 10,000 만원", color: "#eab308" },
-    { label: "≤ 13,000 만원", color: "#22c55e" },
-    { label: "> 13,000 만원", color: "#3b82f6" },
+    { label: "≤ 15,000 만원", color: "#22c55e" },
+    { label: "> 15,000 만원", color: "#3b82f6" },
   ];
 
   // 모바일 감지
@@ -411,7 +411,7 @@ function AuctionMapView({
       {/* 🆕 경매 결과 전용 범례 */}
       <div className="absolute top-2 right-2 z-20 bg-white/95 rounded-lg shadow-lg border p-3">
         <div className="text-sm font-semibold text-gray-700 mb-2">
-          최저가 범례(단위: 만원)
+          매각가 범례(단위: 만원)
         </div>
         <div className="space-y-1">
           {auctionLegendItems.map((item, index) => (
@@ -425,7 +425,7 @@ function AuctionMapView({
           ))}
         </div>
         <div className="mt-2 pt-2 border-t border-gray-200 text-xs text-gray-500">
-          네모박스 숫자 예) 40 = 최저가/감정가 40~49%
+          네모박스 숫자 예) 40 = 매각가/감정가 40~49%
         </div>
       </div>
 

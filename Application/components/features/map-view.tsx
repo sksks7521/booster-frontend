@@ -40,6 +40,19 @@ interface MapViewProps {
   markerColorFn?: (row: any) => string;
   legendItems?: { label: string; color: string }[];
   namespace?: string;
+  // Legend 추가 주입 옵션
+  legendTitle?: string;
+  legendUnitLabel?: string;
+  legendHint?: string;
+  legendEditable?: boolean;
+  legendPaletteOverride?: Partial<{
+    blue: string;
+    green: string;
+    pink: string;
+    orange: string;
+    red: string;
+  }>;
+  legendThresholds?: number[];
 }
 
 function MapView({
@@ -55,6 +68,12 @@ function MapView({
   markerColorFn,
   legendItems,
   namespace,
+  legendTitle,
+  legendUnitLabel,
+  legendHint,
+  legendEditable,
+  legendPaletteOverride,
+  legendThresholds,
 }: MapViewProps) {
   const mapRef = useRef<HTMLDivElement | null>(null);
   const [mapReady, setMapReady] = useState(false);
@@ -314,7 +333,7 @@ function MapView({
     };
     const getColorByPrice = (price?: number | string | null) => {
       const v = typeof price === "string" ? parseFloat(price) : price ?? 0;
-      if (!v || isNaN(v)) return palette.grey; // grey
+      if (!v || isNaN(v)) return "#111827"; // black for missing/invalid
       const sorted = [...thresholds].sort((a, b) => a - b);
       const colors = [
         palette.blue,
@@ -1017,10 +1036,13 @@ function MapView({
         // 색상: 최저가(만원), 텍스트: 비율 10% 버킷
         const price = it?.minimum_bid_price ?? it?.min_bid_price ?? 0;
         const ratioRaw = it?.bid_to_appraised_ratio ?? it?.percentage ?? null;
-        const color =
+        let color =
           typeof markerColorFn === "function"
-            ? markerColorFn(it)
+            ? (markerColorFn as any)(it)
             : getColorByPrice(price);
+        if (typeof color !== "string" || color.trim() === "") {
+          color = "#111827"; // fallback to black if unmapped/invalid
+        }
         const label = getBucketText(ratioRaw);
         const image = getModernBadgeImage(color, label);
 
@@ -1604,7 +1626,39 @@ function MapView({
         </svg>
       </div>
       {/* 범례(레전드): 지도 우상단 고정 */}
-      <MapLegend thresholds={DEFAULT_THRESHOLDS} />
+      {(() => {
+        const hasLegendProps = Boolean(
+          legendItems ||
+            legendTitle ||
+            legendUnitLabel ||
+            legendHint ||
+            legendEditable !== undefined ||
+            legendPaletteOverride ||
+            legendThresholds ||
+            namespace
+        );
+        const unify =
+          (process.env.NEXT_PUBLIC_LEGEND_UNIFY ?? "0") === "1" ||
+          hasLegendProps;
+        return (
+          <MapLegend
+            thresholds={
+              unify &&
+              Array.isArray(legendThresholds) &&
+              legendThresholds.length > 0
+                ? (legendThresholds as number[])
+                : DEFAULT_THRESHOLDS
+            }
+            items={unify ? legendItems : undefined}
+            namespace={unify ? namespace : undefined}
+            title={unify ? legendTitle : undefined}
+            unitLabel={unify ? legendUnitLabel : undefined}
+            hint={unify ? legendHint : undefined}
+            editable={unify ? legendEditable : undefined}
+            paletteOverride={unify ? legendPaletteOverride : undefined}
+          />
+        );
+      })()}
 
       {!mapReady && (
         <div className="absolute top-2 right-2 rounded bg-white/90 px-2 py-1 text-xs text-gray-600 shadow">

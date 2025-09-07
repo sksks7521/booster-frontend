@@ -9,7 +9,7 @@ const ItemTable = dynamic(() => import("@/components/features/item-table"), {
   ssr: false,
 });
 // 가상 테이블 사용 제거
-import MapView from "@/components/features/map-view";
+import AuctionEdMap from "@/components/features/auction-ed/AuctionEdMap";
 
 import { useFilterStore } from "@/store/filterStore";
 import { useSortableColumns } from "@/hooks/useSortableColumns";
@@ -751,9 +751,8 @@ export default function AuctionEdSearchResults({
 
               {activeView === "map" && (
                 <div className="h-[calc(100vh-240px)]">
-                  <MapView
+                  <AuctionEdMap
                     items={mapItems}
-                    namespace="auction_ed"
                     highlightIds={(selectedIds || []).map((k: any) =>
                       String(k)
                     )}
@@ -767,9 +766,8 @@ export default function AuctionEdSearchResults({
                   <div className="space-y-4">
                     <h3 className="text-lg font-semibold">지도 보기</h3>
                     <div className="h-[calc(100vh-360px)]">
-                      <MapView
+                      <AuctionEdMap
                         items={mapItems}
-                        namespace="auction_ed"
                         highlightIds={(selectedIds || []).map((k: any) =>
                           String(k)
                         )}
