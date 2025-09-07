@@ -135,6 +135,9 @@ NEXT_PUBLIC_KAKAO_APP_KEY=your_kakao_js_app_key
 ### 📚 런북/구축 가이드
 
 - 분석/목록 페이지 확장을 위한 표준 런북: [`Doc/LearnBook/Analysispage.md`](./Doc/LearnBook/Analysispage.md)
+ - 지도 팝업 아키텍처: [`Doc/Map/Popup_Architecture.md`](./Doc/Map/Popup_Architecture.md)
+ - 새 데이터셋 팝업 스키마 추가 가이드: [`Doc/Map/Popup_Schema_Guide.md`](./Doc/Map/Popup_Schema_Guide.md)
+ - 팝업 QA 체크리스트: [`Doc/QA/Popup_QA_Checklist.md`](./Doc/QA/Popup_QA_Checklist.md)
 
 ## 🏗 아키텍처 원칙
 
