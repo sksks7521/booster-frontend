@@ -11,6 +11,8 @@ const ItemTable = dynamic(() => import("@/components/features/item-table"), {
 // 가상 테이블 사용 제거
 import AuctionEdMap from "@/components/features/auction-ed/AuctionEdMap";
 import { isWithinRadius } from "@/lib/geo/distance";
+import { pickLatLng } from "@/lib/geo/coords";
+import { useCircleFilterPipeline } from "@/components/features/shared/useCircleFilterPipeline";
 
 import { useFilterStore } from "@/store/filterStore";
 import { useSortableColumns } from "@/hooks/useSortableColumns";
@@ -182,7 +184,6 @@ export default function AuctionEdSearchResults({
     Boolean((filters as any)?.saleDateTo);
 
   // 지도 추가 수집은 별도 처리하고, 기본 데이터는 항상 현재 페이지/사이즈로 요청
-  const wantAllForMap = activeView !== "table";
   const requestPage = page;
   const requestSize = size;
 
@@ -256,31 +257,13 @@ export default function AuctionEdSearchResults({
     const r = Number((nsOverrides as any)?.circleRadiusM ?? 0);
     return Number.isFinite(r) && r > 0 ? r : 1000;
   })();
-  const pickLatLng = (row: any) => {
-    const latRaw = row?.lat ?? row?.latitude;
-    const lngRaw = row?.lng ?? row?.longitude;
-    const lat =
-      typeof latRaw === "number" ? latRaw : parseFloat(String(latRaw));
-    const lng =
-      typeof lngRaw === "number" ? lngRaw : parseFloat(String(lngRaw));
-    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
-    return { lat, lng } as { lat: number; lng: number };
-  };
+  // 좌표 추출은 공통 유틸 사용
+
+  // 지도 활성 또는 반경 필터 활성 시에는 전역 대용량 소스를 확보
+  const wantAllForMap = activeView !== "table" || applyCircle;
 
   // 정렬은 서버에서 처리하므로 클라이언트에서는 그대로 사용하되, 토글 ON이면 반경 필터 적용
-  const processedItems =
-    applyCircle && centerForFilter
-      ? (items || []).filter((row: any) => {
-          const p = pickLatLng(row);
-          return p
-            ? isWithinRadius(centerForFilter, p, radiusMForFilter)
-            : false;
-        })
-      : items;
-
-  // 총 개수는 항상 서버 total 사용 (정렬 시에도 유지)
-  const effectiveTotal = serverTotal || 0;
-  const pagedItems = processedItems;
+  // processedItems는 전역 원천을 기준으로 필터링하도록 뒤에서 계산(전역 mapRawItems 확보 후)
 
   // 지도는 전체(요청된 범위 내) 데이터 사용 + 필요 시 추가 페이지 병합
   const [extraMapItems, setExtraMapItems] = useState<any[]>([]);
@@ -293,9 +276,9 @@ export default function AuctionEdSearchResults({
     setMaxMarkersCap(next);
   };
 
-  // 지도 전용 대용량 요청: 지도 활성 시에만 큰 사이즈로 1페이지 조회해 지도 데이터 소스로 사용
+  // 지도 전용 대용량 요청: 입력 집합은 표시상한 영향을 받지 않도록 cap를 제거
   const mapRequestSize = wantAllForMap
-    ? Math.min(BACKEND_MAX_PAGE_SIZE, MAP_GUARD.maxMarkers, maxMarkersCap)
+    ? Math.min(BACKEND_MAX_PAGE_SIZE, MAP_GUARD.maxMarkers)
     : requestSize;
   const mapPage = 1;
   const mapPageHook = useDataset(
@@ -314,6 +297,14 @@ export default function AuctionEdSearchResults({
     5000
   );
   const mapRawItems = useGlobal ? mapGlobalHook.items : mapPageHook.items;
+  const mapLoading = useGlobal
+    ? (mapGlobalHook as any)?.isLoading
+    : (mapPageHook as any)?.isLoading;
+  const globalReady =
+    wantAllForMap &&
+    Array.isArray(mapRawItems) &&
+    mapRawItems.length > 0 &&
+    !mapLoading;
 
   useEffect(() => {
     // 지도는 별도의 대용량 1페이지 요청을 사용하므로 추가 병합은 비활성화
@@ -324,37 +315,29 @@ export default function AuctionEdSearchResults({
     wantAllForMap,
     JSON.stringify(mergedFilters),
     requestSize,
-    effectiveTotal,
+    // effectiveTotal는 아래에서 계산되므로 의존 제거
     items?.length,
     maxMarkersCap,
   ]);
 
-  // 지도 전용 아이템(표시 상한/추가 페이지 병합)과 테이블 전용 아이템(전체)을 분리
-  const tableItemsAll = processedItems; // 목록은 상한 없이 전체
-  const mapSourceBase = wantAllForMap
-    ? Array.isArray(mapRawItems) && mapRawItems.length > 0
-      ? (mapRawItems as any[])
-      : processedItems
-    : processedItems;
-  const mapSource =
-    applyCircle && centerForFilter
-      ? (mapSourceBase || []).filter((row: any) => {
-          const p = pickLatLng(row);
-          return p
-            ? isWithinRadius(centerForFilter, p, radiusMForFilter)
-            : false;
-        })
-      : mapSourceBase;
-  const mapItemsAll = mapSource;
-  const mapItems = (() => {
-    const list = [...mapItemsAll];
-    list.sort((a: any, b: any) => {
-      const at = a?.sale_date ? new Date(a.sale_date).getTime() : 0;
-      const bt = b?.sale_date ? new Date(b.sale_date).getTime() : 0;
-      return bt - at;
+  // 공통 파이프라인 훅으로 치환
+  const { processedItemsSorted, pagedItems, mapItems, circleCount } =
+    useCircleFilterPipeline({
+      ns: "auction_ed",
+      activeView,
+      page,
+      size,
+      items,
+      // 전역 소스는 준비 완료 시에만 전달(초기 빈/로딩 상태 전파 방지)
+      globalSource: globalReady ? (mapRawItems as any[]) : undefined,
+      maxMarkersCap,
+      getRowSortTs: (r: any) => (r?.sale_date ? Date.parse(r.sale_date) : 0),
     });
-    return list.slice(0, Math.min(MAP_GUARD.maxMarkers, maxMarkersCap));
-  })();
+
+  const effectiveTotal = applyCircle
+    ? processedItemsSorted.length
+    : serverTotal || 0;
+  const tableItemsAll = processedItemsSorted; // 목록은 상한 없이 전체
 
   // 🆕 처리된 데이터를 상위로 전달 (useMemo로 참조 안정성 확보하여 무한루프 방지)
   const processedDataMemo = useMemo(() => {
@@ -367,7 +350,7 @@ export default function AuctionEdSearchResults({
       wantAllForMap,
       activeView,
       extraMapItemsLength: extraMapItems?.length,
-      processedItemsLength: processedItems?.length,
+      processedItemsLength: processedItemsSorted?.length,
     });
     return {
       tableItems: tableItemsAll,
@@ -384,11 +367,12 @@ export default function AuctionEdSearchResults({
   ]);
 
   useEffect(() => {
-    if (onProcessedDataChange) {
-      onProcessedDataChange(processedDataMemo);
-    }
+    if (!onProcessedDataChange) return;
+    // 반경 필터 활성 시 전역 소스 준비 전에는 상위 전달을 지연해 빈 집합 전달을 방지
+    if (applyCircle && !globalReady) return;
+    onProcessedDataChange(processedDataMemo);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [processedDataMemo]);
+  }, [processedDataMemo, applyCircle, globalReady]);
 
   // 테이블 기능을 위한 추가 상태들
   const {
@@ -487,7 +471,7 @@ export default function AuctionEdSearchResults({
                 <span className="inline-block">
                   영역 안 필터{" "}
                   <span className="font-semibold text-indigo-600">
-                    {processedItems.length.toLocaleString()}
+                    {processedItemsSorted.length.toLocaleString()}
                   </span>
                   건
                 </span>
@@ -947,7 +931,7 @@ export default function AuctionEdSearchResults({
                             // 최신 선택 항목을 지도 중심으로 이동 (통합 탭에서 지도도 렌더링 중)
                             const id = added;
                             const sources: any[] = [
-                              ...mapItemsAll, // 지도에 표시되는 집합(상한 적용)
+                              ...mapItems, // 지도에 표시되는 집합(상한 적용)
                               ...tableItemsAll, // 목록 전체(상한 없음)
                               ...extraMapItems,
                               ...items,

@@ -597,6 +597,61 @@ export default function PropertyDetailV2Page() {
     activeDataset,
   ]);
 
+  // 🆕 토글 ON 이후 중심/반지름 지속 보정: center가 비어 있거나 반경이 0/NaN이면 즉시 채움
+  useEffect(() => {
+    try {
+      const ns = nsState?.auction_ed;
+      if (!ns || !ns.applyCircleFilter) return;
+      if (typeof setNsFilter !== "function") return;
+
+      const isValid = (p?: { lat?: number; lng?: number }) =>
+        p &&
+        Number.isFinite((p as any).lat) &&
+        Number.isFinite((p as any).lng) &&
+        !(Number((p as any).lat) === 0 && Number((p as any).lng) === 0);
+
+      // 중심 보정: circleCenter → refMarkerCenter → property
+      if (!isValid(ns.circleCenter)) {
+        const ref = ns.refMarkerCenter as any;
+        if (isValid(ref)) {
+          setNsFilter("auction_ed", "circleCenter" as any, ref);
+        } else if (property) {
+          const toNum = (v: any) =>
+            typeof v === "number" ? v : v != null ? parseFloat(String(v)) : NaN;
+          const plat = toNum(
+            (property as any)?.lat ?? (property as any)?.latitude
+          );
+          const plng = toNum(
+            (property as any)?.lng ?? (property as any)?.longitude
+          );
+          if (
+            Number.isFinite(plat) &&
+            Number.isFinite(plng) &&
+            !(Number(plat) === 0 && Number(plng) === 0)
+          ) {
+            setNsFilter("auction_ed", "circleCenter" as any, {
+              lat: plat,
+              lng: plng,
+            });
+          }
+        }
+      }
+
+      // 반지름 보정
+      const r = Number(ns.circleRadiusM ?? 0);
+      if (!Number.isFinite(r) || r <= 0) {
+        setNsFilter("auction_ed", "circleRadiusM" as any, 1000);
+      }
+    } catch {}
+  }, [
+    nsState?.auction_ed?.applyCircleFilter,
+    nsState?.auction_ed?.circleCenter,
+    nsState?.auction_ed?.refMarkerCenter,
+    nsState?.auction_ed?.circleRadiusM,
+    property,
+    setNsFilter,
+  ]);
+
   // analysis → v2로 넘어올 때 URL의 지역 파라미터를 스토어에 1회 주입
   useEffect(() => {
     try {
@@ -1456,7 +1511,10 @@ export default function PropertyDetailV2Page() {
                                   <AuctionEdMap
                                     enabled={activeView === "map"}
                                     key={`${activeDataset}-map`}
-                                    items={dsItems as any}
+                                    items={
+                                      (processedData as any)?.mapItems ??
+                                      (dsItems as any)
+                                    }
                                     isLoading={false}
                                     error={undefined}
                                     onBoundsChange={(b) => setBounds(b)}
@@ -1666,7 +1724,10 @@ export default function PropertyDetailV2Page() {
                                         <AuctionEdMap
                                           enabled={activeView === "integrated"}
                                           key={`${activeDataset}-integrated`}
-                                          items={dsItems as any}
+                                          items={
+                                            (processedData as any)?.mapItems ??
+                                            (dsItems as any)
+                                          }
                                           isLoading={false}
                                           error={undefined}
                                           onBoundsChange={(b) => setBounds(b)}
