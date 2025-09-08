@@ -129,7 +129,40 @@ const realApiFetcher = async ([_, itemId]: [
       console.warn("Comparables data not available:", error);
     }
 
-    // 3. API 응답을 PropertyDetail 형식으로 변환
+    // 3. 좌표 키 보강 매핑 (lat/lng, latitude/longitude, lat_y/lon, y/x 등)
+    const toNumber = (v: any) =>
+      typeof v === "number" ? v : v != null ? parseFloat(String(v)) : NaN;
+    const pickLat = (src: any) => {
+      const candidates = [src?.lat, src?.latitude, src?.lat_y, src?.y];
+      for (const v of candidates) {
+        const n = toNumber(v);
+        if (Number.isFinite(n) && n >= -90 && n <= 90) return n;
+      }
+      return undefined;
+    };
+    const pickLng = (src: any) => {
+      const candidates = [src?.lng, src?.longitude, src?.lon, src?.x];
+      for (const v of candidates) {
+        const n = toNumber(v);
+        if (Number.isFinite(n) && n >= -180 && n <= 180) return n;
+      }
+      return undefined;
+    };
+    let latNum = pickLat(item as any);
+    let lngNum = pickLng(item as any);
+    // 스왑 감지: 위도 범위가 비정상이고 경도가 위도 범위에 있으면 교환
+    if (
+      Number.isFinite(latNum) &&
+      Number.isFinite(lngNum) &&
+      (latNum as number) > 90 &&
+      Math.abs(lngNum as number) <= 90
+    ) {
+      const t = latNum;
+      latNum = lngNum;
+      lngNum = t;
+    }
+
+    // 4. API 응답을 PropertyDetail 형식으로 변환
     return {
       id: itemId,
       title: item.address, // API에 title이 없으면 address 사용
@@ -137,8 +170,8 @@ const realApiFetcher = async ([_, itemId]: [
       price: item.price,
       area: item.area,
       buildYear: item.built_year,
-      lat: item.lat,
-      lng: item.lng,
+      lat: (latNum as number) ?? (toNumber(item?.lat) as number),
+      lng: (lngNum as number) ?? (toNumber(item?.lng) as number),
       status: "scheduled", // 기본값, 실제 API에서 제공되면 사용
       // 추가 정보는 comparables 데이터나 기본값 사용
       marketAnalysis: comparablesData

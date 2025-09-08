@@ -3,6 +3,7 @@ import * as React from "react";
 import { useEffect, useRef, useState } from "react";
 import { loadKakaoSdk } from "@/lib/map/kakaoLoader";
 import MapLegend from "./MapLegend";
+import MapCircleControls from "./MapCircleControls";
 import { captureError } from "@/lib/monitoring";
 import { DEFAULT_THRESHOLDS, MAP_GUARD } from "@/lib/map/config";
 import { renderBasePopup } from "@/components/map/popup/BasePopup";
@@ -53,6 +54,25 @@ interface MapViewProps {
     red: string;
   }>;
   legendThresholds?: number[];
+  // 반경(원) 컨트롤/오버레이
+  circleControlsEnabled?: boolean;
+  circleEnabled?: boolean;
+  circleCenter?: { lat: number; lng: number } | null;
+  circleRadiusM?: number;
+  applyCircleFilter?: boolean;
+  onCircleToggle?: () => void;
+  onCircleChange?: (next: {
+    center: { lat: number; lng: number } | null;
+    radiusM: number;
+  }) => void;
+  onToggleApplyCircleFilter?: () => void;
+  // 분석물건 마커
+  refMarkerEnabled?: boolean;
+  refMarkerLocked?: boolean;
+  refMarkerCenter?: { lat: number; lng: number } | null;
+  onRefMarkerToggleLock?: () => void;
+  onRefMarkerMove?: (nextCenter: { lat: number; lng: number }) => void;
+  onMoveToRefMarker?: () => void;
 }
 
 function MapView({
@@ -74,6 +94,22 @@ function MapView({
   legendEditable,
   legendPaletteOverride,
   legendThresholds,
+  // circle
+  circleControlsEnabled,
+  circleEnabled,
+  circleCenter,
+  circleRadiusM,
+  applyCircleFilter,
+  onCircleToggle,
+  onCircleChange,
+  onToggleApplyCircleFilter,
+  // ref marker
+  refMarkerEnabled,
+  refMarkerLocked,
+  refMarkerCenter,
+  onRefMarkerToggleLock,
+  onRefMarkerMove,
+  onMoveToRefMarker,
 }: MapViewProps) {
   const mapRef = useRef<HTMLDivElement | null>(null);
   const [mapReady, setMapReady] = useState(false);
@@ -85,6 +121,9 @@ function MapView({
   const focusCircleRef = useRef<any>(null);
   const markersRef = useRef<any[]>([]);
   const clustererRef = useRef<any>(null);
+  // 원 오버레이/중심 마커
+  const drawCircleRef = useRef<any>(null);
+  const drawCircleCenterMarkerRef = useRef<any>(null);
   // id→마커 인덱스/강조 관리
   const markerIndexRef = useRef<
     Map<
@@ -98,6 +137,10 @@ function MapView({
   const coordGroupsRef = useRef<Map<string, any[]>>(new Map());
   // 마커 → 원본 아이템 매핑(클러스터 클릭 시 활용)
   const markerToItemRef = useRef<Map<any, any>>(new Map());
+  const lastClickedMarkerPosRef = useRef<{ lat: number; lng: number } | null>(
+    null
+  );
+  const refMarkerRef = useRef<any>(null);
   // 팝업/툴팁: 데스크톱 CustomOverlay 1개 재사용, 모바일은 하단 시트
   const popupOverlayRef = useRef<any>(null);
   const [mobilePopupItem, setMobilePopupItem] = useState<any | null>(null);
@@ -215,6 +258,11 @@ function MapView({
           level: 8,
         });
         kakaoMapRef.current = map;
+        try {
+          // 디버그용 전역 노출: 브라우저 콘솔에서 지도/스토어에 접근 가능하도록
+          (window as any).__kakao_map_ref = map;
+          (window as any).__getFilterState = (useFilterStore as any)?.getState;
+        } catch {}
         try {
           const c = map.getCenter?.();
           if (c) lastCenterRef.current = { lat: c.getLat(), lng: c.getLng() };
@@ -1076,6 +1124,10 @@ function MapView({
 
         w.kakao.maps.event.addListener(marker, "click", () => {
           try {
+            // 마지막 클릭 마커 좌표 저장 (원 중심 이동 기능에서 사용)
+            try {
+              lastClickedMarkerPosRef.current = { lat, lng };
+            } catch {}
             // 중심 이동 및 하이라이트 (크로스 헤어에 마커가 정확히 오도록 오프셋 적용)
             const centerOnMarker = () => {
               const proj = map.getProjection?.();
@@ -1269,6 +1321,161 @@ function MapView({
       } catch {}
     };
   }, [items, isLoading, mapReady, provider]);
+
+  // Kakao: 원(반경) 오버레이 적용/갱신
+  useEffect(() => {
+    if (provider !== "kakao") return;
+    if (!mapReady || !kakaoMapRef.current) return;
+    const w = window as any;
+    const map = kakaoMapRef.current;
+    try {
+      // 비활성화 시 제거
+      if (!circleEnabled || !circleControlsEnabled) {
+        try {
+          if (drawCircleRef.current) drawCircleRef.current.setMap(null);
+        } catch {}
+        drawCircleRef.current = null;
+        try {
+          if (drawCircleCenterMarkerRef.current)
+            drawCircleCenterMarkerRef.current.setMap(null);
+        } catch {}
+        drawCircleCenterMarkerRef.current = null;
+        return;
+      }
+
+      // 중심 좌표 계산: 원 지정값 → 분석물건 마커 → 현재 지도 중심
+      const centerLat =
+        (circleCenter as any)?.lat ??
+        (refMarkerCenter as any)?.lat ??
+        centerCoord?.lat;
+      const centerLng =
+        (circleCenter as any)?.lng ??
+        (refMarkerCenter as any)?.lng ??
+        centerCoord?.lng;
+      if (
+        !Number.isFinite(centerLat as any) ||
+        !Number.isFinite(centerLng as any) ||
+        (Number(centerLat) === 0 && Number(centerLng) === 0)
+      )
+        return;
+      const radius = Math.max(0, Number(circleRadiusM ?? 0));
+      const centerLatLng = new w.kakao.maps.LatLng(centerLat, centerLng);
+
+      // 원 생성/갱신
+      if (!drawCircleRef.current) {
+        drawCircleRef.current = new w.kakao.maps.Circle({
+          center: centerLatLng,
+          radius,
+          strokeWeight: 3,
+          strokeColor: "#2563eb",
+          strokeOpacity: 0.9,
+          strokeStyle: "solid",
+          fillColor: "#2563eb",
+          fillOpacity: 0.15,
+          zIndex: 5000,
+        });
+        drawCircleRef.current.setMap(map);
+      } else {
+        try {
+          drawCircleRef.current.setPosition(centerLatLng);
+          drawCircleRef.current.setRadius(radius);
+        } catch {}
+      }
+
+      // 중심 드래그 마커 생성/갱신
+      if (!drawCircleCenterMarkerRef.current) {
+        drawCircleCenterMarkerRef.current = new w.kakao.maps.Marker({
+          position: centerLatLng,
+          draggable: true,
+          zIndex: 6000,
+        });
+        drawCircleCenterMarkerRef.current.setMap(map);
+        // 드래그 끝난 후 반영
+        w.kakao.maps.event.addListener(
+          drawCircleCenterMarkerRef.current,
+          "dragend",
+          () => {
+            try {
+              const p = drawCircleCenterMarkerRef.current.getPosition?.();
+              if (p && typeof onCircleChange === "function") {
+                onCircleChange({
+                  center: { lat: p.getLat(), lng: p.getLng() },
+                  radiusM: radius,
+                });
+              }
+            } catch {}
+          }
+        );
+      } else {
+        try {
+          drawCircleCenterMarkerRef.current.setPosition(centerLatLng);
+        } catch {}
+      }
+    } catch {}
+  }, [
+    circleEnabled,
+    circleControlsEnabled,
+    circleCenter,
+    circleRadiusM,
+    mapReady,
+    provider,
+    centerCoord,
+  ]);
+
+  // Kakao: 분석물건 마커 표시/드래그 제어
+  useEffect(() => {
+    if (provider !== "kakao") return;
+    if (!mapReady || !kakaoMapRef.current) return;
+    if (!refMarkerEnabled) {
+      try {
+        if (refMarkerRef.current) refMarkerRef.current.setMap(null);
+      } catch {}
+      refMarkerRef.current = null;
+      return;
+    }
+    const w = window as any;
+    const map = kakaoMapRef.current;
+    try {
+      const centerLat = (refMarkerCenter as any)?.lat ?? centerCoord?.lat;
+      const centerLng = (refMarkerCenter as any)?.lng ?? centerCoord?.lng;
+      if (
+        !Number.isFinite(centerLat as any) ||
+        !Number.isFinite(centerLng as any)
+      )
+        return;
+      const pos = new w.kakao.maps.LatLng(centerLat, centerLng);
+      if (!refMarkerRef.current) {
+        refMarkerRef.current = new w.kakao.maps.Marker({
+          position: pos,
+          draggable: !Boolean(refMarkerLocked),
+          zIndex: 7000,
+        });
+        refMarkerRef.current.setMap(map);
+        w.kakao.maps.event.addListener(refMarkerRef.current, "dragend", () => {
+          try {
+            const p = refMarkerRef.current.getPosition?.();
+            if (p && typeof onRefMarkerMove === "function") {
+              onRefMarkerMove({ lat: p.getLat(), lng: p.getLng() });
+            }
+          } catch {}
+        });
+      } else {
+        try {
+          refMarkerRef.current.setPosition(pos);
+          if (typeof refMarkerRef.current.setDraggable === "function")
+            refMarkerRef.current.setDraggable(!Boolean(refMarkerLocked));
+        } catch {}
+      }
+    } catch {}
+  }, [
+    refMarkerEnabled,
+    refMarkerCenter,
+    refMarkerLocked,
+    mapReady,
+    provider,
+    centerCoord,
+    onRefMarkerMove,
+  ]);
 
   // 선택된 항목 오버레이 표시(좌표 이동 없음)
   useEffect(() => {
@@ -1811,6 +2018,38 @@ function MapView({
           </div>
         </div>
       </div>
+      {/* 좌하단: 원/반경 컨트롤 + 물건 고정/이동 */}
+      <MapCircleControls
+        enabled={Boolean(circleControlsEnabled)}
+        circleEnabled={Boolean(circleEnabled)}
+        radiusM={(function () {
+          const v = Number(circleRadiusM ?? 0);
+          return Number.isFinite(v) && v > 0 ? v : 1000;
+        })()}
+        onToggleCircle={onCircleToggle}
+        onChangeRadius={(r) =>
+          onCircleChange?.({
+            center:
+              circleCenter ?? (refMarkerCenter as any) ?? centerCoord ?? null,
+            radiusM: r,
+          })
+        }
+        // 분석물건 마커 관련
+        refLocked={Boolean(refMarkerLocked)}
+        onToggleRefLock={onRefMarkerToggleLock}
+        onMoveToRefMarker={() => {
+          const target = refMarkerCenter || centerCoord;
+          if (!target) return;
+          try {
+            const w = window as any;
+            const map = kakaoMapRef.current;
+            if (!map) return;
+            const latlng = new w.kakao.maps.LatLng(target.lat, target.lng);
+            if (typeof map.panTo === "function") map.panTo(latlng);
+          } catch {}
+          if (typeof onMoveToRefMarker === "function") onMoveToRefMarker();
+        }}
+      />
       {/* 임시: 목록을 오버레이로 노출하여 선택 가능하도록 제공 */}
       <div className="absolute left-2 top-2 max-h-[380px] w-60 overflow-auto rounded bg-white/95 p-2 text-xs shadow">
         <div className="mb-1 font-semibold">표시 항목</div>

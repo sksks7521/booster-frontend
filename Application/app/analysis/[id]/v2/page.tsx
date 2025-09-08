@@ -71,6 +71,10 @@ export default function PropertyDetailV2Page() {
   } = usePropertyDetail(Number.isFinite(numericId) ? numericId : undefined);
 
   const searchParams = useSearchParams();
+  const nsState = useFilterStore((s: any) => (s as any).ns) as any;
+  const setNsFilter = useFilterStore((s: any) => (s as any).setNsFilter) as
+    | (undefined | ((ns: string, key: any, value: any) => void))
+    | any;
   const initialDs = useMemo(() => {
     const ds = searchParams?.get("ds");
     const normalized = ds === "naver" ? "listings" : ds;
@@ -344,6 +348,254 @@ export default function PropertyDetailV2Page() {
     }
     return null;
   }, [bounds, property, searchParams, selectedProvince]);
+
+  // 🆕 URL → ns(auction_ed) 초기 주입 (1회)
+  const circleBootRef = useRef(false);
+  useEffect(() => {
+    if (circleBootRef.current) return;
+    circleBootRef.current = true;
+    try {
+      const qsLat = Number(searchParams?.get("lat"));
+      const qsLng = Number(searchParams?.get("lng"));
+      const qsRadius = Number(searchParams?.get("radius_km"));
+      if (
+        Number.isFinite(qsLat) &&
+        Number.isFinite(qsLng) &&
+        typeof setNsFilter === "function"
+      ) {
+        setNsFilter("auction_ed", "circleEnabled" as any, true);
+        setNsFilter("auction_ed", "circleCenter" as any, {
+          lat: qsLat,
+          lng: qsLng,
+        });
+        setNsFilter(
+          "auction_ed",
+          "circleRadiusM" as any,
+          Math.max(0, Number.isFinite(qsRadius) ? qsRadius * 1000 : 5000)
+        );
+      }
+      // 분석물건 마커 초기값: URL(lat/lng) 우선, 아니면 상세 좌표(유효 범위 검증)
+      const pickNumber = (v: any) =>
+        typeof v === "number" ? v : parseFloat(String(v));
+      const pickLat = (src: any) => {
+        const cands = [src?.lat, src?.latitude];
+        for (const v of cands) {
+          const n = pickNumber(v);
+          if (Number.isFinite(n) && n >= -90 && n <= 90) return n;
+        }
+        return undefined;
+      };
+      const pickLng = (src: any) => {
+        const cands = [src?.lng, src?.longitude];
+        for (const v of cands) {
+          const n = pickNumber(v);
+          if (Number.isFinite(n) && n >= -180 && n <= 180) return n;
+        }
+        return undefined;
+      };
+      let latNum = Number.isFinite(qsLat) ? qsLat : pickLat(property as any);
+      let lngNum = Number.isFinite(qsLng) ? qsLng : pickLng(property as any);
+      // 범위 기반 스왑(한국 좌표대: lat≈33~39, lng≈124~132)
+      if (
+        Number.isFinite(latNum) &&
+        Number.isFinite(lngNum) &&
+        (latNum as number) > 90 &&
+        Math.abs(lngNum as number) <= 90
+      ) {
+        const t = latNum;
+        latNum = lngNum;
+        lngNum = t;
+      }
+      if (
+        typeof setNsFilter === "function" &&
+        Number.isFinite(latNum) &&
+        Number.isFinite(lngNum) &&
+        !(Number(latNum) === 0 && Number(lngNum) === 0)
+      ) {
+        setNsFilter("auction_ed", "refMarkerCenter" as any, {
+          lat: latNum,
+          lng: lngNum,
+        });
+        setNsFilter("auction_ed", "refMarkerLocked" as any, true);
+      }
+    } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // 🆕 상세(property) 로딩 후 refMarkerCenter 미설정 시 초기화(유효 범위 검증)
+  useEffect(() => {
+    try {
+      const already = nsState?.auction_ed?.refMarkerCenter as
+        | { lat?: number; lng?: number }
+        | null
+        | undefined;
+      const alreadyValid =
+        already &&
+        Number.isFinite((already as any).lat) &&
+        Number.isFinite((already as any).lng) &&
+        !(
+          Number((already as any).lat) === 0 &&
+          Number((already as any).lng) === 0
+        );
+      if (alreadyValid) return;
+      const pickNumber = (v: any) =>
+        typeof v === "number" ? v : parseFloat(String(v));
+      const pickLat = (src: any) => {
+        const cands = [src?.lat, src?.latitude];
+        for (const v of cands) {
+          const n = pickNumber(v);
+          if (Number.isFinite(n) && n >= -90 && n <= 90) return n;
+        }
+        return undefined;
+      };
+      const pickLng = (src: any) => {
+        const cands = [src?.lng, src?.longitude];
+        for (const v of cands) {
+          const n = pickNumber(v);
+          if (Number.isFinite(n) && n >= -180 && n <= 180) return n;
+        }
+        return undefined;
+      };
+      let latNum = pickLat(property as any);
+      let lngNum = pickLng(property as any);
+      if (
+        Number.isFinite(latNum) &&
+        Number.isFinite(lngNum) &&
+        (latNum as number) > 90 &&
+        Math.abs(lngNum as number) <= 90
+      ) {
+        const t = latNum;
+        latNum = lngNum;
+        lngNum = t;
+      }
+      if (
+        typeof setNsFilter === "function" &&
+        Number.isFinite(latNum) &&
+        Number.isFinite(lngNum) &&
+        !(Number(latNum) === 0 && Number(lngNum) === 0)
+      ) {
+        setNsFilter("auction_ed", "refMarkerCenter" as any, {
+          lat: latNum,
+          lng: lngNum,
+        });
+        setNsFilter("auction_ed", "refMarkerLocked" as any, true);
+      }
+    } catch {}
+  }, [property, nsState?.auction_ed?.refMarkerCenter, setNsFilter]);
+
+  // 🆕 URL 갱신 디바운스 도우미
+  const circleUrlTimerRef = useRef<any>(null);
+  const updateCircleQuery = useCallback(
+    (
+      enabled: boolean,
+      center: { lat: number; lng: number } | null | undefined,
+      radiusM: number | null | undefined
+    ) => {
+      try {
+        const current = new URLSearchParams(searchParams?.toString() || "");
+        if (!enabled || !center || !Number.isFinite(radiusM as number)) {
+          current.delete("lat");
+          current.delete("lng");
+          current.delete("radius_km");
+        } else {
+          const latStr = (center.lat ?? 0).toFixed(5);
+          const lngStr = (center.lng ?? 0).toFixed(5);
+          const km = Math.max(0, Number(radiusM || 0) / 1000);
+          const kmStr = km.toFixed(1);
+          current.set("lat", latStr);
+          current.set("lng", lngStr);
+          current.set("radius_km", kmStr);
+        }
+        clearTimeout(circleUrlTimerRef.current);
+        circleUrlTimerRef.current = setTimeout(() => {
+          try {
+            // ds 유지
+            if (activeDataset) current.set("ds", String(activeDataset));
+            router.replace(`?${current.toString()}`, { scroll: false });
+          } catch {}
+        }, 250);
+      } catch {}
+    },
+    [searchParams, router, activeDataset]
+  );
+
+  // 🆕 헤더 토글(영역 안만 보기) → URL 동기화(within, lat/lng/radius)
+  useEffect(() => {
+    try {
+      const apply = Boolean(nsState?.auction_ed?.applyCircleFilter);
+      const current = new URLSearchParams(searchParams?.toString() || "");
+      if (!apply) {
+        current.delete("within");
+        // 토글 끄면 관련 키도 정리
+        current.delete("lat");
+        current.delete("lng");
+        current.delete("lon");
+        current.delete("radius_km");
+        current.delete("radium_km");
+        router.replace(`?${current.toString()}`, { scroll: false });
+        return;
+      }
+      // 중심/반지름 산출: (실시간 스토어) circleCenter → refMarkerCenter → (클로저) nsState → property, 반지름 기본 1000m
+      const liveState = (useFilterStore as any)?.getState?.()?.ns?.auction_ed;
+      // 요청: URL의 lat/lng는 분석물건 마커(refMarkerCenter)를 최우선으로 사용
+      let c =
+        (liveState?.refMarkerCenter as any) ||
+        (liveState?.circleCenter as any) ||
+        (nsState?.auction_ed?.refMarkerCenter as any) ||
+        (nsState?.auction_ed?.circleCenter as any) ||
+        null;
+      if (!c) {
+        // property 기반 폴백 (lat/latitude, lng/longitude만 사용)
+        const toNum = (v: any) =>
+          typeof v === "number" ? v : v != null ? parseFloat(String(v)) : NaN;
+        const plat = toNum(
+          (property as any)?.lat ?? (property as any)?.latitude
+        );
+        const plng = toNum(
+          (property as any)?.lng ?? (property as any)?.longitude
+        );
+        if (
+          Number.isFinite(plat) &&
+          Number.isFinite(plng) &&
+          !(Number(plat) === 0 && Number(plng) === 0)
+        ) {
+          c = { lat: plat, lng: plng } as any;
+        }
+      }
+      const r = Number((nsState?.auction_ed?.circleRadiusM as any) ?? 0);
+      const hasCenter =
+        c &&
+        Number.isFinite(c.lat) &&
+        Number.isFinite(c.lng) &&
+        !(Number(c.lat) === 0 && Number(c.lng) === 0);
+      const radiusM = Number.isFinite(r) && r > 0 ? r : 1000;
+
+      // 요구사항: 토글을 켜면 항상 within, lon, lat, radius_km, radium_km 노출
+      const latStr = hasCenter ? Number(c.lat).toFixed(5) : "";
+      const lngStr = hasCenter ? Number(c.lng).toFixed(5) : "";
+      const kmStr = Math.max(0, radiusM / 1000).toFixed(1);
+      current.set("lat", latStr);
+      current.set("lng", lngStr);
+      // 요청: radium_km만 노출
+      current.set("radium_km", kmStr);
+      // 정리: 더 이상 사용하지 않음
+      current.delete("lon");
+      current.delete("radius_km");
+      current.set("within", "1");
+      if (activeDataset) current.set("ds", String(activeDataset));
+      router.replace(`?${current.toString()}`, { scroll: false });
+    } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    nsState?.auction_ed?.applyCircleFilter,
+    nsState?.auction_ed?.circleCenter,
+    nsState?.auction_ed?.refMarkerCenter,
+    nsState?.auction_ed?.circleRadiusM,
+    property,
+    searchParams,
+    router,
+    activeDataset,
+  ]);
 
   // analysis → v2로 넘어올 때 URL의 지역 파라미터를 스토어에 1회 주입
   useEffect(() => {
@@ -1212,6 +1464,163 @@ export default function PropertyDetailV2Page() {
                                     highlightIds={selectedRowKeys.map((k) =>
                                       String(k)
                                     )}
+                                    // 원/반경 컨트롤 상태 연결
+                                    circleControlsEnabled={true}
+                                    circleEnabled={Boolean(
+                                      nsState?.auction_ed?.circleEnabled
+                                    )}
+                                    circleCenter={
+                                      (nsState?.auction_ed
+                                        ?.circleCenter as any) || null
+                                    }
+                                    circleRadiusM={
+                                      (nsState?.auction_ed
+                                        ?.circleRadiusM as any) || undefined
+                                    }
+                                    applyCircleFilter={Boolean(
+                                      nsState?.auction_ed?.applyCircleFilter
+                                    )}
+                                    onCircleToggle={() => {
+                                      const next = !Boolean(
+                                        nsState?.auction_ed?.circleEnabled
+                                      );
+                                      if (typeof setNsFilter === "function") {
+                                        setNsFilter(
+                                          "auction_ed",
+                                          "circleEnabled" as any,
+                                          next
+                                        );
+                                      }
+                                      // 켜질 때 중심/반지름 기본값 채움: 중심은 분석물건, 반지름은 1000m
+                                      let nextCenter =
+                                        (nsState?.auction_ed
+                                          ?.circleCenter as any) ||
+                                        (nsState?.auction_ed
+                                          ?.refMarkerCenter as any) ||
+                                        null;
+                                      if (
+                                        next &&
+                                        nextCenter &&
+                                        (!Number.isFinite(nextCenter.lat) ||
+                                          !Number.isFinite(nextCenter.lng) ||
+                                          (Number(nextCenter.lat) === 0 &&
+                                            Number(nextCenter.lng) === 0))
+                                      ) {
+                                        nextCenter = null;
+                                      }
+                                      if (
+                                        next &&
+                                        nextCenter &&
+                                        typeof setNsFilter === "function"
+                                      ) {
+                                        setNsFilter(
+                                          "auction_ed",
+                                          "circleCenter" as any,
+                                          nextCenter
+                                        );
+                                      }
+                                      let nextRadiusM = Number(
+                                        (nsState?.auction_ed
+                                          ?.circleRadiusM as any) ?? 0
+                                      );
+                                      if (
+                                        !Number.isFinite(nextRadiusM) ||
+                                        nextRadiusM <= 0
+                                      ) {
+                                        nextRadiusM = 1000;
+                                        if (
+                                          next &&
+                                          typeof setNsFilter === "function"
+                                        ) {
+                                          setNsFilter(
+                                            "auction_ed",
+                                            "circleRadiusM" as any,
+                                            nextRadiusM
+                                          );
+                                        }
+                                      }
+                                      updateCircleQuery(
+                                        next,
+                                        nextCenter,
+                                        nextRadiusM
+                                      );
+                                    }}
+                                    onCircleChange={(next) => {
+                                      if (typeof setNsFilter === "function") {
+                                        setNsFilter(
+                                          "auction_ed",
+                                          "circleCenter" as any,
+                                          next?.center ?? null
+                                        );
+                                        setNsFilter(
+                                          "auction_ed",
+                                          "circleRadiusM" as any,
+                                          Math.max(
+                                            0,
+                                            Number(next?.radiusM ?? 0)
+                                          )
+                                        );
+                                      }
+                                      updateCircleQuery(
+                                        Boolean(
+                                          nsState?.auction_ed?.circleEnabled
+                                        ),
+                                        next?.center ??
+                                          ((nsState?.auction_ed
+                                            ?.circleCenter as any) ||
+                                            null),
+                                        Math.max(
+                                          0,
+                                          Number(
+                                            (next?.radiusM as any) ??
+                                              (nsState?.auction_ed
+                                                ?.circleRadiusM as any) ??
+                                              0
+                                          )
+                                        )
+                                      );
+                                    }}
+                                    onToggleApplyCircleFilter={() => {
+                                      const next = !Boolean(
+                                        nsState?.auction_ed?.applyCircleFilter
+                                      );
+                                      if (typeof setNsFilter === "function")
+                                        setNsFilter(
+                                          "auction_ed",
+                                          "applyCircleFilter" as any,
+                                          next
+                                        );
+                                    }}
+                                    // 분석물건 마커 연결
+                                    refMarkerEnabled={true}
+                                    refMarkerLocked={Boolean(
+                                      nsState?.auction_ed?.refMarkerLocked ??
+                                        true
+                                    )}
+                                    refMarkerCenter={
+                                      (nsState?.auction_ed
+                                        ?.refMarkerCenter as any) || null
+                                    }
+                                    onRefMarkerToggleLock={() => {
+                                      const next = !Boolean(
+                                        nsState?.auction_ed?.refMarkerLocked ??
+                                          true
+                                      );
+                                      if (typeof setNsFilter === "function")
+                                        setNsFilter(
+                                          "auction_ed",
+                                          "refMarkerLocked" as any,
+                                          next
+                                        );
+                                    }}
+                                    onRefMarkerMove={(next) => {
+                                      if (typeof setNsFilter === "function")
+                                        setNsFilter(
+                                          "auction_ed",
+                                          "refMarkerCenter" as any,
+                                          next
+                                        );
+                                    }}
                                   />
                                 ) : (
                                   <MapView

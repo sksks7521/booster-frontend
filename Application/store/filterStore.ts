@@ -67,6 +67,11 @@ interface FilterState {
   pendingMapTarget?: { lat: number; lng: number } | null;
   // 🆕 네임스페이스별 오버라이드 저장소
   ns?: Record<string, Partial<FilterState>>;
+  // 선택적: 원 필터 상태(네임스페이스에서 주로 사용)
+  circleEnabled?: boolean;
+  circleCenter?: { lat: number; lng: number } | null;
+  circleRadiusM?: number; // meters
+  applyCircleFilter?: boolean; // 목록/지도에 반영 토글
 }
 
 // 필터 상태를 변경하는 액션(Action)의 타입을 정의합니다.

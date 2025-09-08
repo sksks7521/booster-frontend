@@ -10,6 +10,7 @@ const ItemTable = dynamic(() => import("@/components/features/item-table"), {
 });
 // 가상 테이블 사용 제거
 import AuctionEdMap from "@/components/features/auction-ed/AuctionEdMap";
+import { isWithinRadius } from "@/lib/geo/distance";
 
 import { useFilterStore } from "@/store/filterStore";
 import { useSortableColumns } from "@/hooks/useSortableColumns";
@@ -239,8 +240,43 @@ export default function AuctionEdSearchResults({
   // 🆕 외부에서 전달받은 데이터가 있으면 우선 사용, 없으면 기존 방식
   const items = externalItems ?? (applyDetailFilters(rawItems) || []);
 
-  // 정렬은 서버에서 처리하므로 클라이언트에서는 그대로 사용
-  const processedItems = items;
+  // 반경 필터(영역 안만 보기)
+  const applyCircle = Boolean(nsOverrides?.applyCircleFilter);
+  const centerCandidate =
+    (nsOverrides as any)?.circleCenter || (nsOverrides as any)?.refMarkerCenter;
+  const centerValid =
+    centerCandidate &&
+    Number.isFinite(centerCandidate.lat) &&
+    Number.isFinite(centerCandidate.lng) &&
+    !(Number(centerCandidate.lat) === 0 && Number(centerCandidate.lng) === 0);
+  const centerForFilter = centerValid
+    ? { lat: Number(centerCandidate.lat), lng: Number(centerCandidate.lng) }
+    : null;
+  const radiusMForFilter = (() => {
+    const r = Number((nsOverrides as any)?.circleRadiusM ?? 0);
+    return Number.isFinite(r) && r > 0 ? r : 1000;
+  })();
+  const pickLatLng = (row: any) => {
+    const latRaw = row?.lat ?? row?.latitude;
+    const lngRaw = row?.lng ?? row?.longitude;
+    const lat =
+      typeof latRaw === "number" ? latRaw : parseFloat(String(latRaw));
+    const lng =
+      typeof lngRaw === "number" ? lngRaw : parseFloat(String(lngRaw));
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+    return { lat, lng } as { lat: number; lng: number };
+  };
+
+  // 정렬은 서버에서 처리하므로 클라이언트에서는 그대로 사용하되, 토글 ON이면 반경 필터 적용
+  const processedItems =
+    applyCircle && centerForFilter
+      ? (items || []).filter((row: any) => {
+          const p = pickLatLng(row);
+          return p
+            ? isWithinRadius(centerForFilter, p, radiusMForFilter)
+            : false;
+        })
+      : items;
 
   // 총 개수는 항상 서버 total 사용 (정렬 시에도 유지)
   const effectiveTotal = serverTotal || 0;
@@ -295,11 +331,20 @@ export default function AuctionEdSearchResults({
 
   // 지도 전용 아이템(표시 상한/추가 페이지 병합)과 테이블 전용 아이템(전체)을 분리
   const tableItemsAll = processedItems; // 목록은 상한 없이 전체
-  const mapSource = wantAllForMap
+  const mapSourceBase = wantAllForMap
     ? Array.isArray(mapRawItems) && mapRawItems.length > 0
       ? (mapRawItems as any[])
       : processedItems
     : processedItems;
+  const mapSource =
+    applyCircle && centerForFilter
+      ? (mapSourceBase || []).filter((row: any) => {
+          const p = pickLatLng(row);
+          return p
+            ? isWithinRadius(centerForFilter, p, radiusMForFilter)
+            : false;
+        })
+      : mapSourceBase;
   const mapItemsAll = mapSource;
   const mapItems = (() => {
     const list = [...mapItemsAll];
@@ -435,9 +480,22 @@ export default function AuctionEdSearchResults({
                 </span>
               </>
             )}
+            {(useFilterStore.getState()?.ns?.auction_ed?.applyCircleFilter ??
+              false) && (
+              <>
+                {" → "}
+                <span className="inline-block">
+                  영역 안 필터{" "}
+                  <span className="font-semibold text-indigo-600">
+                    {processedItems.length.toLocaleString()}
+                  </span>
+                  건
+                </span>
+              </>
+            )}
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 items-center">
           <Button variant="outline" onClick={handleExport}>
             <Download className="w-4 h-4 mr-2" />
             내보내기
@@ -474,44 +532,96 @@ export default function AuctionEdSearchResults({
             </TabsList>
           </Tabs>
           {activeView !== "table" && (
-            <div className="mt-3 flex items-center gap-3 text-xs text-gray-600">
-              <div className="flex items-center gap-2">
-                <span className="text-gray-700">표시 상한</span>
-                <select
-                  className="h-7 rounded border px-2 bg-white"
-                  value={String(maxMarkersCap)}
-                  onChange={(e) => setMaxMarkersCap(parseInt(e.target.value))}
-                >
-                  {[100, 300, 500, 1000, 2000, 3000].map((v) => (
-                    <option key={v} value={v}>
-                      {v.toLocaleString()}개
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <TooltipProvider delayDuration={0}>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <span
-                      className="inline-flex h-5 w-5 items-center justify-center rounded-full border text-gray-600 cursor-help select-none"
-                      aria-label="도움말"
-                    >
-                      ?
-                    </span>
-                  </TooltipTrigger>
-                  <TooltipContent
-                    side="bottom"
-                    align="start"
-                    className="bg-white text-gray-800 border border-gray-200 shadow-md max-w-[280px]"
+            <div className="mt-3 flex items-center justify-between text-xs text-gray-600">
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-gray-700">표시 상한</span>
+                  <select
+                    className="h-7 rounded border px-2 bg-white"
+                    value={String(maxMarkersCap)}
+                    onChange={(e) => setMaxMarkersCap(parseInt(e.target.value))}
                   >
-                    최대 마커 개수를 설정합니다.
-                    <br />
-                    너무 크게 선택하면 브라우저가 느려질 수 있어요.
-                    <br />
-                    최신 매각기일부터 우선 표시합니다.
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
+                    {[100, 300, 500, 1000, 2000, 3000].map((v) => (
+                      <option key={v} value={v}>
+                        {v.toLocaleString()}개
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <TooltipProvider delayDuration={0}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span
+                        className="inline-flex h-5 w-5 items-center justify-center rounded-full border text-gray-600 cursor-help select-none"
+                        aria-label="도움말"
+                      >
+                        ?
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent
+                      side="bottom"
+                      align="start"
+                      className="bg-white text-gray-800 border border-gray-200 shadow-md max-w-[280px]"
+                    >
+                      최대 마커 개수를 설정합니다.
+                      <br />
+                      너무 크게 선택하면 브라우저가 느려질 수 있어요.
+                      <br />
+                      최신 매각기일부터 우선 표시합니다.
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
+              {/* 우측: 영역 안만 보기 토글 */}
+              <label className="flex items-center gap-2 text-xs text-gray-700 border rounded px-2 py-1 bg-white">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4"
+                  checked={Boolean(
+                    (useFilterStore.getState()?.ns?.auction_ed
+                      ?.applyCircleFilter as any) ?? false
+                  )}
+                  onChange={(e) => {
+                    try {
+                      const st = (useFilterStore as any).getState?.();
+                      const setNs = st?.setNsFilter;
+                      const ns = st?.ns?.auction_ed || {};
+                      const checked = Boolean(e.target.checked);
+                      if (typeof setNs === "function") {
+                        if (checked) {
+                          const center =
+                            ns?.circleCenter &&
+                            Number.isFinite(ns.circleCenter.lat) &&
+                            Number.isFinite(ns.circleCenter.lng)
+                              ? ns.circleCenter
+                              : ns?.refMarkerCenter &&
+                                Number.isFinite(ns.refMarkerCenter.lat) &&
+                                Number.isFinite(ns.refMarkerCenter.lng) &&
+                                !(
+                                  Number(ns.refMarkerCenter.lat) === 0 &&
+                                  Number(ns.refMarkerCenter.lng) === 0
+                                )
+                              ? ns.refMarkerCenter
+                              : null;
+                          if (center) {
+                            setNs("auction_ed", "circleCenter" as any, center);
+                          }
+                          const r = Number(ns?.circleRadiusM ?? 0);
+                          if (!Number.isFinite(r) || r <= 0) {
+                            setNs("auction_ed", "circleRadiusM" as any, 1000);
+                          }
+                        }
+                        setNs(
+                          "auction_ed",
+                          "applyCircleFilter" as any,
+                          checked
+                        );
+                      }
+                    } catch {}
+                  }}
+                />
+                <span>영역 안만 보기</span>
+              </label>
             </div>
           )}
         </div>

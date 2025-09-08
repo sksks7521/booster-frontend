@@ -18,6 +18,25 @@ interface AuctionEdMapProps {
   }) => void;
   locationKey?: string;
   highlightIds?: string[];
+  // 원/반경 컨트롤 연동 (옵션: 미지정 시 ns.auction_ed 값 사용)
+  circleControlsEnabled?: boolean;
+  circleEnabled?: boolean;
+  circleCenter?: { lat: number; lng: number } | null;
+  circleRadiusM?: number;
+  applyCircleFilter?: boolean;
+  onCircleToggle?: () => void;
+  onCircleChange?: (next: {
+    center: { lat: number; lng: number } | null;
+    radiusM: number;
+  }) => void;
+  onToggleApplyCircleFilter?: () => void;
+  // 분석물건 마커
+  refMarkerEnabled?: boolean;
+  refMarkerLocked?: boolean;
+  refMarkerCenter?: { lat: number; lng: number } | null;
+  onRefMarkerToggleLock?: () => void;
+  onRefMarkerMove?: (nextCenter: { lat: number; lng: number }) => void;
+  onMoveToRefMarker?: () => void;
 }
 
 export default function AuctionEdMap({
@@ -29,8 +48,25 @@ export default function AuctionEdMap({
   onBoundsChange,
   locationKey,
   highlightIds,
+  circleControlsEnabled,
+  circleEnabled,
+  circleCenter,
+  circleRadiusM,
+  applyCircleFilter,
+  onCircleToggle,
+  onCircleChange,
+  onToggleApplyCircleFilter,
+  refMarkerEnabled,
+  refMarkerLocked,
+  refMarkerCenter,
+  onRefMarkerToggleLock,
+  onRefMarkerMove,
+  onMoveToRefMarker,
 }: AuctionEdMapProps) {
   const nsState = useFilterStore((s: any) => (s as any).ns) as any;
+  const setNsFilter = useFilterStore((s: any) => (s as any).setNsFilter) as
+    | (undefined | ((ns: string, key: any, value: any) => void))
+    | any;
   const palette =
     (nsState?.auction_ed?.palette as Partial<typeof PALETTE> | undefined) ||
     ((useFilterStore as any)?.getState?.()?.palette as
@@ -113,6 +149,123 @@ export default function AuctionEdMap({
       legendHint="네모박스 숫자 예) 40 = 매각가/감정가 40~49%"
       legendThresholds={thresholds}
       legendEditable={true}
+      // 원/반경 컨트롤
+      circleControlsEnabled={
+        typeof circleControlsEnabled === "boolean"
+          ? circleControlsEnabled
+          : true
+      }
+      circleEnabled={
+        typeof circleEnabled === "boolean"
+          ? circleEnabled
+          : Boolean(nsState?.auction_ed?.circleEnabled)
+      }
+      circleCenter={
+        circleCenter !== undefined
+          ? circleCenter
+          : (nsState?.auction_ed?.circleCenter as any) ?? null
+      }
+      circleRadiusM={
+        typeof circleRadiusM === "number"
+          ? circleRadiusM
+          : (nsState?.auction_ed?.circleRadiusM as any) ?? 1000
+      }
+      applyCircleFilter={
+        typeof applyCircleFilter === "boolean"
+          ? applyCircleFilter
+          : Boolean(nsState?.auction_ed?.applyCircleFilter)
+      }
+      onCircleToggle={
+        onCircleToggle ||
+        (() =>
+          typeof setNsFilter === "function" &&
+          (function () {
+            const next = !Boolean(nsState?.auction_ed?.circleEnabled);
+            setNsFilter("auction_ed", "circleEnabled" as any, next);
+            // 원을 켤 때 중심이 비어 있으면 분석물건 마커 위치로 설정
+            if (
+              next &&
+              !(
+                nsState?.auction_ed?.circleCenter &&
+                Number.isFinite(
+                  (nsState?.auction_ed?.circleCenter as any).lat
+                ) &&
+                Number.isFinite((nsState?.auction_ed?.circleCenter as any).lng)
+              )
+            ) {
+              const ref = nsState?.auction_ed?.refMarkerCenter as any;
+              if (
+                ref &&
+                Number.isFinite(ref.lat) &&
+                Number.isFinite(ref.lng) &&
+                !(Number(ref.lat) === 0 && Number(ref.lng) === 0)
+              ) {
+                setNsFilter("auction_ed", "circleCenter" as any, ref);
+              }
+            }
+          })())
+      }
+      onCircleChange={
+        onCircleChange ||
+        ((next) => {
+          if (typeof setNsFilter !== "function") return;
+          // 중심이 비어 있으면 분석물건 마커를 폴백으로 사용
+          const ref = (nsState?.auction_ed?.refMarkerCenter as any) || null;
+          const useCenter =
+            next?.center &&
+            Number.isFinite((next.center as any).lat) &&
+            Number.isFinite((next.center as any).lng)
+              ? next.center
+              : ref;
+          setNsFilter("auction_ed", "circleCenter" as any, useCenter ?? null);
+          setNsFilter(
+            "auction_ed",
+            "circleRadiusM" as any,
+            Math.max(0, Number(next?.radiusM ?? 0))
+          );
+        })
+      }
+      onToggleApplyCircleFilter={
+        onToggleApplyCircleFilter ||
+        (() =>
+          typeof setNsFilter === "function" &&
+          setNsFilter(
+            "auction_ed",
+            "applyCircleFilter" as any,
+            !Boolean(nsState?.auction_ed?.applyCircleFilter)
+          ))
+      }
+      // 분석물건 마커
+      refMarkerEnabled={
+        typeof refMarkerEnabled === "boolean" ? refMarkerEnabled : true
+      }
+      refMarkerLocked={
+        typeof refMarkerLocked === "boolean"
+          ? refMarkerLocked
+          : Boolean(nsState?.auction_ed?.refMarkerLocked ?? true)
+      }
+      refMarkerCenter={
+        refMarkerCenter !== undefined
+          ? refMarkerCenter
+          : (nsState?.auction_ed?.refMarkerCenter as any) ?? null
+      }
+      onRefMarkerToggleLock={
+        onRefMarkerToggleLock ||
+        (() =>
+          typeof setNsFilter === "function" &&
+          setNsFilter(
+            "auction_ed",
+            "refMarkerLocked" as any,
+            !Boolean(nsState?.auction_ed?.refMarkerLocked ?? true)
+          ))
+      }
+      onRefMarkerMove={
+        onRefMarkerMove ||
+        ((next) =>
+          typeof setNsFilter === "function" &&
+          setNsFilter("auction_ed", "refMarkerCenter" as any, next))
+      }
+      onMoveToRefMarker={onMoveToRefMarker}
     />
   );
 }
