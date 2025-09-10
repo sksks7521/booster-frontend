@@ -49,7 +49,9 @@ class FrontendServerRunner:
             "NEXT_PUBLIC_API_BASE_URL": "http://127.0.0.1:8000",
             "NEXT_TELEMETRY_DISABLED": "1",
             "NEXT_SWC_WASM": "1",
-            "NEXT_DISABLE_SWC_BINARY": "1"
+            "NEXT_DISABLE_SWC_BINARY": "1",
+            # 서버 영역필터(auction_ed) 기능 플래그 강제 ON
+            "NEXT_PUBLIC_AUCTION_ED_SERVER_AREA": "1"
         }
         
     def print_header(self):

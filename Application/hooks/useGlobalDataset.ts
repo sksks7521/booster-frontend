@@ -14,13 +14,16 @@ export function useGlobalDataset(
   size: number,
   sortBy?: string,
   sortOrder?: SortOrder,
-  cap: number = 5000
+  cap: number = 5000,
+  enabled: boolean = true
 ) {
   const cfg = datasetConfigs[datasetId];
 
   const enableGlobal = Boolean(sortBy && sortOrder);
 
-  const key = enableGlobal
+  const key = !enabled
+    ? null
+    : enableGlobal
     ? [datasetId, "global", { filters, page, size, sortBy, sortOrder, cap }]
     : [datasetId, "page", { filters, page, size }];
 

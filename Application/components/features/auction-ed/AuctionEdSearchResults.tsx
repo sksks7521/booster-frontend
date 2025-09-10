@@ -17,6 +17,7 @@ import { useCircleFilterPipeline } from "@/components/features/shared/useCircleF
 import { useFilterStore } from "@/store/filterStore";
 import { useSortableColumns } from "@/hooks/useSortableColumns";
 import { useFeatureFlags } from "@/lib/featureFlags";
+import { auctionApi } from "@/lib/api";
 import { MAP_GUARD, BACKEND_MAX_PAGE_SIZE } from "@/lib/map/config";
 import {
   Tooltip,
@@ -79,6 +80,8 @@ interface AuctionEdSearchResultsProps {
     mapItems: any[];
     total: number;
   }) => void;
+  // 🆕 부모(v2)에서 결정한 서버 영역 모드 전달(첫 렌더 일치 보장)
+  serverAreaEnabled?: boolean;
 }
 
 export default function AuctionEdSearchResults({
@@ -91,6 +94,7 @@ export default function AuctionEdSearchResults({
   isLoading: externalLoading,
   error: externalError,
   onProcessedDataChange,
+  serverAreaEnabled,
 }: AuctionEdSearchResultsProps) {
   // 필터 상태 가져오기 (네임스페이스 필터 포함)
   const allFilters: any = useFilterStore();
@@ -126,6 +130,33 @@ export default function AuctionEdSearchResults({
   const setSize = useFilterStore((s: any) => s.setSize);
   const page = useFilterStore((s: any) => s.page);
   const size = useFilterStore((s: any) => s.size);
+
+  // 반경 필터(영역 안만 보기) - 서버 영역필터 분기에 필요하므로 선계산
+  const applyCircle = Boolean(nsOverrides?.applyCircleFilter);
+  const centerCandidate =
+    (nsOverrides as any)?.circleCenter || (nsOverrides as any)?.refMarkerCenter;
+  const centerValid =
+    centerCandidate &&
+    Number.isFinite(centerCandidate.lat) &&
+    Number.isFinite(centerCandidate.lng) &&
+    !(Number(centerCandidate.lat) === 0 && Number(centerCandidate.lng) === 0);
+  const centerForFilter = centerValid
+    ? { lat: Number(centerCandidate.lat), lng: Number(centerCandidate.lng) }
+    : null;
+  const radiusMForFilter = (() => {
+    const MIN_RADIUS = 500;
+    const MAX_RADIUS = 100000; // 10km
+    const r = Number((nsOverrides as any)?.circleRadiusM ?? 0);
+    const valid = Number.isFinite(r) && r > 0 ? r : 1000;
+    return Math.min(MAX_RADIUS, Math.max(MIN_RADIUS, valid));
+  })();
+  const flags2 = useFeatureFlags();
+  const useServerArea =
+    serverAreaEnabled !== undefined
+      ? Boolean(serverAreaEnabled)
+      : Boolean(
+          flags2?.auctionEdServerAreaEnabled && applyCircle && centerForFilter
+        );
 
   // 필터/정렬 활성 시에는 전체 집합을 받아와서(큰 size) 클라이언트에서 정렬/재페이징
   const hasProvince = !!(filters as any)?.province;
@@ -195,7 +226,8 @@ export default function AuctionEdSearchResults({
     "auction_ed",
     mergedFilters,
     requestPage,
-    requestSize
+    requestSize,
+    !useServerArea
   );
   const globalHook = useGlobalDataset(
     "auction_ed",
@@ -204,7 +236,8 @@ export default function AuctionEdSearchResults({
     requestSize,
     sortByGlobal,
     sortOrderGlobal,
-    5000
+    5000,
+    !useServerArea
   );
   // 🆕 외부 데이터가 있으면 우선 사용, 없으면 기존 훅 사용
   const isLoading =
@@ -217,7 +250,13 @@ export default function AuctionEdSearchResults({
     externalTotal ?? (useGlobal ? globalHook.total : pageHook.total);
 
   // 전체 데이터 개수 조회 (지역 필터 없이)
-  const { total: totalAllData } = useDataset("auction_ed", {}, 1, 1);
+  const { total: totalAllData } = useDataset(
+    "auction_ed",
+    {},
+    1,
+    1,
+    !useServerArea
+  );
 
   // 상세 필터링 개수 계산을 위한 지역 필터링된 전체 데이터 조회
   const regionOnlyFilters = {
@@ -230,7 +269,8 @@ export default function AuctionEdSearchResults({
     "auction_ed",
     regionOnlyFilters,
     1,
-    1 // 항상 1개만 가져와서 총 개수만 확인
+    1, // 항상 1개만 가져와서 총 개수만 확인
+    !useServerArea
   );
 
   // 필요 시 클라이언트 필터링 (현재 상세필터는 서버 위임, 유지)
@@ -241,22 +281,6 @@ export default function AuctionEdSearchResults({
   // 🆕 외부에서 전달받은 데이터가 있으면 우선 사용, 없으면 기존 방식
   const items = externalItems ?? (applyDetailFilters(rawItems) || []);
 
-  // 반경 필터(영역 안만 보기)
-  const applyCircle = Boolean(nsOverrides?.applyCircleFilter);
-  const centerCandidate =
-    (nsOverrides as any)?.circleCenter || (nsOverrides as any)?.refMarkerCenter;
-  const centerValid =
-    centerCandidate &&
-    Number.isFinite(centerCandidate.lat) &&
-    Number.isFinite(centerCandidate.lng) &&
-    !(Number(centerCandidate.lat) === 0 && Number(centerCandidate.lng) === 0);
-  const centerForFilter = centerValid
-    ? { lat: Number(centerCandidate.lat), lng: Number(centerCandidate.lng) }
-    : null;
-  const radiusMForFilter = (() => {
-    const r = Number((nsOverrides as any)?.circleRadiusM ?? 0);
-    return Number.isFinite(r) && r > 0 ? r : 1000;
-  })();
   // 좌표 추출은 공통 유틸 사용
 
   // 지도 활성 또는 반경 필터 활성 시에는 전역 대용량 소스를 확보
@@ -285,7 +309,8 @@ export default function AuctionEdSearchResults({
     "auction_ed",
     mergedFilters,
     mapPage,
-    mapRequestSize
+    mapRequestSize,
+    !useServerArea
   );
   const mapGlobalHook = useGlobalDataset(
     "auction_ed",
@@ -294,7 +319,8 @@ export default function AuctionEdSearchResults({
     mapRequestSize,
     sortByGlobal,
     sortOrderGlobal,
-    5000
+    5000,
+    !useServerArea
   );
   const mapRawItems = useGlobal ? mapGlobalHook.items : mapPageHook.items;
   const mapLoading = useGlobal
@@ -305,6 +331,291 @@ export default function AuctionEdSearchResults({
     Array.isArray(mapRawItems) &&
     mapRawItems.length > 0 &&
     !mapLoading;
+
+  // useServerArea는 상단에서 계산
+
+  const [serverAreaState, setServerAreaState] = useState<{
+    items: any[];
+    total: number;
+    isLoading: boolean;
+    error?: any;
+  }>({ items: [], total: 0, isLoading: false });
+
+  // 지도 전용 대용량 상태(영역 모드 전용)
+  const [serverAreaMapState, setServerAreaMapState] = useState<{
+    items: any[];
+    isLoading: boolean;
+    error?: any;
+  }>({ items: [], isLoading: false });
+
+  useEffect(() => {
+    let ignore = false;
+    async function run() {
+      if (!useServerArea) {
+        setServerAreaState((s) => ({ ...s, items: [], total: 0 }));
+        return;
+      }
+      try {
+        setServerAreaState({ items: [], total: 0, isLoading: true });
+        // 파라미터 매핑
+        const q: Record<string, any> = {};
+        q.center_lat = centerForFilter?.lat;
+        q.center_lng = centerForFilter?.lng;
+        q.radius_m = radiusMForFilter;
+        // 지역 키 매핑 교정: province/cityDistrict/town → sido/address_city/eup_myeon_dong
+        if ((filters as any)?.province) q.sido = (filters as any).province;
+        if ((filters as any)?.cityDistrict)
+          q.address_city = (filters as any).cityDistrict;
+        if ((filters as any)?.town) q.eup_myeon_dong = (filters as any).town;
+        // 가격
+        if (Array.isArray((filters as any)?.priceRange)) {
+          const [minP, maxP] = (filters as any).priceRange as [number, number];
+          if (Number.isFinite(minP) && minP > 0)
+            q.price_min = Math.max(0, minP);
+          if (Number.isFinite(maxP) && maxP > 0) {
+            // 서버 스펙: price_max 는 상한 "미만(<)" 규칙. 일단 운영 안전을 위해 100000 이하로 제한
+            const MAX_PRICE_CAP = 100000; // 만원 단위
+            q.price_max = Math.min(MAX_PRICE_CAP, maxP);
+          }
+        }
+        // 건축면적(평)
+        if (Array.isArray((filters as any)?.buildingAreaRange)) {
+          const [minA, maxA] = (filters as any).buildingAreaRange as [
+            number,
+            number
+          ];
+          if (Number.isFinite(minA) && minA > 0) q.area_min = minA;
+          if (Number.isFinite(maxA) && maxA > 0) q.area_max = maxA;
+        }
+        // 토지면적(평)
+        if (Array.isArray((filters as any)?.landAreaRange)) {
+          const [minL, maxL] = (filters as any).landAreaRange as [
+            number,
+            number
+          ];
+          if (Number.isFinite(minL) && minL > 0) q.land_area_min = minL;
+          if (Number.isFinite(maxL) && maxL > 0) q.land_area_max = maxL;
+        }
+        // 건축년도
+        if (Array.isArray((filters as any)?.buildYear)) {
+          const [minYRaw, maxYRaw] = (filters as any).buildYear as [
+            number,
+            number
+          ];
+          const clamp = (v: number) =>
+            Math.min(2030, Math.max(1900, Number.isFinite(v) ? v : 0));
+          const minY = clamp(minYRaw);
+          const maxY = clamp(maxYRaw);
+          if (minY) q.build_year_min = minY;
+          if (maxY) q.build_year_max = maxY;
+        }
+        // 매각기일
+        if ((filters as any)?.saleYear) {
+          const y = String((filters as any).saleYear);
+          q.date_from = `${y}-01-01`;
+          q.date_to = `${y}-12-31`;
+        } else {
+          if ((filters as any)?.saleDateFrom)
+            q.date_from = (filters as any).saleDateFrom;
+          if ((filters as any)?.saleDateTo)
+            q.date_to = (filters as any).saleDateTo;
+        }
+        // 전용 필터
+        const hasElevator = (filters as any)?.hasElevator;
+        if (hasElevator === true || hasElevator === "있음")
+          q.elevator_available = "Y";
+        else if (hasElevator === false || hasElevator === "없음")
+          q.elevator_available = "N";
+        const toCsv = (v: any) =>
+          Array.isArray(v)
+            ? v.filter((x) => x != null && String(x).trim() !== "").join(",")
+            : typeof v === "string"
+            ? v
+            : undefined;
+        const fc = toCsv((filters as any)?.floorConfirmation);
+        if (fc && fc !== "all") q.floor_confirmation = fc;
+        const cs = toCsv((filters as any)?.currentStatus);
+        if (cs && cs !== "all") q.current_status = cs;
+        const sr = toCsv((filters as any)?.specialRights);
+        if (sr) q.special_rights = sr;
+        // 정렬/페이지
+        const sBy = (filters as any)?.sortBy;
+        const sOrd = (filters as any)?.sortOrder;
+        const snake = (k?: string) =>
+          k
+            ? String(k)
+                .replace(/([A-Z])/g, "_$1")
+                .toLowerCase()
+            : undefined;
+        const key = snake(sBy);
+        if (key && sOrd) q.ordering = `${sOrd === "desc" ? "-" : ""}${key}`;
+        q.page = page;
+        // 서버 스펙: size 최대 1000
+        q.size = Math.min(
+          1000,
+          Number.isFinite(size as any) ? (size as any) : 20
+        );
+
+        const res = await auctionApi.getCompletedArea(q as any);
+        if (ignore) return;
+        const rawItems = ((res as any)?.results ?? []) as any[];
+        const adaptedItems = Array.isArray(rawItems)
+          ? rawItems.map((r: any) =>
+              (datasetConfigs as any)?.["auction_ed"]?.adapter?.toItemLike
+                ? (datasetConfigs as any)["auction_ed"].adapter.toItemLike(r)
+                : r
+            )
+          : [];
+        setServerAreaState({
+          items: adaptedItems,
+          total: (res as any)?.total ?? 0,
+          isLoading: false,
+          error: undefined,
+        });
+      } catch (e) {
+        if (ignore) return;
+        setServerAreaState({ items: [], total: 0, isLoading: false, error: e });
+      }
+    }
+    run();
+    return () => {
+      ignore = true;
+    };
+  }, [
+    useServerArea,
+    centerForFilter?.lat,
+    centerForFilter?.lng,
+    radiusMForFilter,
+    JSON.stringify(filters),
+    page,
+    size,
+  ]);
+
+  // 지도 전용 /area 대용량 요청 (page=1, size=상한)
+  useEffect(() => {
+    let ignore = false;
+    async function run() {
+      if (!useServerArea) {
+        setServerAreaMapState({ items: [], isLoading: false });
+        return;
+      }
+      try {
+        setServerAreaMapState({ items: [], isLoading: true });
+        const q: Record<string, any> = {};
+        q.center_lat = centerForFilter?.lat;
+        q.center_lng = centerForFilter?.lng;
+        q.radius_m = radiusMForFilter;
+        if ((filters as any)?.province) q.sido = (filters as any).province;
+        if ((filters as any)?.cityDistrict)
+          q.address_city = (filters as any).cityDistrict;
+        if ((filters as any)?.town) q.eup_myeon_dong = (filters as any).town;
+        if (Array.isArray((filters as any)?.priceRange)) {
+          const [minP, maxP] = (filters as any).priceRange as [number, number];
+          if (Number.isFinite(minP) && minP > 0)
+            q.price_min = Math.max(0, minP);
+          if (Number.isFinite(maxP) && maxP > 0) {
+            const MAX_PRICE_CAP = 100000; // 만원 단위
+            q.price_max = Math.min(MAX_PRICE_CAP, maxP);
+          }
+        }
+        if (Array.isArray((filters as any)?.buildingAreaRange)) {
+          const [minA, maxA] = (filters as any).buildingAreaRange as [
+            number,
+            number
+          ];
+          if (Number.isFinite(minA) && minA > 0) q.area_min = minA;
+          if (Number.isFinite(maxA) && maxA > 0) q.area_max = maxA;
+        }
+        if (Array.isArray((filters as any)?.landAreaRange)) {
+          const [minL, maxL] = (filters as any).landAreaRange as [
+            number,
+            number
+          ];
+          if (Number.isFinite(minL) && minL > 0) q.land_area_min = minL;
+          if (Number.isFinite(maxL) && maxL > 0) q.land_area_max = maxL;
+        }
+        if (Array.isArray((filters as any)?.buildYear)) {
+          const [minYRaw, maxYRaw] = (filters as any).buildYear as [
+            number,
+            number
+          ];
+          const clamp = (v: number) =>
+            Math.min(2030, Math.max(1900, Number.isFinite(v) ? v : 0));
+          const minY = clamp(minYRaw);
+          const maxY = clamp(maxYRaw);
+          if (minY) q.build_year_min = minY;
+          if (maxY) q.build_year_max = maxY;
+        }
+        if ((filters as any)?.saleYear) {
+          const y = String((filters as any).saleYear);
+          q.date_from = `${y}-01-01`;
+          q.date_to = `${y}-12-31`;
+        } else {
+          if ((filters as any)?.saleDateFrom)
+            q.date_from = (filters as any).saleDateFrom;
+          if ((filters as any)?.saleDateTo)
+            q.date_to = (filters as any).saleDateTo;
+        }
+        const hasElevator = (filters as any)?.hasElevator;
+        if (hasElevator === true || hasElevator === "있음")
+          q.elevator_available = "Y";
+        else if (hasElevator === false || hasElevator === "없음")
+          q.elevator_available = "N";
+
+        const sBy = (filters as any)?.sortBy;
+        const sOrd = (filters as any)?.sortOrder;
+        const snake = (k?: string) =>
+          k
+            ? String(k)
+                .replace(/([A-Z])/g, "_$1")
+                .toLowerCase()
+            : undefined;
+        const key = snake(sBy);
+        if (key && sOrd) q.ordering = `${sOrd === "desc" ? "-" : ""}${key}`;
+
+        q.page = 1;
+        const sizeCap = Math.min(
+          1000,
+          BACKEND_MAX_PAGE_SIZE,
+          MAP_GUARD.maxMarkers,
+          maxMarkersCap
+        );
+        q.size = sizeCap;
+
+        const res = await auctionApi.getCompletedArea(q as any);
+        if (ignore) return;
+        const rawItems = ((res as any)?.results ?? []) as any[];
+        const adaptedItems = Array.isArray(rawItems)
+          ? rawItems.map((r: any) =>
+              (datasetConfigs as any)?.["auction_ed"]?.adapter?.toItemLike
+                ? (datasetConfigs as any)["auction_ed"].adapter.toItemLike(r)
+                : r
+            )
+          : [];
+        setServerAreaMapState({
+          items: adaptedItems,
+          isLoading: false,
+          error: undefined,
+        });
+      } catch (e) {
+        if (ignore) return;
+        setServerAreaMapState({ items: [], isLoading: false, error: e });
+      }
+    }
+    run();
+    return () => {
+      ignore = true;
+    };
+  }, [
+    useServerArea,
+    centerForFilter?.lat,
+    centerForFilter?.lng,
+    radiusMForFilter,
+    JSON.stringify(filters),
+    sortByGlobal,
+    sortOrderGlobal,
+    maxMarkersCap,
+  ]);
 
   useEffect(() => {
     // 지도는 별도의 대용량 1페이지 요청을 사용하므로 추가 병합은 비활성화
@@ -328,22 +639,33 @@ export default function AuctionEdSearchResults({
       page,
       size,
       items,
-      // 전역 소스는 준비 완료 시에만 전달(초기 빈/로딩 상태 전파 방지)
-      globalSource: globalReady ? (mapRawItems as any[]) : undefined,
+      // 서버 영역필터 사용 중에는 클라 반경 파이프라인을 사용하지 않음
+      globalSource: useServerArea
+        ? undefined
+        : globalReady
+        ? (mapRawItems as any[])
+        : undefined,
       maxMarkersCap,
       getRowSortTs: (r: any) => (r?.sale_date ? Date.parse(r.sale_date) : 0),
     });
 
-  const effectiveTotal = applyCircle
+  const effectiveTotal = useServerArea
+    ? serverAreaState.total
+    : applyCircle
     ? processedItemsSorted.length
     : serverTotal || 0;
-  const tableItemsAll = processedItemsSorted; // 목록은 상한 없이 전체
+  const tableItemsAll = useServerArea
+    ? serverAreaState.items
+    : processedItemsSorted; // 목록은 상한 없이 전체
 
   // 🆕 처리된 데이터를 상위로 전달 (useMemo로 참조 안정성 확보하여 무한루프 방지)
   const processedDataMemo = useMemo(() => {
+    const mapItemsForUI = useServerArea
+      ? (serverAreaMapState.items as any[])
+      : (mapItems as any[]);
     console.log("🔍 [AuctionEdSearchResults] 데이터 전달:", {
       tableItemsLength: tableItemsAll?.length,
-      mapItemsLength: mapItems?.length,
+      mapItemsLength: mapItemsForUI?.length,
       total: effectiveTotal,
       hasExternalItems: !!externalItems,
       externalItemsLength: externalItems?.length,
@@ -354,22 +676,32 @@ export default function AuctionEdSearchResults({
     });
     return {
       tableItems: tableItemsAll,
-      mapItems: mapItems,
+      mapItems: mapItemsForUI,
       total: effectiveTotal,
     };
   }, [
     // 🔍 실제 데이터 길이와 첫번째 아이템 ID만 비교 (참조 변경 무시)
     tableItemsAll?.length,
-    mapItems?.length,
+    (useServerArea ? serverAreaMapState.items : mapItems)?.length,
     effectiveTotal,
     tableItemsAll?.[0]?.id,
-    mapItems?.[0]?.id,
+    (useServerArea ? serverAreaMapState.items : mapItems)?.[0]?.id,
   ]);
+
+  // ViewState 게이트: 서버 영역모드에서는 서버 응답 기준으로 표시/빈 상태를 판정
+  const viewIsLoading = useServerArea
+    ? Boolean(serverAreaState.isLoading)
+    : Boolean(isLoading);
+  const viewError = useServerArea ? (serverAreaState as any)?.error : error;
+  const itemsForEmpty = useServerArea
+    ? (serverAreaState.items as any[])
+    : (items as any[]);
+  const viewTotal = effectiveTotal;
 
   useEffect(() => {
     if (!onProcessedDataChange) return;
     // 반경 필터 활성 시 전역 소스 준비 전에는 상위 전달을 지연해 빈 집합 전달을 방지
-    if (applyCircle && !globalReady) return;
+    if (!useServerArea && applyCircle && !globalReady) return;
     onProcessedDataChange(processedDataMemo);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [processedDataMemo, applyCircle, globalReady]);
@@ -471,7 +803,7 @@ export default function AuctionEdSearchResults({
                 <span className="inline-block">
                   영역 안 필터{" "}
                   <span className="font-semibold text-indigo-600">
-                    {processedItemsSorted.length.toLocaleString()}
+                    {(effectiveTotal || 0).toLocaleString()}
                   </span>
                   건
                 </span>
@@ -612,11 +944,13 @@ export default function AuctionEdSearchResults({
 
         <div className="p-4">
           {/* 로딩, 에러, 빈 상태 처리 */}
-          {(isLoading && items.length === 0) || error || items.length === 0 ? (
+          {(viewIsLoading && itemsForEmpty.length === 0) ||
+          viewError ||
+          itemsForEmpty.length === 0 ? (
             <ViewState
-              isLoading={isLoading && items.length === 0}
-              error={error}
-              total={items.length}
+              isLoading={viewIsLoading && itemsForEmpty.length === 0}
+              error={viewError}
+              total={viewTotal}
               onRetry={refetch}
             >
               <div className="flex flex-col items-center justify-center py-8">
@@ -633,7 +967,11 @@ export default function AuctionEdSearchResults({
                 <div className="space-y-4">
                   {
                     <ItemTable
-                      items={pagedItems as any}
+                      items={
+                        useServerArea
+                          ? (serverAreaState.items as any)
+                          : (pagedItems as any)
+                      }
                       isLoading={false}
                       error={undefined}
                       rowKeyProp={(row: any) =>
@@ -671,7 +1009,13 @@ export default function AuctionEdSearchResults({
                         }
                         const direct = row?.[key];
                         if (direct !== undefined) return direct;
-                        return row?.extra?.[key];
+                        const extra = row?.extra?.[key];
+                        if (extra !== undefined) return extra;
+                        // 안전망: snake_case 폴백 (어댑터 누락 시)
+                        const snake = String(key)
+                          .replace(/([A-Z])/g, "_$1")
+                          .toLowerCase();
+                        return row?.[snake] ?? row?.extra?.[snake];
                       }}
                       sortBy={sortBy as any}
                       sortOrder={sortOrder as any}
@@ -846,7 +1190,11 @@ export default function AuctionEdSearchResults({
               {activeView === "map" && (
                 <div className="h-[calc(100vh-240px)]">
                   <AuctionEdMap
-                    items={mapItems}
+                    items={
+                      useServerArea
+                        ? (serverAreaMapState.items as any[])
+                        : mapItems
+                    }
                     highlightIds={(selectedIds || []).map((k: any) =>
                       String(k)
                     )}
@@ -861,7 +1209,11 @@ export default function AuctionEdSearchResults({
                     <h3 className="text-lg font-semibold">지도 보기</h3>
                     <div className="h-[calc(100vh-360px)]">
                       <AuctionEdMap
-                        items={mapItems}
+                        items={
+                          useServerArea
+                            ? (serverAreaMapState.items as any[])
+                            : mapItems
+                        }
                         highlightIds={(selectedIds || []).map((k: any) =>
                           String(k)
                         )}
@@ -874,7 +1226,11 @@ export default function AuctionEdSearchResults({
                     <h3 className="text-lg font-semibold">목록 보기</h3>
                     {
                       <ItemTable
-                        items={pagedItems as any}
+                        items={
+                          useServerArea
+                            ? (serverAreaState.items as any)
+                            : (pagedItems as any)
+                        }
                         isLoading={false}
                         error={undefined}
                         rowKeyProp={(row: any) =>

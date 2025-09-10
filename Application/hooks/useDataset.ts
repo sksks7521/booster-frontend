@@ -13,7 +13,8 @@ export function useDataset(
   datasetId: DatasetId,
   filters: Record<string, unknown>,
   page: number,
-  size: number
+  size: number,
+  enabled: boolean = true
 ) {
   const cfg = datasetConfigs[datasetId];
   const safeFilters = roundBounds(sanitizeFilters(filters));
@@ -28,7 +29,9 @@ export function useDataset(
     delete (filtersForQuery as any).north;
     delete (filtersForQuery as any).east;
   }
-  const key = cfg.api.buildListKey({ filters: filtersForQuery, page, size });
+  const key = enabled
+    ? cfg.api.buildListKey({ filters: filtersForQuery, page, size })
+    : null;
   const { data, error, isLoading, mutate } = useSWR(key, async () => {
     try {
       // bounds 간단 검증 실패 시 네트워크 요청 생략

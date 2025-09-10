@@ -435,6 +435,27 @@ class ApiClient {
     );
   }
 
+  // 영역(원형) 서버 필터 전용 API
+  async getAuctionCompletedArea(params?: Record<string, any>): Promise<{
+    results: any[];
+    total: number;
+    page: number;
+    size: number;
+    ordering?: string;
+  }> {
+    const finalParams: Record<string, any> = { ...(params ?? {}) };
+    if (finalParams.page === undefined) finalParams.page = 1;
+    if (finalParams.size === undefined) finalParams.size = 20;
+    const queryParams = new URLSearchParams(finalParams).toString();
+    return this.request<{
+      results: any[];
+      total: number;
+      page: number;
+      size: number;
+      ordering?: string;
+    }>(`/api/v1/auction-completed/area?${queryParams}`);
+  }
+
   async getAuctionCompletedDetail(itemId: number): Promise<AuctionCompleted> {
     return this.request<AuctionCompleted>(
       `/api/v1/auction-completed/${itemId}`
@@ -618,6 +639,8 @@ export const favoriteApi = {
 export const auctionApi = {
   getCompleted: (params?: Record<string, any>) =>
     apiClient.getAuctionCompleted(params),
+  getCompletedArea: (params?: Record<string, any>) =>
+    apiClient.getAuctionCompletedArea(params),
   getCompletedDetail: (itemId: number) =>
     apiClient.getAuctionCompletedDetail(itemId),
   getMarketAnalysis: (params?: Record<string, any>) =>

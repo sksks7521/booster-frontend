@@ -127,6 +127,38 @@ export default function PropertyDetailV2Page() {
   const [isFilterCollapsed, setIsFilterCollapsed] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
+  // 🆕 서버 영역필터 전환 조건 계산(auction_ed 전용)
+  const flags = useFeatureFlags();
+  const nsAuction = (nsState as any)?.auction_ed;
+  const applyCircle = Boolean(nsAuction?.applyCircleFilter);
+  const centerCandidate = nsAuction?.circleCenter || nsAuction?.refMarkerCenter;
+  const centerValid =
+    centerCandidate &&
+    Number.isFinite(centerCandidate.lat) &&
+    Number.isFinite(centerCandidate.lng) &&
+    !(Number(centerCandidate.lat) === 0 && Number(centerCandidate.lng) === 0);
+  // URL 기반 선결정: within=1 + lat/lng(+radius) 존재 시 초기 렌더부터 서버 영역 모드
+  const withinParam = searchParams?.get("within") === "1";
+  const urlLat = Number(searchParams?.get("lat"));
+  const urlLng = Number(searchParams?.get("lng"));
+  const urlRadiusKm = Number(
+    (searchParams?.get("radium_km") as any) ||
+      (searchParams?.get("radius_km") as any)
+  );
+  const urlCenterValid =
+    Number.isFinite(urlLat) &&
+    Number.isFinite(urlLng) &&
+    !(Number(urlLat) === 0 && Number(urlLng) === 0);
+  const initialUseServerAreaFromURL = Boolean(
+    withinParam &&
+      urlCenterValid &&
+      (Number.isFinite(urlRadiusKm) ? urlRadiusKm > 0 : true)
+  );
+  const useServerArea = Boolean(
+    flags?.auctionEdServerAreaEnabled &&
+      (initialUseServerAreaFromURL || (applyCircle && centerValid))
+  );
+
   // 지역 선택을 위한 상태 및 로직
   // regions.json 기반 하드코딩 목록 사용
   const provinces: string[] = (regions as any)["시도"] ?? [];
@@ -719,7 +751,13 @@ export default function PropertyDetailV2Page() {
     isLoading: dsLoading,
     error: dsError,
     mutate: dsRefetch,
-  } = useDataset(activeDataset as any, queryFilters, pageNum, pageSize);
+  } = useDataset(
+    activeDataset as any,
+    queryFilters,
+    pageNum,
+    pageSize,
+    !(activeDataset === "auction_ed" && useServerArea)
+  );
 
   // 가상 스크롤 사용 조건: 전역 플래그 또는 총 건수 임계치 초과
   const { virtualTable, areaDisplay } = useFeatureFlags();
@@ -1121,6 +1159,7 @@ export default function PropertyDetailV2Page() {
                                   ? "both"
                                   : (activeView as "table" | "map" | "both")
                               }
+                              serverAreaEnabled={useServerArea}
                               onViewChange={(view) => {
                                 console.log("🔍 [onViewChange] 뷰 변경:", {
                                   view,

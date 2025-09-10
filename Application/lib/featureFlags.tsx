@@ -9,6 +9,8 @@ export type FeatureFlags = {
     rounding: "round" | "floor" | "ceil";
     digits: number;
   };
+  // 서버 영역필터 사용 여부(auction_ed). 기본 OFF. NEXT_PUBLIC_AUCTION_ED_SERVER_AREA=1 시 ON.
+  auctionEdServerAreaEnabled?: boolean;
 };
 
 const FeatureFlagContext = React.createContext<FeatureFlags>({
@@ -26,6 +28,10 @@ export function FeatureFlagProvider({
   const areaMode = (params.get("area") as any) || "both";
   const round = (params.get("round") as any) || "round";
   const digits = Number(params.get("digits") || 1);
+  // 환경변수 기반 서버 영역필터 플래그(기본 OFF). NEXT_PUBLIC_AUCTION_ED_SERVER_AREA=1 이면 ON.
+  const auctionEdServerAreaEnabled =
+    (process.env.NEXT_PUBLIC_AUCTION_ED_SERVER_AREA ?? "0") === "1";
+
   const value: FeatureFlags = {
     virtualTable: vt === "1",
     areaDisplay: {
@@ -37,6 +43,7 @@ export function FeatureFlagProvider({
         : "round",
       digits: Number.isFinite(digits) ? digits : 1,
     },
+    auctionEdServerAreaEnabled,
   };
   return (
     <FeatureFlagContext.Provider value={value}>
