@@ -31,6 +31,7 @@ import { useGlobalDataset } from "@/hooks/useGlobalDataset";
 import { datasetConfigs } from "@/datasets/registry";
 import { ViewState } from "@/components/ui/view-state";
 import { List, Map, Layers, Download, Bell } from "lucide-react";
+import { buildAreaQueryParams } from "./areaQuery";
 import {
   Select,
   SelectContent,
@@ -357,104 +358,15 @@ export default function AuctionEdSearchResults({
       }
       try {
         setServerAreaState({ items: [], total: 0, isLoading: true });
-        // 파라미터 매핑
-        const q: Record<string, any> = {};
-        q.center_lat = centerForFilter?.lat;
-        q.center_lng = centerForFilter?.lng;
-        q.radius_m = radiusMForFilter;
-        // 지역 키 매핑 교정: province/cityDistrict/town → sido/address_city/eup_myeon_dong
-        if ((filters as any)?.province) q.sido = (filters as any).province;
-        if ((filters as any)?.cityDistrict)
-          q.address_city = (filters as any).cityDistrict;
-        if ((filters as any)?.town) q.eup_myeon_dong = (filters as any).town;
-        // 가격
-        if (Array.isArray((filters as any)?.priceRange)) {
-          const [minP, maxP] = (filters as any).priceRange as [number, number];
-          if (Number.isFinite(minP) && minP > 0)
-            q.price_min = Math.max(0, minP);
-          if (Number.isFinite(maxP) && maxP > 0) {
-            // 서버 스펙: price_max 는 상한 "미만(<)" 규칙. 일단 운영 안전을 위해 100000 이하로 제한
-            const MAX_PRICE_CAP = 100000; // 만원 단위
-            q.price_max = Math.min(MAX_PRICE_CAP, maxP);
-          }
-        }
-        // 건축면적(평)
-        if (Array.isArray((filters as any)?.buildingAreaRange)) {
-          const [minA, maxA] = (filters as any).buildingAreaRange as [
-            number,
-            number
-          ];
-          if (Number.isFinite(minA) && minA > 0) q.area_min = minA;
-          if (Number.isFinite(maxA) && maxA > 0) q.area_max = maxA;
-        }
-        // 토지면적(평)
-        if (Array.isArray((filters as any)?.landAreaRange)) {
-          const [minL, maxL] = (filters as any).landAreaRange as [
-            number,
-            number
-          ];
-          if (Number.isFinite(minL) && minL > 0) q.land_area_min = minL;
-          if (Number.isFinite(maxL) && maxL > 0) q.land_area_max = maxL;
-        }
-        // 건축년도
-        if (Array.isArray((filters as any)?.buildYear)) {
-          const [minYRaw, maxYRaw] = (filters as any).buildYear as [
-            number,
-            number
-          ];
-          const clamp = (v: number) =>
-            Math.min(2030, Math.max(1900, Number.isFinite(v) ? v : 0));
-          const minY = clamp(minYRaw);
-          const maxY = clamp(maxYRaw);
-          if (minY) q.build_year_min = minY;
-          if (maxY) q.build_year_max = maxY;
-        }
-        // 매각기일
-        if ((filters as any)?.saleYear) {
-          const y = String((filters as any).saleYear);
-          q.date_from = `${y}-01-01`;
-          q.date_to = `${y}-12-31`;
-        } else {
-          if ((filters as any)?.saleDateFrom)
-            q.date_from = (filters as any).saleDateFrom;
-          if ((filters as any)?.saleDateTo)
-            q.date_to = (filters as any).saleDateTo;
-        }
-        // 전용 필터
-        const hasElevator = (filters as any)?.hasElevator;
-        if (hasElevator === true || hasElevator === "있음")
-          q.elevator_available = "Y";
-        else if (hasElevator === false || hasElevator === "없음")
-          q.elevator_available = "N";
-        const toCsv = (v: any) =>
-          Array.isArray(v)
-            ? v.filter((x) => x != null && String(x).trim() !== "").join(",")
-            : typeof v === "string"
-            ? v
-            : undefined;
-        const fc = toCsv((filters as any)?.floorConfirmation);
-        if (fc && fc !== "all") q.floor_confirmation = fc;
-        const cs = toCsv((filters as any)?.currentStatus);
-        if (cs && cs !== "all") q.current_status = cs;
-        const sr = toCsv((filters as any)?.specialRights);
-        if (sr) q.special_rights = sr;
-        // 정렬/페이지
-        const sBy = (filters as any)?.sortBy;
-        const sOrd = (filters as any)?.sortOrder;
-        const snake = (k?: string) =>
-          k
-            ? String(k)
-                .replace(/([A-Z])/g, "_$1")
-                .toLowerCase()
-            : undefined;
-        const key = snake(sBy);
-        if (key && sOrd) q.ordering = `${sOrd === "desc" ? "-" : ""}${key}`;
-        q.page = page;
-        // 서버 스펙: size 최대 1000
-        q.size = Math.min(
-          1000,
-          Number.isFinite(size as any) ? (size as any) : 20
-        );
+        const q = buildAreaQueryParams({
+          filters: filters as any,
+          center: centerForFilter,
+          radiusM: radiusMForFilter,
+          page,
+          size,
+          sortBy: (filters as any)?.sortBy,
+          sortOrder: (filters as any)?.sortOrder,
+        });
 
         const res = await auctionApi.getCompletedArea(q as any);
         if (ignore) return;
@@ -501,86 +413,20 @@ export default function AuctionEdSearchResults({
       }
       try {
         setServerAreaMapState({ items: [], isLoading: true });
-        const q: Record<string, any> = {};
-        q.center_lat = centerForFilter?.lat;
-        q.center_lng = centerForFilter?.lng;
-        q.radius_m = radiusMForFilter;
-        if ((filters as any)?.province) q.sido = (filters as any).province;
-        if ((filters as any)?.cityDistrict)
-          q.address_city = (filters as any).cityDistrict;
-        if ((filters as any)?.town) q.eup_myeon_dong = (filters as any).town;
-        if (Array.isArray((filters as any)?.priceRange)) {
-          const [minP, maxP] = (filters as any).priceRange as [number, number];
-          if (Number.isFinite(minP) && minP > 0)
-            q.price_min = Math.max(0, minP);
-          if (Number.isFinite(maxP) && maxP > 0) {
-            const MAX_PRICE_CAP = 100000; // 만원 단위
-            q.price_max = Math.min(MAX_PRICE_CAP, maxP);
-          }
-        }
-        if (Array.isArray((filters as any)?.buildingAreaRange)) {
-          const [minA, maxA] = (filters as any).buildingAreaRange as [
-            number,
-            number
-          ];
-          if (Number.isFinite(minA) && minA > 0) q.area_min = minA;
-          if (Number.isFinite(maxA) && maxA > 0) q.area_max = maxA;
-        }
-        if (Array.isArray((filters as any)?.landAreaRange)) {
-          const [minL, maxL] = (filters as any).landAreaRange as [
-            number,
-            number
-          ];
-          if (Number.isFinite(minL) && minL > 0) q.land_area_min = minL;
-          if (Number.isFinite(maxL) && maxL > 0) q.land_area_max = maxL;
-        }
-        if (Array.isArray((filters as any)?.buildYear)) {
-          const [minYRaw, maxYRaw] = (filters as any).buildYear as [
-            number,
-            number
-          ];
-          const clamp = (v: number) =>
-            Math.min(2030, Math.max(1900, Number.isFinite(v) ? v : 0));
-          const minY = clamp(minYRaw);
-          const maxY = clamp(maxYRaw);
-          if (minY) q.build_year_min = minY;
-          if (maxY) q.build_year_max = maxY;
-        }
-        if ((filters as any)?.saleYear) {
-          const y = String((filters as any).saleYear);
-          q.date_from = `${y}-01-01`;
-          q.date_to = `${y}-12-31`;
-        } else {
-          if ((filters as any)?.saleDateFrom)
-            q.date_from = (filters as any).saleDateFrom;
-          if ((filters as any)?.saleDateTo)
-            q.date_to = (filters as any).saleDateTo;
-        }
-        const hasElevator = (filters as any)?.hasElevator;
-        if (hasElevator === true || hasElevator === "있음")
-          q.elevator_available = "Y";
-        else if (hasElevator === false || hasElevator === "없음")
-          q.elevator_available = "N";
-
-        const sBy = (filters as any)?.sortBy;
-        const sOrd = (filters as any)?.sortOrder;
-        const snake = (k?: string) =>
-          k
-            ? String(k)
-                .replace(/([A-Z])/g, "_$1")
-                .toLowerCase()
-            : undefined;
-        const key = snake(sBy);
-        if (key && sOrd) q.ordering = `${sOrd === "desc" ? "-" : ""}${key}`;
-
-        q.page = 1;
-        const sizeCap = Math.min(
-          1000,
-          BACKEND_MAX_PAGE_SIZE,
-          MAP_GUARD.maxMarkers,
-          maxMarkersCap
-        );
-        q.size = sizeCap;
+        const q = buildAreaQueryParams({
+          filters: filters as any,
+          center: centerForFilter,
+          radiusM: radiusMForFilter,
+          page: 1,
+          size: Math.min(
+            1000,
+            BACKEND_MAX_PAGE_SIZE,
+            MAP_GUARD.maxMarkers,
+            maxMarkersCap
+          ),
+          sortBy: (filters as any)?.sortBy,
+          sortOrder: (filters as any)?.sortOrder,
+        });
 
         const res = await auctionApi.getCompletedArea(q as any);
         if (ignore) return;

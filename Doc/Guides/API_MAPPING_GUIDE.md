@@ -70,6 +70,21 @@ if (filters?.town) {
 }
 ```
 
+### 영역 안 보기(/area) 파라미터 가이드(목록과 파리티)
+
+- 좌표/반경: `center_lat`, `center_lng`, `radius_m`(500m–10km)
+- 지역: `sido`, `address_city`, `eup_myeon_dong`
+- 가격: `price_min/max`(만원, max는 미만 `<` 규칙)
+- 면적: `area_min/max`, `land_area_min/max`
+- 연식/매각일: `build_year_min/max` 또는 `date_from/to`(saleYear 파생)
+- 상태/권리/층: `current_status=CSV`, `special_rights=CSV`, `floor_confirmation=CSV`
+- 엘리베이터: `has_elevator=true|false`(+ 호환용 `elevator_available=Y|N` 병행 전송)
+- 검색: `road_address_search` | `case_number_search` | `address_search`
+- 정렬: `ordering=[-]sale_date|final_sale_price|exclusive_area_sqm|construction_year|bidder_count`
+- 페이징: `page(1-base)`, `size≤1000`
+
+프런트는 공통 빌더(`buildAreaQueryParams`)로 표/지도 모두 동일 파라미터 세트를 구성합니다. 지도는 page=1, size=min(1000, BACKEND_MAX_PAGE_SIZE, MAP_GUARD.maxMarkers, UI 상한)로 요청합니다.
+
 ### **응답 데이터 매핑**
 
 ```typescript
