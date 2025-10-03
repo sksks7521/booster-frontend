@@ -95,7 +95,15 @@ export default function SaleSearchResults({
   const sortOrder = useFilterStore((s: any) => s.sortOrder);
   const { areaDisplay } = useFeatureFlags();
   const useVirtual = false; // 기본적으로 일반 테이블 사용
-  const [selectedRowKeys, setSelectedRowKeys] = useState<Key[]>([]);
+
+  // 🆕 체크박스 선택 → 지도 연동 (Zustand 스토어 사용)
+  const EMPTY_ARRAY: any[] = [];
+  const NOOP = () => {};
+  const selectedIds = useFilterStore((s: any) => s.selectedIds ?? EMPTY_ARRAY);
+  const setSelectedIds = useFilterStore((s: any) => s.setSelectedIds ?? NOOP);
+  const setPendingMapTarget = useFilterStore(
+    (s: any) => s.setPendingMapTarget ?? NOOP
+  );
 
   // sale 데이터셋 설정 가져오기
   const datasetConfig = datasetConfigs["sale"];
@@ -459,8 +467,10 @@ export default function SaleSearchResults({
                       sortBy={sortBy as any}
                       sortOrder={sortOrder as any}
                       onSort={handleSort}
-                      selectedRowKeys={selectedRowKeys}
-                      onSelectionChange={setSelectedRowKeys}
+                      selectedRowKeys={selectedIds as any}
+                      onSelectionChange={(keys) => {
+                        setSelectedIds(Array.from(keys).map((k) => String(k)));
+                      }}
                       containerHeight={560}
                       rowHeight={44}
                       overscan={8}
@@ -500,8 +510,10 @@ export default function SaleSearchResults({
                       sortBy={sortBy as any}
                       sortOrder={sortOrder as any}
                       onSort={handleSort}
-                      selectedRowKeys={selectedRowKeys}
-                      onSelectionChange={setSelectedRowKeys}
+                      selectedRowKeys={selectedIds as any}
+                      onSelectionChange={(keys) => {
+                        setSelectedIds(Array.from(keys).map((k) => String(k)));
+                      }}
                       totalCount={totalCount || 0}
                       page={page}
                       pageSize={size}
@@ -673,6 +685,9 @@ export default function SaleSearchResults({
                     legendThresholds={[5000, 10000, 30000, 50000]}
                     legendEditable={true}
                     legendHint="네모박스 내용 Y=엘베 있음, N=엘베 없음"
+                    highlightIds={(selectedIds || []).map((k: any) =>
+                      String(k)
+                    )}
                   />
                 </div>
               )}
@@ -691,6 +706,9 @@ export default function SaleSearchResults({
                         legendThresholds={[5000, 10000, 30000, 50000]}
                         legendEditable={true}
                         legendHint="네모박스 내용 Y=엘베 있음, N=엘베 없음"
+                        highlightIds={(selectedIds || []).map((k: any) =>
+                          String(k)
+                        )}
                       />
                     </div>
                   </div>
@@ -706,8 +724,48 @@ export default function SaleSearchResults({
                         sortBy={sortBy as any}
                         sortOrder={sortOrder as any}
                         onSort={handleSort}
-                        selectedRowKeys={selectedRowKeys}
-                        onSelectionChange={setSelectedRowKeys}
+                        selectedRowKeys={selectedIds as any}
+                        onSelectionChange={(keys) => {
+                          const prev = new Set(
+                            (selectedIds || []).map((k: any) => String(k))
+                          );
+                          const now = new Set(
+                            Array.from(keys).map((k) => String(k))
+                          );
+                          let added: string | undefined;
+                          now.forEach((k) => {
+                            if (!prev.has(String(k))) added = String(k);
+                          });
+                          setSelectedIds(Array.from(now));
+
+                          // 🆕 통합 뷰에서 체크박스 선택 시 지도 이동
+                          if (added) {
+                            const found = items.find(
+                              (r: any) => String(r?.id ?? "") === added
+                            );
+                            const latRaw =
+                              (found as any)?.lat ??
+                              (found as any)?.latitude ??
+                              (found as any)?.lat_y ??
+                              (found as any)?.y;
+                            const lngRaw =
+                              (found as any)?.lng ??
+                              (found as any)?.longitude ??
+                              (found as any)?.lon ??
+                              (found as any)?.x;
+                            const lat =
+                              typeof latRaw === "number"
+                                ? latRaw
+                                : parseFloat(String(latRaw));
+                            const lng =
+                              typeof lngRaw === "number"
+                                ? lngRaw
+                                : parseFloat(String(lngRaw));
+                            if (Number.isFinite(lat) && Number.isFinite(lng)) {
+                              setPendingMapTarget({ lat, lng });
+                            }
+                          }
+                        }}
                         containerHeight={400}
                         rowHeight={44}
                         overscan={8}
@@ -747,8 +805,48 @@ export default function SaleSearchResults({
                         sortBy={sortBy as any}
                         sortOrder={sortOrder as any}
                         onSort={handleSort}
-                        selectedRowKeys={selectedRowKeys}
-                        onSelectionChange={setSelectedRowKeys}
+                        selectedRowKeys={selectedIds as any}
+                        onSelectionChange={(keys) => {
+                          const prev = new Set(
+                            (selectedIds || []).map((k: any) => String(k))
+                          );
+                          const now = new Set(
+                            Array.from(keys).map((k) => String(k))
+                          );
+                          let added: string | undefined;
+                          now.forEach((k) => {
+                            if (!prev.has(String(k))) added = String(k);
+                          });
+                          setSelectedIds(Array.from(now));
+
+                          // 🆕 통합 뷰에서 체크박스 선택 시 지도 이동
+                          if (added) {
+                            const found = items.find(
+                              (r: any) => String(r?.id ?? "") === added
+                            );
+                            const latRaw =
+                              (found as any)?.lat ??
+                              (found as any)?.latitude ??
+                              (found as any)?.lat_y ??
+                              (found as any)?.y;
+                            const lngRaw =
+                              (found as any)?.lng ??
+                              (found as any)?.longitude ??
+                              (found as any)?.lon ??
+                              (found as any)?.x;
+                            const lat =
+                              typeof latRaw === "number"
+                                ? latRaw
+                                : parseFloat(String(latRaw));
+                            const lng =
+                              typeof lngRaw === "number"
+                                ? lngRaw
+                                : parseFloat(String(lngRaw));
+                            if (Number.isFinite(lat) && Number.isFinite(lng)) {
+                              setPendingMapTarget({ lat, lng });
+                            }
+                          }
+                        }}
                         totalCount={totalCount || 0}
                         page={page}
                         pageSize={size}

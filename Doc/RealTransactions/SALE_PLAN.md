@@ -549,15 +549,65 @@
 
 **남은 작업 (경매결과 패리티):**
 
-### 📋 그룹 A: 테이블-지도 연동 ⭐⭐⭐ (필수, 2시간)
+### 📋 그룹 A: 테이블-지도 연동 ⭐⭐⭐ (필수, 2시간) ✅ 완료 (2025-10-03)
 
-- [ ] **A-1. 체크박스 선택 → 지도 강조**
+- [x] **A-1. 체크박스 선택 → 지도 강조**
   - selectedRowKeys를 Zustand selectedIds로 변경
   - highlightIds props를 MapView에 전달
   - 참고: `AuctionEdSearchResults.tsx` Line 568-569, 1063-1065, 1122-1180
-- [ ] **A-2. 통합 뷰 (both) 구현**
-  - 지도(상단) + 테이블(하단) 동시 표시
-  - 참고: `AuctionEdSearchResults.tsx` Line 1051-1070
+  - ✅ 구현 완료:
+    - `SaleSearchResults.tsx` Line 99-106: Zustand 스토어 연동
+    - `SaleSearchResults.tsx` Line 470-516: table 뷰 체크박스 연동
+    - `SaleSearchResults.tsx` Line 688: map 뷰에 highlightIds 전달
+    - `SaleSearchResults.tsx` Line 707: both 뷰에 highlightIds 전달
+- [x] **A-2. 통합 뷰 (both) 지도 이동 기능**
+  - 체크박스 선택 시 지도 중심 자동 이동
+  - 참고: `AuctionEdSearchResults.tsx` Line 1051-1070, 1132-1180
+  - ✅ 구현 완료:
+    - `SaleSearchResults.tsx` Line 724-762: ItemTableVirtual onSelectionChange
+    - `SaleSearchResults.tsx` Line 803-841: ItemTable onSelectionChange
+    - 좌표 추출 로직: lat/latitude/lat_y/y, lng/longitude/lon/x 지원
+    - setPendingMapTarget으로 지도 중심 이동
+
+**구현 세부 사항:**
+
+```typescript
+// 1. Zustand 스토어 연동
+const selectedIds = useFilterStore((s: any) => s.selectedIds ?? EMPTY_ARRAY);
+const setSelectedIds = useFilterStore((s: any) => s.setSelectedIds ?? NOOP);
+const setPendingMapTarget = useFilterStore((s: any) => s.setPendingMapTarget ?? NOOP);
+
+// 2. 체크박스 선택 핸들러 (both 뷰)
+onSelectionChange={(keys) => {
+  const prev = new Set((selectedIds || []).map((k: any) => String(k)));
+  const now = new Set(Array.from(keys).map((k) => String(k)));
+  let added: string | undefined;
+  now.forEach((k) => { if (!prev.has(String(k))) added = String(k); });
+  setSelectedIds(Array.from(now));
+
+  // 새로 선택된 항목으로 지도 이동
+  if (added) {
+    const found = items.find((r: any) => String(r?.id ?? "") === added);
+    // 좌표 추출 및 지도 이동
+    if (Number.isFinite(lat) && Number.isFinite(lng)) {
+      setPendingMapTarget({ lat, lng });
+    }
+  }
+}}
+
+// 3. MapView에 highlightIds 전달 (모든 뷰)
+<MapView
+  highlightIds={(selectedIds || []).map((k: any) => String(k))}
+/>
+```
+
+**테스트 결과:**
+
+- ✅ Table 뷰: 체크박스 선택 상태 유지
+- ✅ Map 뷰: 선택된 항목에 화살표 강조 표시
+- ✅ Both 뷰: 체크박스 선택 시 지도 중심 이동 + 화살표 표시
+- ✅ 여러 항목 선택: 모든 항목에 화살표 표시
+- ✅ 겹치는 좌표: MapView 클러스터링으로 자동 처리
 
 ### 📋 그룹 B: 원 그리기 + 영역 필터 ⭐⭐⭐ (필수, 3시간)
 
@@ -595,22 +645,24 @@
 ### 📊 Phase 4 진행 상황
 
 ```
-[██████░░░░] 60% 완료
+[████████░░] 80% 완료
 
-✅ 완료: 11개 작업
-🔄 남은 작업: 7개 작업
-  - 그룹 A: 2개 (필수)
-  - 그룹 B: 2개 (필수)
+✅ 완료: 13개 작업
+  - 기본 컴포넌트: 11개
+  - 그룹 A: 2개 ✅ (2025-10-03)
+
+🔄 남은 작업: 5개 작업
+  - 그룹 B: 2개 (필수, 다음 단계)
   - 그룹 C: 1개 (선택)
   - 그룹 D: 2개 (선택)
 
 예상 소요 시간:
-  - 필수: 5시간 (그룹 A+B)
+  - 필수: 3시간 (그룹 B)
   - 선택: 3시간 (그룹 C+D)
-  - 전체: 8시간
+  - 전체: 6시간
 ```
 
-**다음 단계:** 그룹 A부터 순차 진행
+**다음 단계:** 그룹 B (원 그리기 + 영역 필터)
 
 ---
 
