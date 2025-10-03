@@ -582,6 +582,13 @@ function MapView({
         realTransactionApi
           .getTransactionsByAddress(address)
           .then((response) => {
+            // ⭐ 경고 메시지 처리 (1000건 초과 시)
+            if (response.warning) {
+              console.warn(`[MapView API Warning] ${response.warning}`);
+              // TODO: 선택적으로 사용자에게 토스트 표시
+              // toast.warning(response.warning);
+            }
+
             const transactions = response.items || [];
             const buildingInfo = transactions[0] || item; // 첫 번째 거래 또는 현재 아이템을 대표로 사용
 
@@ -597,6 +604,7 @@ function MapView({
               table,
               tableCollapsible: true,
               actions,
+              widthPx: 540,
             });
 
             // 팝업 오버레이가 여전히 존재하는 경우에만 업데이트

@@ -261,12 +261,7 @@ export function renderBasePopup({
   closeBtn.setAttribute("data-action", "close");
   Object.assign(closeBtn.style, pillButtonStyle("#e5e7eb", "#111827", "#fff"));
   closeBtn.textContent = "닫기";
-  const detailBtn = document.createElement("button");
-  detailBtn.setAttribute("data-action", "detail");
-  Object.assign(detailBtn.style, pillButtonStyle("#1d4ed8", "#fff", "#2563eb"));
-  detailBtn.textContent = "상세보기";
   footer.appendChild(closeBtn);
-  footer.appendChild(detailBtn);
   root.appendChild(footer);
 
   return root;

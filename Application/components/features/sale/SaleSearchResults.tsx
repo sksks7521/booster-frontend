@@ -127,11 +127,13 @@ export default function SaleSearchResults({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 lg:space-y-6">
       {/* 검색 결과 헤더 및 액션 버튼 */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between">
         <div className="mb-4 md:mb-0">
-          <h2 className="text-2xl font-bold text-gray-900">실거래가(매매)</h2>
+          <h2 className="text-xl lg:text-2xl font-bold text-gray-900">
+            실거래가(매매)
+          </h2>
           <div className="flex flex-wrap items-center gap-2 mt-2">
             <p className="text-gray-600">
               총{" "}
@@ -166,14 +168,26 @@ export default function SaleSearchResults({
             )}
           </div>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={handleExport} size="sm">
+        <div className="flex gap-2 flex-wrap">
+          <Button
+            variant="outline"
+            onClick={handleExport}
+            size="sm"
+            className="text-xs lg:text-sm"
+          >
             <Download className="w-4 h-4 mr-2" />
-            내보내기
+            <span className="hidden sm:inline">내보내기</span>
+            <span className="sm:hidden">내보내기</span>
           </Button>
-          <Button variant="outline" onClick={handleSetAlert} size="sm">
+          <Button
+            variant="outline"
+            onClick={handleSetAlert}
+            size="sm"
+            className="text-xs lg:text-sm"
+          >
             <Bell className="w-4 h-4 mr-2" />
-            알림 설정
+            <span className="hidden sm:inline">알림 설정</span>
+            <span className="sm:hidden">알림</span>
           </Button>
         </div>
       </div>
@@ -492,6 +506,12 @@ export default function SaleSearchResults({
                       page={page}
                       pageSize={size}
                       onPageChange={(p) => setPage(p)}
+                      columnOrderStorageKey={"table:order:sale"}
+                      defaultColumnOrder={
+                        Array.isArray(schemaColumns)
+                          ? schemaColumns.map((c: any) => c.key)
+                          : undefined
+                      }
                     />
                   )}
 
@@ -733,6 +753,12 @@ export default function SaleSearchResults({
                         page={page}
                         pageSize={size}
                         onPageChange={(p) => setPage(p)}
+                        columnOrderStorageKey={"table:order:sale"}
+                        defaultColumnOrder={
+                          Array.isArray(schemaColumns)
+                            ? schemaColumns.map((c: any) => c.key)
+                            : undefined
+                        }
                       />
                     )}
 

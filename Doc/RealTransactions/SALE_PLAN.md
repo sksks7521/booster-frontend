@@ -530,61 +530,87 @@
   - sale 데이터셋 시 page.tsx 지역 관리 `useEffect` 비활성화
   - `SaleSearchResults.tsx`: selectedRowKeys 로컬 상태 관리로 변경
 
-#### Phase 4: 검색 결과 컴포넌트 ✅ 대부분 완료 (2025-10-03)
+#### Phase 4: 검색 결과 컴포넌트 🔄 진행 중 (60% 완료, 2025-10-03)
 
 **완료된 작업:**
 
-- [x] **작업 D: SWR 캐싱 최적화** (2025-10-03)
-  - `useDataset.ts`, `useGlobalDataset.ts` 수정
-  - 적용된 최적화: keepPreviousData, dedupingInterval(1.5초), revalidateOnFocus(false), errorRetryCount(1회)
-  - 기대 효과: API 요청 약 50% 감소, 페이지 전환 시 깜빡임 제거
-- [x] **작업 C: 빈 상태 & 에러 메시지 개선** (2025-10-03)
-  - `SaleSearchResults.tsx` 수정
-  - 로딩 상태 UI 개선
-  - 데이터 없음 상태: 현재 필터 조건 표시(파란색 박스) + 4개 카테고리별 제안 카드
-  - 에러 상태: 에러 종류별 구체적 안내(500/404/TIMEOUT) + 고객센터 정보
-- [x] **작업 3: 정렬 기능 통합** (2025-10-03)
-  - 백엔드 `/columns` API 구현 완료 (5개 필드 정렬 지원)
-  - `api.ts`: `realTransactionApi.getColumns()` 추가
-  - `useSortableColumns.ts`: sale 데이터셋 지원 추가 (30분 캐싱)
-  - 기본 정렬: `contractDate desc` (최신 거래부터)
-  - 정렬 가능 필드: contract_date, transaction_amount, exclusive_area_sqm, construction_year_real, price_per_pyeong
-- [x] **모듈 구조 오류 수정** (2025-10-03)
-  - `useSortableColumns.ts`: import 문을 파일 맨 위로 이동하여 EBUSY 오류 해결
+- [x] **기본 컴포넌트 구조** (2025-10-03)
+  - SaleSearchResults.tsx 생성 및 기본 뷰(table/map) 구현
+  - useDataset 훅 연동
+  - 정렬, 페이지네이션 기본 기능
+  - 컬럼 순서 저장/복원 (DnD, localStorage)
+  - 컬럼 클릭 정렬 (오름차순/내림차순)
+  - 빈 상태 & 에러 메시지 개선
+  - SWR 캐싱 최적화
+  - 테이블 컬럼 최적화 (57개 → 36개)
+  - Mock API 제거 및 백엔드 API 연동 ✅
+  - 팝업 너비 확대 (270px → 540px) ✅
+  - 팝업 경고 메시지 처리 ✅
 
-**남은 작업:**
+**남은 작업 (경매결과 패리티):**
 
-1. `SaleSearchResults.tsx`: 지역 키 통일/검색·기간 필드 확정 반영
+### 📋 그룹 A: 테이블-지도 연동 ⭐⭐⭐ (필수, 2시간)
 
-   - 질문: "기간 입력은 연·월 기본으로 진행할까요? 일 단위 범위도 추가할까요?"
-   - 질문: "검색 우선순위(도로명>건물명>지번)와 자동완성 사용을 확정해 주시겠어요?"
+- [ ] **A-1. 체크박스 선택 → 지도 강조**
+  - selectedRowKeys를 Zustand selectedIds로 변경
+  - highlightIds props를 MapView에 전달
+  - 참고: `AuctionEdSearchResults.tsx` Line 568-569, 1063-1065, 1122-1180
+- [ ] **A-2. 통합 뷰 (both) 구현**
+  - 지도(상단) + 테이블(하단) 동시 표시
+  - 참고: `AuctionEdSearchResults.tsx` Line 1051-1070
 
-2. `SaleSearchResults.tsx`: 테이블 저장 키/기본 순서/rowKey 확정
+### 📋 그룹 B: 원 그리기 + 영역 필터 ⭐⭐⭐ (필수, 3시간)
 
-   - 질문: "기본 10컬럼 라벨/순서를 이대로 확정할까요? 교체 희망 컬럼이 있나요?"
-   - 질문: "모바일 1열 핵심 지표는 거래금액과 평단가 중 무엇으로 표기할까요?"
+- [ ] **B-1. MapCircleControls 통합**
 
-3. `datasetConfigs.sale`: 서버 파라미터 매핑/정렬 전달/아답터 좌표 가드 재검증
+  - 원 상태 관리: circleEnabled, circleCenter, circleRadiusM, applyCircleFilter
+  - MapView에 원 관련 props 전달
+  - 원 이벤트 핸들러 구현
+  - 참고: `AuctionEdSearchResults.tsx` Line 101-114, 178-208
+  - 참고: `AuctionEdMap.tsx` Line 22-32, 153-194
 
-   - 질문: "기본 정렬은 계약연·월 내림차순으로 진행하고 동순위 보조키는 contractDay→id로 할까요?"
-   - 질문: "서버 정렬 허용 키 목록(`/columns`)에서 우선 노출할 키가 있나요?"
+- [ ] **B-2. useCircleFilterPipeline 훅**
+  - 원 안의 항목만 필터링
+  - 필터링된 데이터를 테이블/지도에 적용
+  - 참고: `AuctionEdSearchResults.tsx` Line 15, 210-244, 417-527
 
-4. 지도/마커: 빈상태·상한 안내/중심·레벨 보존 동작 확인
+### 📋 그룹 C: 서버 영역 모드 ⭐⭐ (선택, 2시간)
 
-   - 질문: "지도 색상 기준은 거래금액과 평단가 중 어느 쪽으로 설정할까요?"
-   - 질문: "임계값 t1~t4(만원)를 6000/8000/10000/13000으로 시작해도 될까요? 마커 라벨은 억 단위 축약으로 진행할까요?"
+- [ ] **C-1. useGlobalDataset 통합**
+  - 1000건 이상 대용량 데이터 처리
+  - `/area` 엔드포인트 호출 (백엔드 확인 필요)
+  - 참고: `AuctionEdSearchResults.tsx` Line 246-318, 415-470
 
-5. SWR/성능/페이지네이션/딥링크 설정
+### 📋 그룹 D: 기타 개선 ⭐ (선택, 1시간)
 
-   - 질문: "페이지 기본 size는 20으로 확정할까요?"
-   - 질문: "SWR은 dedupingInterval 1~2초, revalidateOnFocus=false로 적용할까요?"
-   - 질문: "필터 상태를 URL에 영속하는 딥링크를 기본 ON으로 둘까요?"
+- [ ] **D-1. onProcessedDataChange 콜백**
 
-6. QA 수행 및 DoD 충족 확인 → 릴리즈 플래그 온
-   - 질문: "중복 계약 처리(최신 1건만 보기) 기본값 ON으로 배포해도 될까요?"
-   - 질문: "취소/무효 계약은 기본 제외로 표기하고 옵션으로 표시 전환 허용할까요?"
-   - 스모크: scripts/smoke.ps1 / smoke-detail.ps1 / smoke-comparables.ps1 순으로 실행해 core 흐름 검증
-   - E2E(최소 3): 지역 필터→정렬→지도, 모바일 1열·페이지네이션, 딥링크 복원
+  - 처리된 데이터를 상위로 전달
+  - 참고: `AuctionEdSearchResults.tsx` Line 79-83, 541-553
+
+- [ ] **D-2. serverAreaEnabled props**
+  - 부모에서 서버 영역 모드 제어
+  - 참고: `AuctionEdSearchResults.tsx` Line 85-86, 98
+
+### 📊 Phase 4 진행 상황
+
+```
+[██████░░░░] 60% 완료
+
+✅ 완료: 11개 작업
+🔄 남은 작업: 7개 작업
+  - 그룹 A: 2개 (필수)
+  - 그룹 B: 2개 (필수)
+  - 그룹 C: 1개 (선택)
+  - 그룹 D: 2개 (선택)
+
+예상 소요 시간:
+  - 필수: 5시간 (그룹 A+B)
+  - 선택: 3시간 (그룹 C+D)
+  - 전체: 8시간
+```
+
+**다음 단계:** 그룹 A부터 순차 진행
 
 ---
 
@@ -637,6 +663,7 @@
 **목표:** 마커 클릭 시 건물 공통 정보와 개별 거래 내역을 테이블로 표시하는 팝업 구현
 
 **백엔드 API 요청:**
+
 - **문서**: `Communication/Backend/send/Request/251003_Frontend_to_Backend_real-transactions_by-address_API_요청.md`
 - **엔드포인트**: `GET /api/v1/real-transactions/by-address`
 - **파라미터**: `address` (필수), `size` (기본 1000), `ordering` (기본 `-contract_date`)
@@ -645,6 +672,7 @@
 **프론트엔드 구현 완료:**
 
 - [x] **Task 1: 팝업 스키마 생성**
+
   - `Application/components/map/popup/schemas/sale.ts` 생성
   - `saleSchema(buildingInfo, transactions)` 함수 구현
   - 건물 공통 정보 섹션 (6개 필드)
@@ -652,12 +680,14 @@
   - 결측값 안전 처리 (`safeValue`, `toNumberOrU`, `formatMoney`, `formatArea`, `elevatorText`)
 
 - [x] **Task 2: 팝업 렌더러 확장**
+
   - `Application/components/map/popup/BasePopup.ts` 수정
   - `table` 및 `tableCollapsible` 속성 추가
   - 개별 거래 테이블 렌더링 (📊 섹션 헤더 + 토글 버튼)
   - 고정 헤더, 가로/세로 스크롤 지원, 최대 높이 300px
 
 - [x] **Task 3: Mock API 구현**
+
   - `Application/lib/api.ts` 수정
   - `realTransactionApi.getTransactionsByAddress(address)` 함수 추가
   - 0.5초 지연 시뮬레이션, 3건 Mock 데이터 반환
@@ -671,11 +701,13 @@
   - 비동기 데이터 로딩 (로딩 → 성공 → 에러 처리)
 
 **검증 상태:**
+
 - ✅ 코드 린트 오류 없음
 - ✅ TypeScript 타입 체크 통과
 - ✅ 페이지 로드 및 지역 드롭다운 정상 작동
 - ⏳ 최종 검증 (백엔드 API 완성 후)
 
 **백엔드 API 연동 시 변경 사항:**
+
 - `Application/lib/api.ts` 1곳 수정 (주석 해제 + Mock 코드 삭제)
 - 소요 시간: 1분
