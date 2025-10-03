@@ -145,6 +145,25 @@ const AUCTION_ED_SERVER_FILTERS = [
   "searchField",
 ] as const;
 
+// sale 전용: 실거래가(매매) 허용 필터
+const SALE_FILTERS = [
+  "province",
+  "cityDistrict",
+  "town",
+  "transactionAmountRange",
+  "exclusiveAreaRange",
+  "landRightsAreaRange",
+  "pricePerPyeongRange",
+  "buildYearRange",
+  "floorConfirmation",
+  "elevatorAvailable",
+  "dateRange",
+  "searchField",
+  "searchQuery",
+  "sortBy",
+  "sortOrder",
+] as const;
+
 export const datasetConfigs: Record<DatasetId, DatasetConfig> = {
   auction_ed: {
     id: "auction_ed",
@@ -701,74 +720,80 @@ export const datasetConfigs: Record<DatasetId, DatasetConfig> = {
     title: "실거래가(매매)",
     api: {
       buildListKey: ({ filters, page, size }) => {
-        const cleanFilters = { ...filters };
-        // 좌표 기반 필터 제거 (auction_ed와 동일한 문제)
-        delete cleanFilters.lat;
-        delete cleanFilters.lng;
-        delete cleanFilters.south;
-        delete cleanFilters.west;
-        delete cleanFilters.north;
-        delete cleanFilters.east;
-        delete cleanFilters.radius_km;
+        // 화이트리스트로 허용된 필터만 선택
+        const allowedFilters = pickAllowed(filters as any, SALE_FILTERS);
+        const cleanFilters = { ...allowedFilters } as Record<string, unknown>;
 
         // 지역 필터를 real_transactions 백엔드 필드명으로 매핑
-        if (filters?.province) {
-          cleanFilters.sido = filters.province;
+        if (allowedFilters.province) {
+          cleanFilters.sido = allowedFilters.province;
           delete cleanFilters.province;
         }
-        if (filters?.cityDistrict) {
-          cleanFilters.sigungu = filters.cityDistrict;
+        if (allowedFilters.cityDistrict) {
+          cleanFilters.sigungu = allowedFilters.cityDistrict;
           delete cleanFilters.cityDistrict;
         }
-        if (filters?.town) {
-          cleanFilters.admin_dong_name = filters.town;
+        if (allowedFilters.town) {
+          cleanFilters.admin_dong_name = allowedFilters.town;
           delete cleanFilters.town;
+        }
+
+        // 정렬 파라미터를 서버 ordering 형식으로 변환 (auction_ed 패턴)
+        if (allowedFilters.sortBy && allowedFilters.sortOrder) {
+          const serverKey = camelToSnake(allowedFilters.sortBy as string);
+          if (serverKey) {
+            const order = allowedFilters.sortOrder as string;
+            const ordering = `${order === "desc" ? "-" : ""}${serverKey}`;
+            cleanFilters.ordering = ordering;
+            delete cleanFilters.sortBy;
+            delete cleanFilters.sortOrder;
+          }
         }
 
         return [
           "/api/v1/real-transactions/",
           {
-            ...pickAllowed(cleanFilters as any, ALLOWED_FILTERS_WITH_SORT),
+            ...cleanFilters,
             page,
             size,
           },
         ] as const;
       },
       fetchList: async ({ filters, page, size }) => {
-        const cleanFilters = { ...filters };
-        // 좌표 기반 필터 제거
-        delete cleanFilters.lat;
-        delete cleanFilters.lng;
-        delete cleanFilters.south;
-        delete cleanFilters.west;
-        delete cleanFilters.north;
-        delete cleanFilters.east;
-        delete cleanFilters.radius_km;
+        // 화이트리스트로 허용된 필터만 선택
+        const allowedFilters = pickAllowed(filters as any, SALE_FILTERS);
+        const cleanFilters = { ...allowedFilters } as Record<string, unknown>;
 
         // 지역 필터를 real_transactions 백엔드 필드명으로 매핑
-        if (filters?.province) {
-          cleanFilters.sido = filters.province;
+        if (allowedFilters.province) {
+          cleanFilters.sido = allowedFilters.province;
           delete cleanFilters.province;
         }
-        if (filters?.cityDistrict) {
-          cleanFilters.sigungu = filters.cityDistrict;
+        if (allowedFilters.cityDistrict) {
+          cleanFilters.sigungu = allowedFilters.cityDistrict;
           delete cleanFilters.cityDistrict;
         }
-        if (filters?.town) {
-          cleanFilters.admin_dong_name = filters.town;
+        if (allowedFilters.town) {
+          cleanFilters.admin_dong_name = allowedFilters.town;
           delete cleanFilters.town;
         }
 
+        // 정렬 파라미터를 서버 ordering 형식으로 변환 (auction_ed 패턴)
+        if (allowedFilters.sortBy && allowedFilters.sortOrder) {
+          const serverKey = camelToSnake(allowedFilters.sortBy as string);
+          if (serverKey) {
+            const order = allowedFilters.sortOrder as string;
+            const ordering = `${order === "desc" ? "-" : ""}${serverKey}`;
+            cleanFilters.ordering = ordering;
+            delete cleanFilters.sortBy;
+            delete cleanFilters.sortOrder;
+          }
+        }
+
         return realTransactionApi.getTransactions({
-          ...pickAllowed(cleanFilters as any, ALLOWED_FILTERS),
+          ...(cleanFilters as any),
           page,
           size,
-          ...(filters?.sortBy && filters?.sortOrder
-            ? {
-                sort_by: (filters as any).sortBy,
-                sort_order: (filters as any).sortOrder,
-              }
-            : {}),
         });
       },
     },
@@ -874,9 +899,25 @@ export const datasetConfigs: Record<DatasetId, DatasetConfig> = {
     },
     table: {
       columns: columnsSale as any,
-      defaultSort: { key: "transactionAmount", order: "desc" },
+      defaultSort: { key: "contractDate", order: "desc" },
     },
     filters: { defaults: {}, ui: [] },
+    map: {
+      legend: [
+        { label: "6천만원 이하", color: "#5cb85c" },
+        { label: "8천만원 이하", color: "#f0ad4e" },
+        { label: "1억원 이하", color: "#d9534f" },
+        { label: "1.3억원 이상", color: "#c9302c" },
+      ],
+      marker: (row) => {
+        const price = row.price ?? 0;
+        if (price <= 6000) return { color: "#5cb85c" };
+        if (price <= 8000) return { color: "#f0ad4e" };
+        if (price <= 10000) return { color: "#d9534f" };
+        return { color: "#c9302c" };
+      },
+      useClustering: true,
+    },
   },
   rent: {
     id: "rent",

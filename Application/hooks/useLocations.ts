@@ -231,3 +231,96 @@ export function findNameByCode(
 ): string | undefined {
   return items.find((item) => item.code === code)?.name;
 }
+
+// ========================================
+// 실거래가(매매) 전용 지역 목록 API
+// ========================================
+
+export interface RealTransactionsRegion {
+  name: string;
+  count: number;
+}
+
+/**
+ * 실거래가 시도 목록 조회
+ * GET /api/v1/real-transactions/regions/sido
+ *
+ * ⚠️ 주의: 경매 데이터가 아닌 실거래가 데이터 기반
+ */
+export function useRealTransactionsSido() {
+  const { data, error, isLoading, mutate } = useSWR<RealTransactionsRegion[]>(
+    "/api/v1/real-transactions/regions/sido",
+    fetcher,
+    {
+      revalidateOnFocus: false,
+      revalidateOnReconnect: false,
+      dedupingInterval: 30 * 60 * 1000, // 30분 캐시
+    }
+  );
+
+  return {
+    sidos: data || [],
+    isLoading,
+    error,
+    refresh: mutate,
+  };
+}
+
+/**
+ * 실거래가 시군구 목록 조회
+ * GET /api/v1/real-transactions/regions/sigungu?sido={sido}
+ *
+ * ⚠️ 중요: 반환 값이 "경기도 고양시 덕양구" 형태 (구 단위까지 포함)
+ */
+export function useRealTransactionsSigungu(sido?: string) {
+  const { data, error, isLoading, mutate } = useSWR<RealTransactionsRegion[]>(
+    sido
+      ? `/api/v1/real-transactions/regions/sigungu?sido=${encodeURIComponent(
+          sido
+        )}`
+      : null,
+    fetcher,
+    {
+      revalidateOnFocus: false,
+      revalidateOnReconnect: false,
+      dedupingInterval: 30 * 60 * 1000, // 30분 캐시
+    }
+  );
+
+  return {
+    sigungus: data || [],
+    isLoading,
+    error,
+    refresh: mutate,
+  };
+}
+
+/**
+ * 실거래가 읍면동 목록 조회 (선택사항)
+ * GET /api/v1/real-transactions/regions/admin-dong?sido={sido}&sigungu={sigungu}
+ */
+export function useRealTransactionsAdminDong(sido?: string, sigungu?: string) {
+  const shouldFetch = sido && sigungu;
+  const url = shouldFetch
+    ? `/api/v1/real-transactions/regions/admin-dong?sido=${encodeURIComponent(
+        sido
+      )}&sigungu=${encodeURIComponent(sigungu)}`
+    : null;
+
+  const { data, error, isLoading, mutate } = useSWR<RealTransactionsRegion[]>(
+    url,
+    fetcher,
+    {
+      revalidateOnFocus: false,
+      revalidateOnReconnect: false,
+      dedupingInterval: 30 * 60 * 1000, // 30분 캐시
+    }
+  );
+
+  return {
+    adminDongs: data || [],
+    isLoading,
+    error,
+    refresh: mutate,
+  };
+}

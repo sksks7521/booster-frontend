@@ -64,81 +64,78 @@ export const columnsAuctionEd = [
 ] as const;
 
 export const columnsSale = [
-  // ✅ 현재 백엔드가 제공하는 10개 필드 (2025-01-31 기준)
+  // === 기본 정보 (5개) ===
   { key: "id", header: "ID" },
+  { key: "createdAt", header: "등록일시" },
   { key: "sido", header: "광역시도" },
   { key: "sigungu", header: "시군구" },
+  { key: "sidoAdmin", header: "시도(행정)" },
+
+  // === 주소 정보 (9개) ===
   { key: "roadAddressReal", header: "도로명주소" },
-  { key: "buildingNameReal", header: "건물명" },
-  { key: "exclusiveAreaSqm", header: "전용면적(㎡)" },
-  { key: "contractYear", header: "계약연도" },
-  { key: "contractMonth", header: "계약월" },
-  { key: "transactionAmount", header: "거래금액(만원)" },
-  { key: "pricePerPyeong", header: "평단가(만원)" },
-
-  // ⏳ 백엔드 확장 예정 필드들 (향후 백엔드 업데이트 시 자동 표시)
-  // 기본 메타
-  { key: "createdAt", header: "등록일시" },
-
-  // 면적/계약 상세
-  { key: "exclusiveAreaRange", header: "전용면적범위" },
-  { key: "landRightsAreaSqm", header: "대지권면적(㎡)" },
-  { key: "contractDay", header: "계약일" },
-  { key: "contractDate", header: "계약일" },
-
-  // 건물/연식
-  { key: "floorInfoReal", header: "층" },
-  { key: "constructionYearReal", header: "건축연도" },
-  { key: "constructionYearRange", header: "건축연도범위" },
-
-  // 거래 유형
-  { key: "transactionType", header: "거래유형" },
-  { key: "buyerType", header: "매수자" },
-  { key: "sellerType", header: "매도자" },
-
-  // 좌표
-  { key: "longitude", header: "경도" },
-  { key: "latitude", header: "위도" },
-
-  // 추가 주소/행정
-  { key: "roadAddress", header: "도로명주소" },
-  { key: "sidoAdmin", header: "시도" },
-  { key: "buildingRegistryPk", header: "건축물대장PK" },
-  { key: "adminCode", header: "행정코드" },
-  { key: "legalCode", header: "법정코드" },
+  { key: "roadAddress", header: "도로명주소(표준)" },
   { key: "jibunAddress", header: "지번주소" },
+  { key: "buildingNameReal", header: "건물명" },
+  { key: "buildingName", header: "건물명(표준)" },
+  { key: "dongName", header: "동명" },
+  { key: "adminDong", header: "행정동" },
+  { key: "adminDongName", header: "행정동명칭" },
+  { key: "legalDongUnit", header: "법정동단위" },
+
+  // === 좌표 및 코드 (7개) ===
+  { key: "latitude", header: "위도" },
+  { key: "longitude", header: "경도" },
   { key: "postalCode", header: "우편번호" },
   { key: "pnu", header: "PNU" },
-  { key: "buildingName", header: "건물명" },
-  { key: "dongName", header: "동명" },
-  { key: "legalDongUnit", header: "법정동단위" },
-  { key: "adminDongName", header: "행정동명칭" },
-  { key: "adminDong", header: "행정동" },
+  { key: "adminCode", header: "행정코드" },
+  { key: "legalCode", header: "법정코드" },
+  { key: "buildingRegistryPk", header: "건축물대장PK" },
 
-  // 건축물 상세
-  { key: "landAreaSqm", header: "대지면적(㎡)" },
+  // === 거래 정보 (10개) ===
+  { key: "transactionAmount", header: "거래금액(만원)" },
+  { key: "pricePerPyeong", header: "평단가(만원/평)" },
+  { key: "pricePerSqm", header: "㎡당가격(만원)" },
+  { key: "contractYear", header: "계약연도" },
+  { key: "contractMonth", header: "계약월" },
+  { key: "contractDay", header: "계약일" },
+  { key: "contractDate", header: "계약일자" },
+  { key: "transactionType", header: "거래유형" },
+  { key: "buyerType", header: "매수자유형" },
+  { key: "sellerType", header: "매도자유형" },
+
+  // === 면적 정보 (7개) ===
+  { key: "exclusiveAreaSqm", header: "전용면적(㎡)" },
+  { key: "exclusiveAreaPyeong", header: "전용면적(평)" },
+  { key: "exclusiveAreaRange", header: "전용면적범위" },
+  { key: "landRightsAreaSqm", header: "대지권면적(㎡)" },
+  { key: "landAreaSqm", header: "토지면적(㎡)" },
   { key: "constructionAreaSqm", header: "건축면적(㎡)" },
   { key: "totalFloorAreaSqm", header: "연면적(㎡)" },
+
+  // === 건물 기본 정보 (10개) ===
+  { key: "constructionYear", header: "건축연도" },
+  { key: "constructionYearReal", header: "건축연도(실제)" },
+  { key: "constructionYearRange", header: "건축연도범위" },
+  { key: "floorInfoReal", header: "층정보" },
+  { key: "floorConfirmation", header: "층확인" },
+  { key: "buildingHeight", header: "건물높이(m)" },
+  { key: "groundFloors", header: "지상층수" },
+  { key: "basementFloors", header: "지하층수" },
+  { key: "elevatorAvailable", header: "엘리베이터유무" },
+  { key: "elevatorCount", header: "엘리베이터대수" },
+
+  // === 건축 상세 (6개) ===
   { key: "buildingCoverageRatio", header: "건폐율(%)" },
   { key: "floorAreaRatio", header: "용적률(%)" },
   { key: "mainStructure", header: "주구조" },
   { key: "mainUsage", header: "주용도" },
   { key: "otherUsage", header: "기타용도" },
-  { key: "buildingHeight", header: "높이" },
-  { key: "groundFloors", header: "지상층수" },
-  { key: "basementFloors", header: "지하층수" },
+  { key: "usageApprovalDate", header: "사용승인일" },
+
+  // === 세대 정보 (3개) ===
   { key: "householdCount", header: "세대수" },
   { key: "familyCount", header: "가구수" },
   { key: "roomNumber", header: "호수" },
-  { key: "usageApprovalDate", header: "사용승인일" },
-  { key: "elevatorCount", header: "승용승강기(대)" },
-  { key: "constructionYear", header: "건축연도(추가)" },
-  { key: "floorConfirmation", header: "층확인" },
-  { key: "elevatorAvailable", header: "엘리베이터여부" },
-
-  // 계산 필드
-  { key: "exclusiveAreaPyeong", header: "전용면적(평)" },
-  { key: "pricePerSqm", header: "㎡당가격(만원)" },
 ] as const;
 
 export const columnsRent = [

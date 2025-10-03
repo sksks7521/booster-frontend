@@ -1,0 +1,539 @@
+## 실거래가(매매) v3 구현 계획 - OUTLINE
+
+### 0. 목적/범위
+
+- 목적: 경매결과 v2 패턴을 최대 재사용하여 실거래가(매매) 페이지(v3) 구현
+- 범위: 목록/지도/정렬/필터 구조 동일 유지, 데이터 소스·컬럼·팝업 정책만 차등
+
+### 1. 재사용(동일) 구성 요소/패턴
+
+- 컨테이너 패턴: 결과 컨테이너에서 테이블/지도 토글, 로딩·빈상태 처리
+  - `Application/components/features/sale/SaleSearchResults.tsx`
+- 테이블(스키마 기반): 컬럼 DnD·리사이즈, 외부 페이지네이션, 헤더 정렬 위임
+  - `Application/components/features/item-table.tsx`
+- 지도 공통: 초기 fitBounds 1회, 필터 변경 시 중심·레벨 유지, 마커 상한/빈상태 안내
+  - `Application/components/features/map-view.tsx`
+- 필터 UI 구조/상태 관리: 전역 스토어, 지역 선택 체계, 페이지·사이즈, 정렬 상태
+  - `Application/components/features/sale/SaleFilter.tsx`
+  - `store/filterStore.ts` (루트)
+- 데이터 훅/어댑터: SWR 캐시, 응답 정규화 `{ items,total_items } → { results,count }`
+  - `Application/hooks/useDataset.ts`
+  - `Application/datasets/registry.ts`(`datasetConfigs.sale`)
+- 정렬 허용 컬럼 메타 로딩: `/api/v1/real-transactions/columns`
+  - `Application/hooks/useSortableColumns.ts`
+- 지역 데이터 소스(시/도→시군구→읍면동):
+  - `Application/hooks/useLocations.ts`, `regions.json`
+- API 클라이언트:
+
+  - `Application/lib/api.ts`(`realTransactionApi`)
+
+- 선택 필터 바 요약/초기화:
+  - `Application/components/features/selected-filter-bar.tsx`
+- 컬럼 순서/저장 훅(로컬 스토리지 연동):
+  - `Application/hooks/useColumnOrder.ts`
+- 전역 데이터셋 공유(필요 시):
+  - `Application/hooks/useGlobalDataset.ts`
+- 테이블 정렬/가공 유틸:
+  - `Application/components/features/table/sort-utils.ts`
+- 입력 디바운스(검색 UX):
+  - `Application/hooks/useDebounce.ts`
+- 지도 부가 UI(선택): 범례/원형 선택
+  - `Application/components/features/MapLegend.tsx`, `Application/components/features/MapCircleControls.tsx`
+- 단위/표기 공통 유틸(금액·면적):
+  - `Application/lib/units.ts`, `Application/components/features/property-detail/utils/formatters.ts`
+- 로깅/분석/모니터링(선택):
+  - `Application/lib/analytics.ts`, `Application/lib/monitoring.ts`
+- SWR 페처/공통 유틸:
+  - `Application/lib/fetcher.ts`, `Application/lib/utils.ts`
+- 에러/예외 공통 처리(선택):
+  - `Application/lib/errors.ts`
+- 피처 플래그/토글(선택):
+  - `Application/lib/featureFlags.ts`, `Application/lib/featureFlags.tsx`
+- 지도 설정/로더(선택):
+  - `Application/lib/map/config.ts`, `Application/lib/map/kakaoLoader.ts`
+- 지오 유틸(거리/좌표 변환):
+  - `Application/lib/geo/coords.ts`, `Application/lib/geo/distance.ts`
+- 공통 UI 컴포넌트(Shadcn 기반):
+  - `Application/components/ui/*` (table, pagination, select, dialog, sheet, tabs 등)
+- 가상 테이블/대안 테이블(대량 데이터 시 선택):
+  - `Application/components/features/item-table-virtual.tsx`, `Application/components/features/item-table.tanstack.tsx`
+- 기타 공통 데이터 훅(선택):
+
+  - `Application/hooks/useItems.ts`, `Application/hooks/useItemDetail.ts`
+
+- 필터 바 대체 프레임(선택):
+  - `Application/components/features/filter-control.tsx`, `filter-control-new.tsx`, `filter-control-fixed.tsx` (레이아웃/고정형/신규 시안)
+- 공유 카운터/파이프라인(선택):
+  - `Application/components/features/shared/CircleFilterHeaderCount.tsx`, `Application/components/features/shared/useCircleFilterPipeline.ts`
+- 즐겨찾기 시스템(선택):
+  - `Application/components/features/favorites-system.tsx` (행 즐겨찾기/북마크 토글 패턴)
+- 데이터셋 스키마/정규화(타이핑/호환):
+  - `Application/datasets/schemas.ts`, `Application/datasets/normalize.ts`, `Application/types/datasets.ts`
+- 테마/프로바이더(전역 UI 상태):
+  - `Application/app/providers.tsx`, `Application/components/theme-provider.tsx`
+- 개발 목업/MSW(선택):
+  - `mocks/browser.ts`, `mocks/handlers.ts`, `public/mockServiceWorker.js` (개발 환경 데이터 스텁)
+- 스모크/도구 스크립트(선택):
+  - `scripts/smoke.ps1`, `scripts/smoke-detail.ps1`, `scripts/smoke-comparables.ps1`
+- 디버그 플래그/환경변수(선택):
+  - `NEXT_PUBLIC_DETAIL_DEBUG=1`(디테일 디버그 UI), `NEXT_PUBLIC_LISTINGS_MOCK`(목업 활성화)
+
+### 2. 차이(매매 전용) 포인트
+
+- 엔드포인트/계약
+
+  - 목록/메타: `/api/v1/real-transactions`, `/api/v1/real-transactions/columns` (선택: `/{id}`)
+  - 데이터셋 키: `sale` 사용(`datasetConfigs.sale`)
+  - 응답 정규화: `{items,total_items}` → `{results,count}` (공통)
+
+- 컬럼/지표(표시 규칙)
+
+  - 기본 10컬럼 유지: `Application/datasets/contracts.ts`(`columnsSale`) 기준
+  - 지표 우선순위 [결정필요]: 리스트/지도 기본 지표를 “거래금액” vs “평단가” 중 무엇으로 노출
+  - 포맷 [결정필요]: 1) 만원 고정, 2) 억/만원 혼합, 3) 반올림 자리수(금액/평단가)
+
+- 기간/정렬
+
+  - 기간 입력 [결정필요]: 연/월(간편) vs 일단위 범위(정밀)
+  - 기본 정렬 [확정]: `contractDate desc` (연-월-일 최신순)
+  - 보조 키 [결정필요]: 동순위 시 `contractDay desc` 또는 `id desc` 내재화 여부
+
+- 중복/이상치 처리
+
+  - 동일 주소·면적·월 다건 계약 [결정필요]: “최신 1건만 보기” 토글 제공/기본값
+  - 취소/무효 계약 [결정필요]: 제외/표시/배지 구분 정책
+  - 이상치 [결정필요]: 극단값 하이라이트/제외/무시 중 선택
+
+- 검색 UX
+
+  - 대상/우선순위 [결정필요]: 1순위 도로명주소, 2순위 건물명, 3순위 지번(변경 가능)
+  - 자동완성 [결정필요]: 지역 연동 주소 자동완성/제안 사용 여부(성능 비용 수용 여부)
+
+- 필터 범위/서버 이전
+
+  - 1차: 서버(지역/정렬/페이지), 나머지 클라(가격/면적/기간)
+  - 서버 이전 1순위 [결정필요]: 가격 vs 면적 vs 기간 중 우선 도입 항목과 파라미터 명세
+  - 클라 기본 범위 [결정필요]: 가격/면적 초기값(권장 상한 포함) 확정
+
+- 지도/범례/마커
+
+  - 색상 기준 [결정필요]: 거래금액 구간 vs 평단가 구간
+  - 구간 임계값 t1~t4 [결정필요]: 매매용 기본값(만원) 확정
+  - 라벨 [결정필요]: 정수 금액 vs 억 단위 축약 vs 평단가 숫자
+
+- 팝업/상세
+
+  - 단기: 주소 클릭 팝업 비활성(A안) 유지
+  - 장기 [결정필요]: `/real-transactions/{id}` 상세(B안) 필수 필드(계약일, 금액, 평단가, 층, 연식, 전용, 주소, 좌표)
+
+- 페이지네이션/레이아웃
+
+  - 기본 size [결정필요]: 20 vs 50 vs 100
+  - 모바일 축약 [결정필요]: 1열 핵심 지표를 금액 vs 평단가 중 무엇으로
+
+- 캐시/성능
+
+  - SWR 옵션 [결정필요]: `dedupingInterval`, `revalidateOnFocus` 기본값(분석 체감 고려)
+  - 프리페치 [결정필요]: 지도 탭 대용량 프리페치 허용/상한
+
+- 품질/가드
+
+  - 좌표 결측 시 정책: 리스트 표시는 유지, 지도 안내 강화(공통). 문구 [결정필요]
+  - 데이터 없음/오류 안내 톤&링크 [결정필요]
+
+- 권한/공유
+  - 즐겨찾기/공유 [결정필요]: 매매에도 노출(경매와 동등) 여부
+  - 딥링크 [결정필요]: 필터 상태 URL 영속 기본 ON/OFF
+
+> 세부 규칙/구현 방법은 섹션 6(컬럼), 7(정렬), 8(필터), 9(지도)에서 구체화합니다. 본 섹션은 ‘결정 항목’만 유지합니다.
+
+### 3. 사용자 결정·백엔드 요청·산출물/테스트
+
+- A) 사용자 결정(최종 확정 필요) — 기본값 제안 포함
+
+  - 기본 정렬: `contractDate desc` (연-월-일 최신순)
+  - 기본 지표: 기본값=거래금액(목록/지도), 보조=평단가
+  - 금액/평단가 표기: 기본값=금액 억/만원 혼합(정수), 평단가 만원/평(소수 1자리)
+  - 기간 입력 단위: 기본값=연·월(간편), 선택=일 단위 범위(고급)
+  - 검색 우선순위: 기본값=도로명 > 건물명 > 지번, 자동완성=초기 OFF(성능 안정) — 필요 시 ON
+  - 중복/취소/이상치: 기본값=“최신 1건만 보기” ON(주소+전용+연월 기준), 취소계약 기본 제외(옵션 표시), 이상치 기본 표시+행 하이라이트
+  - 지도 범례: 기본값=색상 기준 ‘거래금액’, 임계값 t1~t4=6000/8000/10000/13000(만원), 마커 라벨=억 단위 축약(예: 2.4억)
+  - 테이블/모바일: 기본 10컬럼 라벨·순서 유지, 모바일 1열 핵심 지표=거래금액
+  - 페이지 사이즈 기본값: 20
+  - 성능/운영: SWR dedupingInterval=1000~2000ms, revalidateOnFocus=false, 지도 대용량 프리페치 상한=500(추후 /area 도입 시 조정)
+  - 권한/공유: 즐겨찾기/공유 버튼 노출=ON(경매와 동등), 딥링크(필터 URL) 기본 ON
+  - 텍스트/접근성: 에러/빈데이터 안내=“조정 제안+다음 행동” 톤, 금액/일자/주소/층/면적 aria-label 부여
+
+- B) 백엔드 협업 요청/확인 — 요청 표(예시 키 포함)
+
+  - 엔드포인트: `/api/v1/real-transactions`, `/columns` 스키마(허용 정렬 키 목록) 재확인
+  - 상세(B안 대비): `/real-transactions/{id}` 제공 시 필드 스키마(계약일, 금액, 평단가, 층, 연식, 전용, 주소, 좌표)
+  - 파라미터 매핑: 지역 키 `sido/sigungu/admin_dong_name` 확정, 정렬 `ordering` 지원 키 확인
+  - 서버 필터(확장): 가격/면적/기간 파라미터 명세·허용 범위, 적용 시점 합의
+  - 좌표/품질: `latitude/longitude` 보장 여부와 폴백 키(lon/x/y/lat_y) 가능성, 취소계약 구분 필드 유무, 이상치 기준(선택)
+  - AREA(선택): `/real-transactions/area` 도입 가능성, 동일 파라미터·대용량 size 상한, 반경 가드(500m~10km)
+
+  예시 요청 표(요약):
+
+  - 정렬 허용 키: `transactionAmount`, `pricePerPyeong`, `contractYear`, `contractMonth`, `exclusiveAreaSqm` …(백엔드 확정)
+  - 상세 필드 스키마(필수): `id, contract_date, transaction_amount, price_per_pyeong, floor_info_real, construction_year_real, exclusive_area_sqm, road_address_real, latitude, longitude`
+  - 서버 필터 후보: `min_price/max_price`, `min_area/max_area`, `contract_date_from/to` (형식: ISO8601, 단위: 만원/㎡)
+
+- C) 구현·운영 산출물(준비 아티팩트) — 템플릿
+
+  - 데이터 계약/매핑 표(템플릿)
+    - 작성 가이드: 각 필드의 최종 표기 라벨·단위·반올림 자리·예시값을 채웁니다(표는 실제 키명 사용). 누락 시 구현이 지연됩니다.
+    - 프론트 키 | 백엔드 필드 | 라벨 | 단위 | 반올림 | 예시값
+    - `transactionAmount` | `transaction_amount` | 거래금액 | 만원 | 정수 | 34500
+    - `pricePerPyeong` | `price_per_pyeong` | 평단가 | 만원/평 | 소수1 | 256.3
+    - `exclusiveAreaSqm` | `exclusive_area_sqm` | 전용면적 | ㎡ | 소수1 | 84.9
+    - `contractYear` | `contract_year` | 계약연도 | 년 | 정수 | 2025
+    - `contractMonth` | `contract_month` | 계약월 | 월 | 정수 | 9
+    - `roadAddressReal` | `road_address_real` | 도로명주소 | - | - | 서울시 강남구 …
+    - (필요 시 추가)
+  - 정렬 허용 맵(템플릿)
+    - 작성 가이드: `/columns.sortable_columns`와 매칭하여 허용=true만 활성화합니다. 헤더명은 사용자 표기 라벨입니다.
+    - 헤더 | 서버 key | 허용 | 비고
+    - 거래금액 | transaction_amount | true | 기본
+    - 평단가 | price_per_pyeong | true |
+    - 계약연도 | contract_year | true | 보조
+    - 계약월 | contract_month | true | 보조
+    - 전용면적 | exclusive_area_sqm | true | 선택
+  - 범례/마커 사양(템플릿)
+    - 작성 가이드: 기준(금액/평단가), 임계값(t1~t4, 만원), 팔레트, 라벨 포맷(억 축약 등)을 명시합니다.
+    - 기준=거래금액, t1=6000, t2=8000, t3=10000, t4=13000(만원), 라벨=억 축약
+    - 팔레트: blue/green/pink/orange/red, 0 또는 결측=grey
+    - 예시: 9500만원 → pink, 라벨 "0.95억"
+  - 안내 문구(템플릿)
+    - 작성 가이드: 사용자에 ‘다음 행동’을 제시하는 톤으로 1~2문장을 유지합니다.
+    - 데이터 없음: "조건에 맞는 결과가 없습니다. 지역/기간/가격을 조정해 보세요."
+    - 네트워크 오류: "일시적인 오류가 발생했습니다. 다시 시도하거나 조건을 변경해 보세요."
+    - 좌표 결측 다수: "일부 항목은 지도에 표시되지 않을 수 있습니다. 목록에서 상세 정보를 확인해 주세요."
+  - 접근성(ARIA) 체크리스트(템플릿)
+
+    - 작성 가이드: 스크린리더 핵심 정보(금액/일자/주소/층/면적)에 라벨을 제공합니다.
+    - 테이블 셀: 금액/평단가/면적/연월 aria-label(예: "거래금액 3억 4천 5백만원")
+    - 정렬 버튼: aria-pressed 적용(활성 상태 반영)
+    - 지도 마커: title에 금액·주소 요약(예: "2.4억, 강남구 대치동 …")
+
+  - 환경 변수 매트릭스(템플릿)
+
+    - 키 | 목적 | 예시값 | 검증
+    - NEXT_PUBLIC_API_BASE_URL | API 베이스 URL | http://127.0.0.1:8000 | 200 OK /health
+    - NEXT_PUBLIC_KAKAO_APP_KEY | 카카오 지도 | xxxxxxxxxxxxxxxxxxxxx | 도메인 등록 확인
+    - NEXT_PUBLIC_LISTINGS_MOCK | 매물 목업 토글 | 1/0 | 개발만 1
+    - NEXT_PUBLIC_DETAIL_DEBUG | 상세 디버그 | 1/0 | 개발만 1
+
+  - 사용자 선호 저장 키(템플릿)
+
+    - 키 | 설명 | 저장소
+    - table:order:sale | 컬럼 순서 | localStorage
+    - table:width:sale | 컬럼 너비 | localStorage
+    - table:sort:sale | 정렬 상태 | localStorage
+    - pageSize:sale | 페이지 사이즈 | localStorage
+    - (선택) user-preferences API 키 | 서버 선호 저장 | server
+
+  - 분석/모니터링 이벤트(템플릿)
+    - 이벤트 | 트리거 | 속성 | 샘플링 | 채널
+    - sort_changed | 헤더 클릭 | key, order | 100% | analytics.ts
+    - filter_applied | 필터 submit | filters | 50% | analytics.ts
+    - map_marker_click | 마커 클릭 | id, price | 100% | analytics.ts
+    - error_shown | 에러표시 | code, path | 100% | sentry
+
+- D) 테스트/DoD 체크리스트 — "검증 절차 / 기대값" 형식
+
+  - 네트워크
+    - 지역 파라미터 매핑 요청 확인 / 응답 아이템 주소 시·군·동 일치
+    - `/columns` 허용 목록 반영 / 비허용 헤더 클릭 시 정렬 비활성
+    - (서버 필터 적용 시) 가격·면적·기간 파라미터 전달 / total 감소 합리적
+  - 목록/지도
+    - “최신 1건만 보기” ON/OFF / 결과 개수 및 중복 해소 차이 확인
+    - 임계값(t1~t4) 변경 / 마커 색상 구간 및 범례 즉시 반영
+    - 좌표 결측/0건 / 지도 중심·레벨 유지 및 안내 문구 노출
+  - UI/UX
+    - 모바일 1열·페이지 size=20 / 레이아웃·페이지네이션 정상
+    - 딥링크 ON / 새로고침·공유에서 필터 상태 복원
+    - 검색 자동완성 OFF / 입력 지연 없이 반응(ON 시 제안 표시)
+  - 접근성/성능
+    - aria-label 적용 / 스크린리더 읽기 정상
+    - 로딩/스켈레톤 / 깜빡임 최소(keepPreviousData, dedupe 1~2s)
+
+  스크립트 예시(선택)
+
+  - cURL: 지역 필터 + 정렬 전달 확인
+    - 읍면동 선택 시
+      ```bash
+      curl -G "http://127.0.0.1:8000/api/v1/real-transactions/" \
+        --data-urlencode "sido=서울특별시" \
+        --data-urlencode "sigungu=강남구" \
+        --data-urlencode "admin_dong_name=대치동" \
+        --data-urlencode "ordering=-transaction_amount" \
+        --data-urlencode "page=1" \
+        --data-urlencode "size=20"
+      ```
+    - 읍면동 미선택(전체) 시
+      ```bash
+      curl -G "http://127.0.0.1:8000/api/v1/real-transactions/" \
+        --data-urlencode "sido=서울특별시" \
+        --data-urlencode "sigungu=강남구" \
+        --data-urlencode "ordering=-transaction_amount" \
+        --data-urlencode "page=1" \
+        --data-urlencode "size=20"
+      ```
+  - PowerShell: `/columns` 정렬 허용 키 확인
+    ```powershell
+    $r = Invoke-RestMethod "http://127.0.0.1:8000/api/v1/real-transactions/columns"
+    "sortable_columns=`t{0}" -f (($r.sortable_columns -join ", "))
+    ```
+
+> 본 문서는 아웃라인입니다. 위 사용자 결정 사항 확정 후 본문(세부 설계/예시/체크리스트)을 채웁니다.
+
+---
+
+### 4. 아키텍처 개요(페이지 · 데이터 흐름)
+
+- 페이지 구성: 필터 바 → 결과 컨테이너(테이블/지도 토글) → 페이지네이션/사이즈
+- 데이터 흐름: `filterStore` 상태 → `datasetConfigs.sale.api` → `realTransactionApi` → 응답 정규화(`useDataset`/어댑터) → `ItemTable`와 `MapView` 렌더
+- 정렬 흐름: 테이블 헤더 클릭 → `setSortConfig(sortBy, sortOrder)` → `/columns` 허용 목록 필터 → 서버로 `ordering` 전달
+- 지도 연동: 리스트 아이템 → `toItemLike` 좌표 매핑 → `MapView` 마커/하이라이트 렌더, 중심·레벨 보존
+
+### 5. API 계약 상세(매매)
+
+- 목록: `GET /api/v1/real-transactions/`
+  - 쿼리: `page`, `size`, `sido`, `sigungu`, `admin_dong_name?`, `ordering?`
+  - 주의: 지역 키는 프론트 `province/cityDistrict/town` → 서버 `sido/sigungu/admin_dong_name`로 매핑됨
+  - 응답: `{ items: Item[], total_items: number }`
+  - `admin_dong_name`는 선택사항: 미전달 시 해당 시군구 전체 응답
+- 컬럼 메타: `GET /api/v1/real-transactions/columns`
+  - 응답: `{ sortable_columns: string[] }` (예: `["transaction_amount","price_per_pyeong","contract_year","contract_month","exclusive_area_sqm"]`)
+- 상세(선택): `GET /api/v1/real-transactions/{id}`(도입 시)
+- 에러/레이트리밋(예시):
+  - 400/422: 파라미터 형식 오류 → 입력값 검증 및 가이드 문구 표시
+  - 429: 요청 과다 → 재시도 지연 및 사용자 안내
+  - 500: 서버 오류 → 재시도 버튼/토스트, 로그 전송
+
+예시 요청 파라미터 매핑(개념 예):
+
+```json
+{
+  "province": "서울특별시",
+  "cityDistrict": "강남구",
+  "town": "대치동",
+  "sortBy": "transactionAmount",
+  "sortOrder": "desc",
+  "page": 1,
+  "size": 20
+}
+```
+
+서버 전달 후:
+
+```json
+{
+  "sido": "서울특별시",
+  "sigungu": "강남구",
+  "admin_dong_name": "대치동",
+  "page": 1,
+  "size": 20,
+  "sort_by": "transactionAmount",
+  "sort_order": "desc"
+}
+```
+
+### 6. 컬럼 정의 상세(기본 10 + 확장)
+
+- 기본 10 컬럼(표시/정렬 후보):
+  - `id`, `sido`, `sigungu`, `roadAddressReal`, `buildingNameReal`, `exclusiveAreaSqm`, `contractYear`, `contractMonth`, `transactionAmount`, `pricePerPyeong`
+- 표시 규칙:
+  - 금액: 천단위 구분, 단위 기본 "만원"
+  - 면적: ㎡ 기본, 전역 플래그로 평 변환 표시(참고 값만)
+  - 평단가: 만원/평, 소수 1자리 (3-A 기본값 반영)
+  - 빈값: `-`로 표시, 정렬 시 빈값은 최하위
+- 확장 컬럼: 서버 추가 시 자동 노출(라벨은 `contracts.ts` 정의 사용)
+- 열 폭/모바일(권장): 기본 폭 160px, min 120px, max 360px, 모바일에서는 주소 2줄 클램프, 숫자 우측 정레
+- 열 고정: 좌측 ID/주소 고정(선택), 우측 합계/액션 고정(현재 없음)
+
+### 7. 정렬 정책 상세
+
+- 허용 컬럼: `/columns`의 `sortable_columns`에 포함된 키만 활성
+- 기본 정렬: `contractDate desc` (연-월-일 최신순)
+- 폴백: 허용 목록이 비어 있으면 모든 헤더 정렬 비활성
+- 토글 사이클: asc → desc → none, isSorting 동안 재클릭 억제(아이콘 ⏳)
+- 아이콘/색상: 활성 헤더 강조(굵기/색), 비활성 회색, none 상태는 아이콘 숨김
+
+### 8. 필터 정의 상세(클라이언트 우선) ✅ 구현 완료
+
+#### 구현된 필터 목록 (총 5개)
+
+**1. 지역 필터** ✅
+
+- 필터 키: `province`(시도) / `cityDistrict`(시군구) / `town`(읍면동, 선택사항)
+- 서버 매핑: `sido` / `sigungu` / `admin_dong_name`
+- 구현 완료: 계단식 선택, "전체" 옵션, URL 딥링크
+
+**2. 거래금액 필터** ✅
+
+- 필터 키: `transactionAmountRange`
+- 범위: 0 ~ 100,000만원 (10억원)
+- 모드: Slider (1,000만원 스텝) + Input (직접 입력)
+- 프리셋: "고액 매매 (10억 이상)" [100,000~500,000]
+
+**3. 전용면적 필터** ✅
+
+- 필터 키: `exclusiveAreaRange`
+- 범위: 0 ~ 300㎡
+- 모드: Slider (5㎡ 스텝) + Input (직접 입력)
+- 프리셋: "소형 아파트 (33평 이하)" [0~110]
+
+**4. 건축연도 필터** ✅
+
+- 필터 키: `buildYearRange`
+- 범위: 1980년 ~ 2024년
+- 모드: Slider (1년 스텝) + Input (직접 입력)
+- 프리셋: "신축 매매 (5년 이내)" [2019~2024]
+
+**5. 거래 날짜 필터** ✅
+
+- 필터 키: `dateRange`
+- 빠른 선택: 최근 1/3/6개월, 올해
+- 직접 입력: 시작일/종료일 (type="date", ISO 8601 형식)
+
+#### 공통 기능
+
+- 검색: `searchField=address|building_name_real` + `searchQuery`
+- 페이지/사이즈: 기본 20 (후보 20/50/100)
+- 영속화: 컬럼 순서/너비/정렬/페이지 사이즈는 로컬 스토리지 키 스킴 유지
+- 활성화 상태 표시: 필터 적용 시 라벨 파란색 강조
+
+#### 읍면동 선택 정책 ✅ 구현됨
+
+- `town`은 선택사항: 시/도+시군구만 선택해도 조회 가능
+- 읍면동 드롭다운에 "전체" 옵션 제공 → 선택 시 `admin_dong_name` 미전달(시군구 전체 조회)
+- 계단식 동작: 시/도 변경 시 시군구·읍면동 초기화, 시군구 변경 시 읍면동 초기화
+
+#### 초기화 버튼(설정 초기화) 정책 ✅ 구현됨
+
+- 지역 필터(province/cityDistrict/town)는 그대로 유지
+- 가격/면적/건축연도/날짜/검색/정렬은 기본값으로 복원, 페이지는 1로 복원
+- 정렬 기본값: `contractDate desc`
+
+### 9. 지도/마커 동작 상세
+
+- 좌표 매핑: 다양한 키(lat/lng/lon/x/y/lat_y 등)에서 우선순위 추출 후 범위 기반 스왑 가드
+- 초기: 첫 로드 1회 `fitBounds` 실행, 이후 필터 변경 시 현재 중심/레벨 유지
+- 마커 상한: 공통 상한치 적용(상한 도달 시 안내 배지 표시), 지도 대용량 프리페치 상한=500 (3-A 기본값)
+- 빈 상태: 아이템 0건이어도 중심/레벨 리셋 금지, 좌표 오버레이 유지
+- 팝업 락: 전역 토글로 자동 닫힘 방지 지원(지도 상호작용 시)
+- 클러스터러: minLevel=9, gridSize=60(권장), fitBounds padding=40px, 이벤트 디바운스=200ms
+- 범례/마커 기준(확정): 거래금액 기준, 임계값 t1~t4=6000/8000/10000/13000(만원)
+
+### 10. 팝업/상세 정책
+
+- 단기 A안: 매매에서 행/주소 클릭 시 공통 상세 팝업 비활성(현상 유지)
+- 장기 B안: `/real-transactions/{id}` 도입 시 매매 전용 상세로 분기(설계 별도 문서)
+- 값 미존재 시 플레이스홀더: `-` 또는 "정보 없음"(접근성 라벨 포함)
+
+### 11. 상태관리/스토어 키
+
+- 필터/정렬: `province`, `cityDistrict`, `town`, `sortBy`, `sortOrder`, `page`, `size`
+- 액션: `setFilter`, `setRangeFilter`, `setSortConfig`, `setPage`, `setSize`
+- 테이블 퍼시스턴스 키: `table:order:sale` 등 네임스페이스 구분 적용
+- 네임스페이스/URL 동기화: `sale` 네임스페이스로 필터 상태 저장, URL 쿼리와 양방향 동기화(딥링크 ON)
+- 키 충돌 방지: 페이지별 prefix 적용, 기존 페이지와 키 중복 금지
+
+### 12. 구현 단계(개발 체크) + 단계별 확인 질문 가이드
+
+#### Phase 1: 백엔드 확인 ✅ 완료
+
+- [x] API 엔드포인트 확인 (`/api/v1/real-transactions/`)
+- [x] 컬럼 메타데이터 확인 (`/api/v1/real-transactions/columns`)
+- [x] 정렬 가능한 컬럼 확인 (sortable_columns)
+
+#### Phase 2: 데이터셋 설정 ✅ 완료
+
+- [x] `contracts.ts`에 `columnsSale` 정의 (57개 컬럼)
+- [x] `registry.ts`에 `sale` 데이터셋 추가
+- [x] API 엔드포인트 연결
+- [x] 어댑터 함수(`toItemLike`) 구현
+- [x] 기본 정렬 설정 (`contractDate desc`)
+- [x] 지도 범례/마커 설정 (거래금액 기준)
+- [x] 정렬 파라미터 통일 (`ordering=-snake_case`)
+
+#### Phase 3: 필터 컴포넌트 구현 ✅ 완료 (2025-10-02)
+
+- [x] `SaleFilter.tsx` 생성 (1,083줄 최종)
+- [x] **지역 필터**: 시/도, 시군구, 읍면동(선택사항, "전체" 옵션)
+- [x] **주소 검색**: 주소 기반 필터링
+- [x] **거래 날짜 필터**: 빠른 선택(1/3/6개월, 올해) + 직접 입력
+- [x] **거래금액 필터**: 0~100,000만원 (Slider/Input)
+- [x] **평단가 필터**: 0~5,000만원/평 (Slider/Input) ⭐ 신규
+- [x] **전용면적 필터**: 0~300㎡ (Slider/Input)
+- [x] **대지권면적 필터**: 0~600㎡ (Slider/Input) ⭐ 신규
+- [x] **건축연도 필터**: 1980~2024년 (Slider/Input)
+- [x] **층확인 필터**: 전체/반지하/1층/일반층/탑층 (다중선택) ⭐ 신규
+- [x] **엘리베이터 필터**: 전체/있음/없음 (단일선택) ⭐ 신규
+- [x] Slider/Input 듀얼 모드 (모든 범위 필터)
+- [x] 활성화 상태 표시 (파란색 강조)
+- [x] 초기화 로직 (지역 유지, "설정 초기화" 버튼)
+- [x] **UI 일관성**: 경매결과 패턴 완전 통일
+  - 헤더: `<Filter />` + "필터"
+  - "선택 항목만 보기" & "설정 초기화" 맨 위 배치
+  - 프리셋 기능 제거 (경매결과 미보유)
+  - 아이콘 제거 (거래날짜, 층확인, 엘리베이터)
+- [x] **필터 순서**: 거래날짜 → 거래금액 → 평단가 → 전용면적 → 대지권면적 → 건축연도 → 층확인 → 엘리베이터
+- [x] **쿼리 파라미터 오염 해결**: 화이트리스트 패턴 적용 (`SALE_FILTERS`)
+
+#### Phase 4: 검색 결과 컴포넌트 (다음 단계)
+
+1. `SaleSearchResults.tsx`: 지역 키 통일/검색·기간 필드 확정 반영
+
+   - 질문: "기간 입력은 연·월 기본으로 진행할까요? 일 단위 범위도 추가할까요?"
+   - 질문: "검색 우선순위(도로명>건물명>지번)와 자동완성 사용을 확정해 주시겠어요?"
+
+2. `SaleSearchResults.tsx`: 테이블 저장 키/기본 순서/rowKey 확정
+
+   - 질문: "기본 10컬럼 라벨/순서를 이대로 확정할까요? 교체 희망 컬럼이 있나요?"
+   - 질문: "모바일 1열 핵심 지표는 거래금액과 평단가 중 무엇으로 표기할까요?"
+
+3. `datasetConfigs.sale`: 서버 파라미터 매핑/정렬 전달/아답터 좌표 가드 재검증
+
+   - 질문: "기본 정렬은 계약연·월 내림차순으로 진행하고 동순위 보조키는 contractDay→id로 할까요?"
+   - 질문: "서버 정렬 허용 키 목록(`/columns`)에서 우선 노출할 키가 있나요?"
+
+4. 지도/마커: 빈상태·상한 안내/중심·레벨 보존 동작 확인
+
+   - 질문: "지도 색상 기준은 거래금액과 평단가 중 어느 쪽으로 설정할까요?"
+   - 질문: "임계값 t1~t4(만원)를 6000/8000/10000/13000으로 시작해도 될까요? 마커 라벨은 억 단위 축약으로 진행할까요?"
+
+5. SWR/성능/페이지네이션/딥링크 설정
+
+   - 질문: "페이지 기본 size는 20으로 확정할까요?"
+   - 질문: "SWR은 dedupingInterval 1~2초, revalidateOnFocus=false로 적용할까요?"
+   - 질문: "필터 상태를 URL에 영속하는 딥링크를 기본 ON으로 둘까요?"
+
+6. QA 수행 및 DoD 충족 확인 → 릴리즈 플래그 온
+   - 질문: "중복 계약 처리(최신 1건만 보기) 기본값 ON으로 배포해도 될까요?"
+   - 질문: "취소/무효 계약은 기본 제외로 표기하고 옵션으로 표시 전환 허용할까요?"
+   - 스모크: scripts/smoke.ps1 / smoke-detail.ps1 / smoke-comparables.ps1 순으로 실행해 core 흐름 검증
+   - E2E(최소 3): 지역 필터→정렬→지도, 모바일 1열·페이지네이션, 딥링크 복원
+
+---
+
+## 부록 A. UX/성능(요약)
+
+- 데이터: SWR 캐시/디듀플, `keepPreviousData`로 깜빡임 최소화
+- 테이블: 가상 스크롤(행 많을 때), 컬럼 DnD/리사이즈 스로틀링
+- 지도: 클러스터링/지연 렌더, 마커 상한 안내
+- 반응형: 모바일 1열 축약+상단 고정 필터 바
+
+## 부록 B. 에러/빈상태(요약)
+
+- 네트워크 에러: 재시도 버튼/토스트, 검색 조건 유지
+- 데이터 없음: 조건 요약과 가이드 텍스트 노출(지역/기간/가격 조정 제안)
+- 좌표 결측: 리스트는 표시, 지도는 건수/가이드 안내
+
+## 부록 C. 리스크/완화(요약)
+
+- `/columns` 빈 응답 시: 테이블 헤더 정렬 비활성 정책 적용
+- 좌표 결측·키 상이 비율 높을 때 지도 체감도 저하 → 상한/가이드 강화
+- 상세 팝업(B안) 도입 시 스키마 영향 → 별도 스프린트로 분리

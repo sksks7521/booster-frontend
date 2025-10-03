@@ -94,17 +94,18 @@ export const handlers = [
     return HttpResponse.json(data);
   }),
 
-  http.get("/api/v1/real-transactions/", () => {
-    const data = sampleItems.map((it) => ({
-      id: it.id,
-      address: it.address,
-      price: it.price,
-      area: it.area,
-      transactionDate: new Date().toISOString(),
-      transactionType: "sale",
-    }));
-    return HttpResponse.json(data);
-  }),
+  // real-transactions는 실제 백엔드 사용 (MSW 우회)
+  // http.get("/api/v1/real-transactions/", () => {
+  //   const data = sampleItems.map((it) => ({
+  //     id: it.id,
+  //     address: it.address,
+  //     price: it.price,
+  //     area: it.area,
+  //     transactionDate: new Date().toISOString(),
+  //     transactionType: "sale",
+  //   }));
+  //   return HttpResponse.json(data);
+  // }),
 
   http.get("/api/v1/real-rents/", () => {
     const data = sampleItems.map((it) => ({

@@ -50,7 +50,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import regions from "@/regions.json";
-import { useLocationsSimple } from "@/hooks/useLocations";
+import {
+  useRealTransactionsSido,
+  useRealTransactionsSigungu,
+  useRealTransactionsAdminDong,
+} from "@/hooks/useLocations";
 import { Label } from "@/components/ui/label";
 
 export default function PropertyDetailV2Page() {
@@ -84,6 +88,7 @@ export default function PropertyDetailV2Page() {
       : "auction_ed";
   }, [searchParams]);
   const [activeDataset, setActiveDataset] = useState(initialDs);
+  const useSaleApi = activeDataset === "sale";
   type ViewType = "list" | "map" | "integrated";
   const initialView = useMemo(() => {
     const v = searchParams?.get("view");
@@ -160,7 +165,7 @@ export default function PropertyDetailV2Page() {
   );
 
   // 지역 선택을 위한 상태 및 로직
-  // regions.json 기반 하드코딩 목록 사용
+  // regions.json 기반 하드코딩 + 실거래가 전용 API 혼합 사용
   const provinces: string[] = (regions as any)["시도"] ?? [];
   const districtsByProvince: Record<string, string[]> =
     ((regions as any)["시군구"] as Record<string, string[]>) ?? {};
@@ -171,13 +176,27 @@ export default function PropertyDetailV2Page() {
   const bootRef = useRef(true);
   const pendingCityRef = useRef<string | null>(null);
   const [availableDistricts, setAvailableDistricts] = useState<string[]>([]);
+  const province = useFilterStore((s: any) => s.province);
+  const cityDistrict = useFilterStore((s: any) => s.cityDistrict);
+  const town = useFilterStore((s: any) => s.town);
   const setFilter = useFilterStore((s: any) => s.setFilter);
 
-  // 지역 선택 로직 - 시도 변경 시
+  // 실거래가 전용 지역 목록 API
+  const { sidos } = useRealTransactionsSido();
+  const { sigungus } = useRealTransactionsSigungu(
+    useSaleApi ? selectedProvince : undefined
+  );
+  const { adminDongs } = useRealTransactionsAdminDong(
+    useSaleApi ? selectedProvince : undefined,
+    useSaleApi ? selectedCity : undefined
+  );
+
+  // 지역 선택 로직 - 시도 변경 시 (sale 데이터셋이 아닐 때만)
   useEffect(() => {
+    if (useSaleApi) return; // sale 데이터셋은 SaleFilter에서 관리
+
     // 시군구 원본 목록을 '시' 단위로 접어서(예: "경기도 고양시 덕양구" → "경기도 고양시") 중복 제거
     const collapseCity = (full: string): string => {
-      // 예: "경상남도 창원시 의창구" → "경상남도 창원시"
       const idx = full.indexOf("시 ");
       if (idx >= 0) {
         const cut = full.slice(0, idx + 1); // "…시"
@@ -186,48 +205,71 @@ export default function PropertyDetailV2Page() {
       return full;
     };
 
-    if (selectedProvince) {
-      const raw = districtsByProvince[selectedProvince] || [];
-      const collapsed = Array.from(new Set(raw.map((v) => collapseCity(v))));
+    const prevCitiesRef = (PropertyDetailV2Page as any)._prevCitiesRef || {
+      current: [] as string[],
+    };
+    (PropertyDetailV2Page as any)._prevCitiesRef = prevCitiesRef;
+
+    if (!selectedProvince) {
+      if (availableCities.length > 0) setAvailableCities([]);
+      if (selectedCity) setSelectedCity("");
+      if (selectedDistrict) setSelectedDistrict("");
+      if (availableDistricts.length > 0) setAvailableDistricts([]);
+      return;
+    }
+
+    const raw = districtsByProvince[selectedProvince] || [];
+    const collapsed = Array.from(new Set(raw.map((v) => collapseCity(v))));
+    const changed =
+      collapsed.length !== prevCitiesRef.current.length ||
+      collapsed.some((v, i) => v !== prevCitiesRef.current[i]);
+    if (changed) {
       setAvailableCities(collapsed);
-      if (!collapsed.includes(selectedCity)) {
-        setSelectedCity("");
-        setSelectedDistrict("");
-        setAvailableDistricts([]);
-      }
-    } else {
-      setAvailableCities([]);
+      prevCitiesRef.current = collapsed;
+    }
+    if (selectedCity && !collapsed.includes(selectedCity)) {
       setSelectedCity("");
       setSelectedDistrict("");
-      setAvailableDistricts([]);
+      if (availableDistricts.length > 0) setAvailableDistricts([]);
     }
-  }, [selectedProvince, selectedCity]);
+  }, [selectedProvince, selectedCity, useSaleApi]);
 
-  // 지역 선택 로직 - 시군구 변경 시
+  // 지역 선택 로직 - 시군구 변경 시 (sale 데이터셋이 아닐 때만)
   useEffect(() => {
+    if (useSaleApi) return; // sale 데이터셋은 SaleFilter에서 관리
+
+    if (!selectedCity) {
+      if (availableDistricts.length > 0) setAvailableDistricts([]);
+      if (selectedDistrict) setSelectedDistrict("");
+      return;
+    }
+
     // regions.json은 시군구까지 제공하므로 읍면동은 사용하지 않음(빈 리스트 유지)
-    setAvailableDistricts([]);
-    setSelectedDistrict("");
-  }, [selectedCity]);
+    if (availableDistricts.length > 0) setAvailableDistricts([]);
+    if (selectedDistrict) setSelectedDistrict("");
+  }, [selectedCity, useSaleApi, selectedDistrict]);
 
-  // 실제 필터 적용 - 값이 있을 때만 적용
+  // 실제 필터 적용 - 값이 바뀔 때만 적용 (sale 데이터셋이 아닐 때만)
   useEffect(() => {
-    if (selectedProvince) {
+    if (useSaleApi) return; // sale 데이터셋은 SaleFilter에서 관리
+    if (selectedProvince && province !== selectedProvince) {
       setFilter("province", selectedProvince);
     }
-  }, [selectedProvince, setFilter]);
+  }, [selectedProvince, province, setFilter, useSaleApi]);
 
   useEffect(() => {
-    if (selectedCity) {
+    if (useSaleApi) return; // sale 데이터셋은 SaleFilter에서 관리
+    if (selectedCity && cityDistrict !== selectedCity) {
       setFilter("cityDistrict", selectedCity);
     }
-  }, [selectedCity, setFilter]);
+  }, [selectedCity, cityDistrict, setFilter, useSaleApi]);
 
   useEffect(() => {
-    if (selectedDistrict) {
+    if (useSaleApi) return; // sale 데이터셋은 SaleFilter에서 관리
+    if (selectedDistrict && town !== selectedDistrict) {
       setFilter("town", selectedDistrict);
     }
-  }, [selectedDistrict, setFilter]);
+  }, [selectedDistrict, town, setFilter, useSaleApi]);
 
   // URL → 드롭다운 초기 동기화 (마운트 시 1회: province는 즉시, city/town은 옵션 로딩 후 적용)
   useEffect(() => {
@@ -272,7 +314,12 @@ export default function PropertyDetailV2Page() {
       else current.delete("cityDistrict");
       if (selectedDistrict) current.set("town", selectedDistrict);
       else current.delete("town");
-      router.replace(`?${current.toString()}`, { scroll: false });
+      const nextQs = `?${current.toString()}`;
+      const prevQs =
+        typeof window !== "undefined" ? window.location.search : "";
+      if (nextQs !== prevQs) {
+        router.replace(nextQs, { scroll: false });
+      }
     } catch {}
   }, [selectedProvince, selectedCity, selectedDistrict]);
   const handleSearch = () => {};
@@ -1022,7 +1069,7 @@ export default function PropertyDetailV2Page() {
             <TabsTrigger value="listings">매물</TabsTrigger>
           </TabsList>
 
-          {/* 지역 선택 UI */}
+          {/* 지역 선택 UI (모든 데이터셋 공통) */}
           <Card className="mb-4">
             <CardContent className="pt-4">
               <div className="flex items-center gap-2 mb-3">
@@ -1041,9 +1088,10 @@ export default function PropertyDetailV2Page() {
                     value={selectedProvince || "all"}
                     onValueChange={(value) => {
                       const actualValue = value === "all" ? "" : value;
+                      if (actualValue === selectedProvince) return; // 동일값 가드
                       setSelectedProvince(actualValue);
-                      setSelectedCity("");
-                      setSelectedDistrict("");
+                      if (selectedCity) setSelectedCity("");
+                      if (selectedDistrict) setSelectedDistrict("");
                     }}
                   >
                     <SelectTrigger className="h-9">
@@ -1051,11 +1099,13 @@ export default function PropertyDetailV2Page() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">전체</SelectItem>
-                      {provinces.map((province) => (
-                        <SelectItem key={province} value={province}>
-                          {province}
-                        </SelectItem>
-                      ))}
+                      {(useSaleApi ? sidos.map((s) => s.name) : provinces).map(
+                        (province) => (
+                          <SelectItem key={province} value={province}>
+                            {province}
+                          </SelectItem>
+                        )
+                      )}
                     </SelectContent>
                   </Select>
                 </div>
@@ -1069,8 +1119,9 @@ export default function PropertyDetailV2Page() {
                     value={selectedCity || "all"}
                     onValueChange={(value) => {
                       const actualValue = value === "all" ? "" : value;
+                      if (actualValue === selectedCity) return; // 동일값 가드
                       setSelectedCity(actualValue);
-                      setSelectedDistrict("");
+                      if (selectedDistrict) setSelectedDistrict("");
                     }}
                     disabled={!selectedProvince}
                   >
@@ -1079,7 +1130,10 @@ export default function PropertyDetailV2Page() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">선택</SelectItem>
-                      {availableCities.map((city) => (
+                      {(useSaleApi
+                        ? sigungus.map((s) => s.name)
+                        : availableCities
+                      ).map((city) => (
                         <SelectItem key={city} value={city}>
                           {city}
                         </SelectItem>
@@ -1097,16 +1151,20 @@ export default function PropertyDetailV2Page() {
                     value={selectedDistrict || "all"}
                     onValueChange={(value) => {
                       const actualValue = value === "all" ? "" : value;
+                      if (actualValue === selectedDistrict) return; // 동일값 가드
                       setSelectedDistrict(actualValue);
                     }}
-                    disabled
+                    disabled={useSaleApi ? !selectedCity : true}
                   >
                     <SelectTrigger className="h-9">
                       <SelectValue placeholder="읍면동 선택" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">선택</SelectItem>
-                      {availableDistricts.map((district) => (
+                      {(useSaleApi
+                        ? adminDongs.map((d) => d.name)
+                        : availableDistricts
+                      ).map((district) => (
                         <SelectItem key={district} value={district}>
                           {district}
                         </SelectItem>
@@ -1118,8 +1176,8 @@ export default function PropertyDetailV2Page() {
             </CardContent>
           </Card>
 
-          {/* 안내 배너: 지역 미선택 시 */}
-          {!(selectedProvince && selectedCity) && (
+          {/* 안내 배너: 지역 미선택 시 (sale 제외) */}
+          {activeDataset !== "sale" && !(selectedProvince && selectedCity) && (
             <div className="mb-4 rounded-md border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
               지역을 먼저 선택하세요. 시도와 시군구를 선택하면 결과가
               표시됩니다.
