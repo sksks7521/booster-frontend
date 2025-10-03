@@ -32,47 +32,60 @@ export function useDataset(
   const key = enabled
     ? cfg.api.buildListKey({ filters: filtersForQuery, page, size })
     : null;
-  const { data, error, isLoading, mutate } = useSWR(key, async () => {
-    try {
-      // bounds 간단 검증 실패 시 네트워크 요청 생략
-      // 단, 중심+반경 모드일 때는 bounds 무효여도 요청을 진행한다.
-      if (!hasCenterRadius && !isValidBounds(safeFilters)) {
-        console.log("bounds 검증 실패로 빈 결과 반환");
-        return { items: [], total: 0, page, size } as any;
-      }
-
-      const result = await cfg.api.fetchList({
-        filters: filtersForQuery,
-        page,
-        size,
-      });
-
-      return result;
-    } catch (e: any) {
-      // 백엔드 미구현/일시 오류 시에도 UI는 동작하도록 안전 결과 반환
+  const { data, error, isLoading, mutate } = useSWR(
+    key,
+    async () => {
       try {
-        const normalizedError = {
-          message: e?.message ?? String(e),
-          status: e?.status ?? e?.response?.status,
-          statusText: e?.statusText ?? e?.response?.statusText,
-          url: e?.url ?? e?.config?.url,
-          code: e?.code,
-          data: e?.data ?? e?.response?.data,
-        };
-        console.error("=== API 요청 실패 ===", {
-          datasetId,
-          key,
+        // bounds 간단 검증 실패 시 네트워크 요청 생략
+        // 단, 중심+반경 모드일 때는 bounds 무효여도 요청을 진행한다.
+        if (!hasCenterRadius && !isValidBounds(safeFilters)) {
+          console.log("bounds 검증 실패로 빈 결과 반환");
+          return { items: [], total: 0, page, size } as any;
+        }
+
+        const result = await cfg.api.fetchList({
           filters: filtersForQuery,
           page,
           size,
-          error: normalizedError,
         });
-      } catch (logErr) {
-        console.error("=== API 요청 실패(로그중 오류) ===", logErr);
+
+        return result;
+      } catch (e: any) {
+        // 백엔드 미구현/일시 오류 시에도 UI는 동작하도록 안전 결과 반환
+        try {
+          const normalizedError = {
+            message: e?.message ?? String(e),
+            status: e?.status ?? e?.response?.status,
+            statusText: e?.statusText ?? e?.response?.statusText,
+            url: e?.url ?? e?.config?.url,
+            code: e?.code,
+            data: e?.data ?? e?.response?.data,
+          };
+          console.error("=== API 요청 실패 ===", {
+            datasetId,
+            key,
+            filters: filtersForQuery,
+            page,
+            size,
+            error: normalizedError,
+          });
+        } catch (logErr) {
+          console.error("=== API 요청 실패(로그중 오류) ===", logErr);
+        }
+        return { items: [], total: 0, page, size, _error: e } as any;
       }
-      return { items: [], total: 0, page, size, _error: e } as any;
+    },
+    {
+      keepPreviousData: true,
+      dedupingInterval: 1500,
+      revalidateOnFocus: false,
+      revalidateOnReconnect: false,
+      focusThrottleInterval: 1500,
+      loadingTimeout: 8000,
+      errorRetryCount: 1,
+      errorRetryInterval: 1500,
     }
-  });
+  );
 
   // items 표준화: { results, count, page, size }, { items, total, page, size } 또는 배열 형태 모두 수용
   const rawItemsAll: any[] = Array.isArray(data)

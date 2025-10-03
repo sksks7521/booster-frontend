@@ -249,27 +249,24 @@ export default function PropertyDetailV2Page() {
     if (selectedDistrict) setSelectedDistrict("");
   }, [selectedCity, useSaleApi, selectedDistrict]);
 
-  // 실제 필터 적용 - 값이 바뀔 때만 적용 (sale 데이터셋이 아닐 때만)
+  // 실제 필터 적용 - 값이 바뀔 때만 적용 (모든 데이터셋)
   useEffect(() => {
-    if (useSaleApi) return; // sale 데이터셋은 SaleFilter에서 관리
     if (selectedProvince && province !== selectedProvince) {
       setFilter("province", selectedProvince);
     }
-  }, [selectedProvince, province, setFilter, useSaleApi]);
+  }, [selectedProvince, province, setFilter]);
 
   useEffect(() => {
-    if (useSaleApi) return; // sale 데이터셋은 SaleFilter에서 관리
     if (selectedCity && cityDistrict !== selectedCity) {
       setFilter("cityDistrict", selectedCity);
     }
-  }, [selectedCity, cityDistrict, setFilter, useSaleApi]);
+  }, [selectedCity, cityDistrict, setFilter]);
 
   useEffect(() => {
-    if (useSaleApi) return; // sale 데이터셋은 SaleFilter에서 관리
     if (selectedDistrict && town !== selectedDistrict) {
       setFilter("town", selectedDistrict);
     }
-  }, [selectedDistrict, town, setFilter, useSaleApi]);
+  }, [selectedDistrict, town, setFilter]);
 
   // URL → 드롭다운 초기 동기화 (마운트 시 1회: province는 즉시, city/town은 옵션 로딩 후 적용)
   useEffect(() => {
@@ -284,24 +281,29 @@ export default function PropertyDetailV2Page() {
 
   useEffect(() => {
     try {
-      if (
-        pendingCityRef.current &&
-        availableCities.includes(pendingCityRef.current)
-      ) {
+      const cityList = useSaleApi
+        ? sigungus.map((s) => s.name)
+        : availableCities;
+
+      if (pendingCityRef.current && cityList.includes(pendingCityRef.current)) {
         setSelectedCity(pendingCityRef.current);
         pendingCityRef.current = null;
       }
       // 초기 동기화가 끝났으면 부트스트랩 종료
       if (bootRef.current) bootRef.current = false;
     } catch {}
-  }, [availableCities]);
+  }, [availableCities, useSaleApi, sigungus]);
 
   useEffect(() => {
     try {
       const t = searchParams?.get("town") || "";
-      if (t && availableDistricts.includes(t)) setSelectedDistrict(t);
+      const districtList = useSaleApi
+        ? adminDongs.map((d) => d.name)
+        : availableDistricts;
+
+      if (t && districtList.includes(t)) setSelectedDistrict(t);
     } catch {}
-  }, [searchParams, availableDistricts]);
+  }, [searchParams, availableDistricts, useSaleApi, adminDongs]);
 
   // 드롭다운 → URL 동기화 (선택 변경 시 쿼리 업데이트)
   useEffect(() => {

@@ -652,6 +652,138 @@ export const realTransactionApi = {
     apiClient.getRealTransactions(params),
   getMarketPrice: (params?: Record<string, any>) =>
     apiClient.getMarketPrice(params),
+  getColumns: async (): Promise<any> => {
+    const response = await fetch(
+      `${API_BASE_URL}/api/v1/real-transactions/columns`
+    );
+    if (!response.ok) {
+      throw new Error("Failed to fetch columns");
+    }
+    return response.json();
+  },
+  // 🆕 주소별 실거래가 조회 (백엔드 구현 전에는 Mock 데이터 반환)
+  getTransactionsByAddress: async (address: string): Promise<any> => {
+    // TODO: 백엔드 API 완성 후 실제 API 호출로 교체
+    // const response = await fetch(
+    //   `${API_BASE_URL}/api/v1/real-transactions/by-address?address=${encodeURIComponent(address)}&size=1000`
+    // );
+    // if (!response.ok) {
+    //   throw new Error("Failed to fetch transactions by address");
+    // }
+    // return response.json();
+
+    // 🔧 임시 Mock 데이터 (백엔드 대기 중)
+    console.log(
+      `[Mock API] getTransactionsByAddress called with address: ${address}`
+    );
+
+    // 0.5초 지연 (실제 API 호출 시뮬레이션)
+    await new Promise((resolve) => setTimeout(resolve, 500));
+
+    return {
+      items: [
+        {
+          id: "mock-1",
+          address: address,
+          buildYear: 1994,
+          price: 43000,
+          area: 75.57,
+          lat: 37.64849863,
+          lng: 126.7832692,
+          extra: {
+            buildingName: "흰돌마을",
+            buildingNameReal: "흰돌마을6(라이프)",
+            roadAddressReal: address,
+            jibunAddress: "경기도 고양시 일산동구 백석동 1193",
+            constructionYear: 1994,
+            elevatorAvailable: false,
+            elevatorCount: 0,
+            dongName: "601동",
+            contractYear: 2023,
+            contractMonth: 8,
+            contractDay: 15,
+            contractDate: "2023-08-15",
+            exclusiveAreaSqm: 75.57,
+            exclusiveAreaPyeong: 22.86,
+            landRightsAreaSqm: 88.36,
+            transactionAmount: 43000,
+            pricePerPyeong: 1877,
+            pricePerSqm: 569.01,
+            floorInfoReal: "3",
+            floorConfirmation: "일반층",
+            transactionType: "중개거래",
+          },
+        },
+        {
+          id: "mock-2",
+          address: address,
+          buildYear: 1994,
+          price: 43500,
+          area: 75.57,
+          lat: 37.64849863,
+          lng: 126.7832692,
+          extra: {
+            buildingName: "흰돌마을",
+            buildingNameReal: "흰돌마을6(라이프)",
+            roadAddressReal: address,
+            jibunAddress: "경기도 고양시 일산동구 백석동 1193",
+            constructionYear: 1994,
+            elevatorAvailable: false,
+            elevatorCount: 0,
+            dongName: "602동",
+            contractYear: 2023,
+            contractMonth: 9,
+            contractDay: 12,
+            contractDate: "2023-09-12",
+            exclusiveAreaSqm: 75.57,
+            exclusiveAreaPyeong: 22.86,
+            landRightsAreaSqm: 88.36,
+            transactionAmount: 43500,
+            pricePerPyeong: 1903,
+            pricePerSqm: 576.12,
+            floorInfoReal: "2",
+            floorConfirmation: "일반층",
+            transactionType: "중개거래",
+          },
+        },
+        {
+          id: "mock-3",
+          address: address,
+          buildYear: 1994,
+          price: 44000,
+          area: 75.57,
+          lat: 37.64849863,
+          lng: 126.7832692,
+          extra: {
+            buildingName: "흰돌마을",
+            buildingNameReal: "흰돌마을6(라이프)",
+            roadAddressReal: address,
+            jibunAddress: "경기도 고양시 일산동구 백석동 1193",
+            constructionYear: 1994,
+            elevatorAvailable: false,
+            elevatorCount: 0,
+            dongName: "603동",
+            contractYear: 2024,
+            contractMonth: 5,
+            contractDay: 20,
+            contractDate: "2024-05-20",
+            exclusiveAreaSqm: 75.57,
+            exclusiveAreaPyeong: 22.86,
+            landRightsAreaSqm: 88.36,
+            transactionAmount: 44000,
+            pricePerPyeong: 1925,
+            pricePerSqm: 582.34,
+            floorInfoReal: "1",
+            floorConfirmation: "1층",
+            transactionType: "중개거래",
+          },
+        },
+      ],
+      total: 3,
+      page: 1,
+      size: 1000,
+    };
+  },
 };
 
 export const realRentApi = {

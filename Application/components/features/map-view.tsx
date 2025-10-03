@@ -8,8 +8,10 @@ import { captureError } from "@/lib/monitoring";
 import { DEFAULT_THRESHOLDS, MAP_GUARD } from "@/lib/map/config";
 import { renderBasePopup } from "@/components/map/popup/BasePopup";
 import { auctionSchema } from "@/components/map/popup/schemas/auction";
+import { saleSchema } from "@/components/map/popup/schemas/sale";
 import { analysisSchema } from "@/components/map/popup/schemas/analysis";
 import { useFilterStore } from "@/store/filterStore";
+import { realTransactionApi } from "@/lib/api";
 import {
   Sheet,
   SheetContent,
@@ -365,20 +367,42 @@ function MapView({
       markerToItemRef.current.clear();
     } catch {}
 
-    // Threshold (만원) - 전역 상태 사용 (동적 길이 1..5)
-    const thresholds: number[] = Array.isArray(thresholdsState)
-      ? (thresholdsState as number[])
-      : ([6000, 8000, 10000, 13000] as number[]);
+    // Threshold (만원) - 데이터셋별 기본값 + 전역 상태 사용
+    const defaultThresholds =
+      namespace === "sale"
+        ? [5000, 10000, 30000, 50000] // 실거래가: 5천, 1억, 3억, 5억
+        : [6000, 8000, 10000, 13000]; // 경매: 기존 값
 
-    // 최저가(만원) → 색상 매핑 (현대적 팔레트)
-    const palette = (useFilterStore as any)?.getState?.()?.palette ?? {
-      blue: "#2563eb",
-      green: "#16a34a",
-      pink: "#ec4899",
-      orange: "#f59e0b",
-      red: "#ef4444",
-      grey: "#64748b",
-    };
+    // sale 데이터셋은 기본값 우선, 다른 데이터셋은 전역 스토어 우선
+    const thresholds: number[] =
+      namespace === "sale"
+        ? legendThresholds ?? defaultThresholds
+        : Array.isArray(thresholdsState)
+        ? (thresholdsState as number[])
+        : defaultThresholds;
+
+    // 데이터셋별 색상 팔레트
+    const defaultPalette =
+      namespace === "sale"
+        ? {
+            blue: "#2563eb",
+            green: "#22c55e", // 녹색: ~5천만원
+            pink: "#eab308", // 노란색: 5천~1억
+            orange: "#f97316", // 주황색: 1억~3억
+            red: "#ef4444", // 빨간색: 3억~5억
+            grey: "#9333ea", // 보라색: 5억 이상
+          }
+        : {
+            blue: "#2563eb",
+            green: "#16a34a",
+            pink: "#ec4899",
+            orange: "#f59e0b",
+            red: "#ef4444",
+            grey: "#64748b",
+          };
+
+    const palette =
+      (useFilterStore as any)?.getState?.()?.palette ?? defaultPalette;
     const getColorByPrice = (price?: number | string | null) => {
       const v = typeof price === "string" ? parseFloat(price) : price ?? 0;
       if (!v || isNaN(v)) return "#111827"; // black for missing/invalid
@@ -413,6 +437,115 @@ function MapView({
       return `${Number(v).toLocaleString()}만원`;
     };
 
+    // 실거래가 금액 포맷: 억/만원 단위로 간략 표시
+    const formatSaleAmount = (amount?: number | string | null) => {
+      const v = typeof amount === "string" ? parseFloat(amount) : amount ?? 0;
+      if (!isFinite(v as number) || v === 0) return "-";
+
+      const eok = Math.floor(v / 10000);
+      const man = Math.floor((v % 10000) / 1000);
+
+      if (eok > 0) {
+        return man > 0 ? `${eok}억${man}천` : `${eok}억`;
+      }
+
+      if (v >= 1000) {
+        return `${Math.floor(v / 1000)}천`;
+      }
+
+      return `${Math.floor(v)}`;
+    };
+
+    // 팝업 이벤트 핸들러 등록 헬퍼 함수
+    const attachPopupEventHandlers = (root: HTMLElement, item: any) => {
+      const closeBtn = root.querySelector(
+        '[data-action="close"]'
+      ) as HTMLButtonElement | null;
+      const detailBtn = root.querySelector(
+        '[data-action="detail"]'
+      ) as HTMLButtonElement | null;
+      const favBtn = root.querySelector(
+        '[data-action="fav"]'
+      ) as HTMLButtonElement | null;
+      const shareBtn = root.querySelector(
+        '[data-action="share"]'
+      ) as HTMLButtonElement | null;
+      const copyAddrBtn = root.querySelector(
+        '[data-action="copy-addr"]'
+      ) as HTMLButtonElement | null;
+
+      closeBtn?.addEventListener("click", () => closePopup());
+
+      detailBtn?.addEventListener("click", () => {
+        const evt = new CustomEvent("property:openDetail", {
+          detail: { id: String(item?.id ?? "") },
+        });
+        window.dispatchEvent(evt);
+      });
+
+      favBtn?.addEventListener("click", () => {
+        const evt = new CustomEvent("property:toggleFavorite", {
+          detail: { id: String(item?.id ?? "") },
+        });
+        window.dispatchEvent(evt);
+        // 아이콘 토글(빈별 ↔ 채운별)
+        try {
+          const active = favBtn.getAttribute("data-active") === "1";
+          if (active) {
+            favBtn.textContent = "☆";
+            favBtn.setAttribute("data-active", "0");
+          } else {
+            favBtn.textContent = "⭐";
+            favBtn.setAttribute("data-active", "1");
+          }
+        } catch {}
+      });
+
+      shareBtn?.addEventListener("click", async () => {
+        try {
+          const title = item?.address || item?.roadAddress || "";
+          const text = item?.extra?.buildingName || "";
+          const url = window.location.href;
+          if ((navigator as any).share) {
+            await (navigator as any).share({ title, text, url });
+          } else {
+            await navigator.clipboard.writeText(`${title}\n${text}\n${url}`);
+          }
+        } catch {}
+      });
+
+      copyAddrBtn?.addEventListener("click", async () => {
+        try {
+          const addr =
+            item?.address ||
+            item?.roadAddress ||
+            item?.extra?.roadAddressReal ||
+            "";
+          await navigator.clipboard.writeText(addr);
+
+          // 토스트 메시지
+          const toast = document.createElement("div");
+          toast.textContent = "주소가 복사되었습니다.";
+          toast.style.position = "fixed";
+          toast.style.left = "50%";
+          toast.style.top = "24px";
+          toast.style.transform = "translate(-50%, -10px)";
+          toast.style.zIndex = "99999";
+          toast.style.padding = "8px 12px";
+          toast.style.background = "#111827";
+          toast.style.color = "#fff";
+          toast.style.borderRadius = "8px";
+          toast.style.fontSize = "13px";
+          document.body.appendChild(toast);
+          setTimeout(() => {
+            toast.style.opacity = "0";
+            toast.style.transition = "opacity 0.3s";
+            setTimeout(() => toast.remove(), 300);
+          }, 1500);
+        } catch {}
+      });
+    };
+
     const buildPopupHTML = (it: any) => {
       // 🆕 auction_ed 전용 팝업: 공통 베이스 + 경매 스키마로 렌더링
       if (namespace === "auction_ed") {
@@ -420,6 +553,89 @@ function MapView({
         // 안전 매핑: snake_case 원본과 extra의 camelCase 모두 허용하도록 스키마가 처리
         const { title, subtitle, rows, actions } = auctionSchema(item);
         return renderBasePopup({ title, subtitle, rows, actions });
+      }
+
+      // 🆕 sale 전용 팝업: 비동기 데이터 로딩 + 테이블 렌더링
+      if (namespace === "sale") {
+        const item = it || {};
+        const address =
+          item?.address ||
+          item?.roadAddress ||
+          item?.extra?.roadAddressReal ||
+          "";
+
+        // 로딩 중 팝업 생성
+        const loadingDiv = document.createElement("div");
+        loadingDiv.style.width = "270px";
+        loadingDiv.style.padding = "20px";
+        loadingDiv.style.background = "rgba(255,255,255,0.98)";
+        loadingDiv.style.boxShadow = "0 8px 24px rgba(0,0,0,0.12)";
+        loadingDiv.style.border = "1px solid rgba(0,0,0,0.08)";
+        loadingDiv.style.borderRadius = "8px";
+        loadingDiv.style.textAlign = "center";
+        loadingDiv.innerHTML = `
+          <div style="font-size:14px;color:#6b7280;margin-bottom:8px">데이터 로딩 중...</div>
+          <div style="font-size:12px;color:#9ca3af">${address}</div>
+        `;
+
+        // 비동기로 데이터 로딩 후 팝업 업데이트
+        realTransactionApi
+          .getTransactionsByAddress(address)
+          .then((response) => {
+            const transactions = response.items || [];
+            const buildingInfo = transactions[0] || item; // 첫 번째 거래 또는 현재 아이템을 대표로 사용
+
+            const { title, subtitle, rows, table, actions } = saleSchema(
+              buildingInfo,
+              transactions
+            );
+
+            const newContent = renderBasePopup({
+              title,
+              subtitle,
+              rows,
+              table,
+              tableCollapsible: true,
+              actions,
+            });
+
+            // 팝업 오버레이가 여전히 존재하는 경우에만 업데이트
+            if (popupOverlayRef.current && popupOverlayRef.current.getMap()) {
+              popupOverlayRef.current.setContent(newContent);
+
+              // 이벤트 핸들러 재등록
+              attachPopupEventHandlers(newContent, item);
+            }
+          })
+          .catch((error) => {
+            console.error("[MapView] Failed to load transactions:", error);
+
+            // 에러 팝업
+            const errorDiv = document.createElement("div");
+            errorDiv.style.width = "270px";
+            errorDiv.style.padding = "20px";
+            errorDiv.style.background = "rgba(255,255,255,0.98)";
+            errorDiv.style.boxShadow = "0 8px 24px rgba(0,0,0,0.12)";
+            errorDiv.style.border = "1px solid rgba(0,0,0,0.08)";
+            errorDiv.style.borderRadius = "8px";
+            errorDiv.style.textAlign = "center";
+            errorDiv.innerHTML = `
+              <div style="font-size:14px;color:#ef4444;margin-bottom:8px">데이터 로딩 실패</div>
+              <div style="font-size:12px;color:#9ca3af">${address}</div>
+              <button data-action="close" style="margin-top:12px;padding:6px 12px;border:1px solid #e5e7eb;border-radius:9999px;background:#fff;color:#111827;font-size:12px">닫기</button>
+            `;
+
+            if (popupOverlayRef.current && popupOverlayRef.current.getMap()) {
+              popupOverlayRef.current.setContent(errorDiv);
+
+              const closeBtn = errorDiv.querySelector(
+                '[data-action="close"]'
+              ) as HTMLButtonElement;
+              closeBtn?.addEventListener("click", () => closePopup());
+            }
+          });
+
+        return loadingDiv;
       }
 
       // 기본(분석 등) 팝업: 공통 베이스 + 분석 스키마로 렌더링
@@ -1068,22 +1284,49 @@ function MapView({
     // 좌표 결측 제외 + 상한 적용
     const filtered = items.filter(
       (it: any) =>
-        (it?.lat ?? it?.latitude) != null && (it?.lng ?? it?.longitude) != null
+        (it?.latitude ?? it?.lat ?? it?.lat_y ?? it?.y) != null &&
+        (it?.longitude ?? it?.lng ?? it?.lon ?? it?.x) != null
     );
     const slice = filtered.slice(0, MAX);
     const toAdd: any[] = [];
     let missingCoords = items.length - filtered.length;
-    slice.forEach((it: any) => {
-      const latRaw = it?.lat ?? it?.latitude;
-      const lngRaw = it?.lng ?? it?.longitude;
+    slice.forEach((it: any, idx: number) => {
+      // 실거래가 데이터 좌표 필드 우선 지원 + 기존 경매 데이터 호환
+      const latRaw = it?.latitude ?? it?.lat ?? it?.lat_y ?? it?.y;
+      const lngRaw = it?.longitude ?? it?.lng ?? it?.lon ?? it?.x;
       const lat = typeof latRaw === "number" ? latRaw : parseFloat(latRaw);
       const lng = typeof lngRaw === "number" ? lngRaw : parseFloat(lngRaw);
       if (!isFinite(lat) || !isFinite(lng)) return;
       try {
         const pos = new w.kakao.maps.LatLng(lat, lng);
-        // 색상: 최저가(만원), 텍스트: 비율 10% 버킷
-        const price = it?.minimum_bid_price ?? it?.min_bid_price ?? 0;
-        const ratioRaw = it?.bid_to_appraised_ratio ?? it?.percentage ?? null;
+        // 가격 필드: 실거래가(price/transactionAmount) vs 경매(minimum_bid_price)
+        const price =
+          it?.price ??
+          it?.transactionAmount ??
+          it?.transaction_amount ??
+          it?.minimum_bid_price ??
+          it?.min_bid_price ??
+          0;
+
+        // 라벨: namespace에 따라 분기
+        let label: string;
+        if (namespace === "sale") {
+          // 실거래가: 엘리베이터 여부 표시 (Y/N)
+          const elevatorAvailable = it?.extra?.elevatorAvailable;
+          if (elevatorAvailable === true) {
+            label = "Y";
+          } else if (elevatorAvailable === false) {
+            label = "N";
+          } else {
+            label = "-"; // 정보 없음
+          }
+        } else {
+          // 경매: 비율 표시
+          const ratioRaw = it?.bid_to_appraised_ratio ?? it?.percentage ?? null;
+          label = getBucketText(ratioRaw);
+        }
+
+        // 색상 결정
         let color =
           typeof markerColorFn === "function"
             ? (markerColorFn as any)(it)
@@ -1091,15 +1334,21 @@ function MapView({
         if (typeof color !== "string" || color.trim() === "") {
           color = "#111827"; // fallback to black if unmapped/invalid
         }
-        const label = getBucketText(ratioRaw);
         const image = getModernBadgeImage(color, label);
 
         const marker = new w.kakao.maps.Marker({
           position: pos,
           image,
-          title: `최저가 ${Number(
-            parseFloat(price || 0) || 0
-          ).toLocaleString()}만원, 비율 ${label === "--" ? "-" : `${label}%`}`,
+          title:
+            namespace === "sale"
+              ? `거래금액 ${Number(
+                  parseFloat(price || 0) || 0
+                ).toLocaleString()}만원`
+              : `최저가 ${Number(
+                  parseFloat(price || 0) || 0
+                ).toLocaleString()}만원, 비율 ${
+                  label === "--" ? "-" : `${label}%`
+                }`,
         });
         // 클러스터 사용 시 setMap은 클러스터러가 담당
         if (!clustererRef.current) marker.setMap(map);

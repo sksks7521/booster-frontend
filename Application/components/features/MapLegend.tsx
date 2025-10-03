@@ -127,9 +127,12 @@ export function MapLegend({
     if (typeof collapsed === "boolean") setIsCollapsed(collapsed);
   }, [collapsed]);
 
-  const effective = (nsThresholds ??
-    storeThresholds ??
-    thresholds) as Thresholds;
+  // sale 네임스페이스는 props 우선, 다른 네임스페이스는 스토어 우선
+  const effective = (
+    namespace === "sale"
+      ? thresholds // sale이면 props([5000, 10000, 30000, 50000]) 우선
+      : nsThresholds ?? storeThresholds ?? thresholds
+  ) as Thresholds;
   const lines = React.useMemo(() => {
     if (unitLabel && Array.isArray(effective)) {
       const sorted = [...effective].sort((a, b) => a - b);

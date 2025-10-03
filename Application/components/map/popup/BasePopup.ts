@@ -12,6 +12,11 @@ export interface BasePopupOptions {
   rows: PopupRow[];
   widthPx?: number; // default 270
   actions?: { label: string; action: string }[]; // 예: 주소복사/사건번호복사
+  table?: {
+    headers: string[];
+    rows: any[][];
+  }; // 🆕 개별 거래 테이블 (실거래가 전용)
+  tableCollapsible?: boolean; // 🆕 테이블 접기/펴기 가능 여부 (기본값: true)
 }
 
 // 생성된 엘리먼트는 카카오 CustomOverlay의 content로 그대로 사용 가능합니다.
@@ -21,6 +26,8 @@ export function renderBasePopup({
   rows,
   widthPx = 270,
   actions,
+  table,
+  tableCollapsible = true,
 }: BasePopupOptions): HTMLElement {
   const root = document.createElement("div");
   root.style.width = `${widthPx}px`;
@@ -97,12 +104,12 @@ export function renderBasePopup({
     root.appendChild(row);
   }
 
-  const table = document.createElement("table");
-  table.style.width = "100%";
-  table.style.fontSize = "12px";
-  table.style.color = "#111827";
-  table.style.borderCollapse = "collapse";
-  table.style.tableLayout = "fixed";
+  const infoTable = document.createElement("table");
+  infoTable.style.width = "100%";
+  infoTable.style.fontSize = "12px";
+  infoTable.style.color = "#111827";
+  infoTable.style.borderCollapse = "collapse";
+  infoTable.style.tableLayout = "fixed";
   for (const r of rows) {
     const tr = document.createElement("tr");
     const tdLabel = document.createElement("td");
@@ -121,9 +128,128 @@ export function renderBasePopup({
     tdValue.textContent = r.value ?? "";
     tr.appendChild(tdLabel);
     tr.appendChild(tdValue);
-    table.appendChild(tr);
+    infoTable.appendChild(tr);
   }
-  root.appendChild(table);
+  root.appendChild(infoTable);
+
+  // 🆕 개별 거래 테이블 렌더링 (실거래가 전용)
+  if (table && table.rows && table.rows.length > 0) {
+    const transactionSection = document.createElement("div");
+    transactionSection.style.marginTop = "12px";
+    transactionSection.style.paddingTop = "12px";
+    transactionSection.style.borderTop = "1px solid #e5e7eb";
+
+    // 섹션 헤더 (제목 + 토글 버튼)
+    const sectionHeader = document.createElement("div");
+    sectionHeader.style.display = "flex";
+    sectionHeader.style.justifyContent = "space-between";
+    sectionHeader.style.alignItems = "center";
+    sectionHeader.style.marginBottom = "8px";
+
+    const sectionTitle = document.createElement("div");
+    sectionTitle.style.fontWeight = "600";
+    sectionTitle.style.fontSize = "12px";
+    sectionTitle.style.color = "#111827";
+    sectionTitle.textContent = `📊 개별 거래 내역 (${table.rows.length}건)`;
+
+    sectionHeader.appendChild(sectionTitle);
+
+    if (tableCollapsible) {
+      const toggleBtn = document.createElement("button");
+      toggleBtn.setAttribute("data-action", "toggle-table");
+      toggleBtn.setAttribute("data-collapsed", "true");
+      Object.assign(
+        toggleBtn.style,
+        pillButtonStyle("#e5e7eb", "#111827", "#fff")
+      );
+      toggleBtn.style.padding = "4px 8px";
+      toggleBtn.style.fontSize = "11px";
+      toggleBtn.innerHTML = "▼ 펴기";
+      sectionHeader.appendChild(toggleBtn);
+    }
+
+    transactionSection.appendChild(sectionHeader);
+
+    // 거래 테이블 컨테이너 (접기/펴기 대상)
+    const tableContainer = document.createElement("div");
+    tableContainer.setAttribute("data-table-container", "true");
+    tableContainer.style.display = tableCollapsible ? "none" : "block";
+    tableContainer.style.maxHeight = "300px";
+    tableContainer.style.overflowY = "auto";
+    tableContainer.style.overflowX = "auto";
+    tableContainer.style.border = "1px solid #e5e7eb";
+    tableContainer.style.borderRadius = "4px";
+
+    const transactionTable = document.createElement("table");
+    transactionTable.style.width = "100%";
+    transactionTable.style.fontSize = "11px";
+    transactionTable.style.borderCollapse = "collapse";
+    transactionTable.style.minWidth = "600px"; // 가로 스크롤을 위한 최소 너비
+
+    // 테이블 헤더
+    const thead = document.createElement("thead");
+    thead.style.position = "sticky";
+    thead.style.top = "0";
+    thead.style.background = "#f9fafb";
+    thead.style.zIndex = "1";
+    const headerRow = document.createElement("tr");
+    for (const header of table.headers) {
+      const th = document.createElement("th");
+      th.style.padding = "6px 4px";
+      th.style.textAlign = "left";
+      th.style.fontWeight = "600";
+      th.style.color = "#374151";
+      th.style.borderBottom = "1px solid #e5e7eb";
+      th.style.whiteSpace = "nowrap";
+      th.textContent = header;
+      headerRow.appendChild(th);
+    }
+    thead.appendChild(headerRow);
+    transactionTable.appendChild(thead);
+
+    // 테이블 바디
+    const tbody = document.createElement("tbody");
+    for (const row of table.rows) {
+      const tr = document.createElement("tr");
+      tr.style.borderBottom = "1px solid #f3f4f6";
+      for (const cell of row) {
+        const td = document.createElement("td");
+        td.style.padding = "6px 4px";
+        td.style.color = "#111827";
+        td.style.whiteSpace = "nowrap";
+        td.textContent = cell ?? "-";
+        tr.appendChild(td);
+      }
+      tbody.appendChild(tr);
+    }
+    transactionTable.appendChild(tbody);
+
+    tableContainer.appendChild(transactionTable);
+    transactionSection.appendChild(tableContainer);
+    root.appendChild(transactionSection);
+
+    // 토글 기능 이벤트 핸들러
+    if (tableCollapsible) {
+      const toggleBtn = sectionHeader.querySelector(
+        '[data-action="toggle-table"]'
+      ) as HTMLButtonElement;
+      if (toggleBtn) {
+        toggleBtn.addEventListener("click", () => {
+          const isCollapsed =
+            toggleBtn.getAttribute("data-collapsed") === "true";
+          if (isCollapsed) {
+            tableContainer.style.display = "block";
+            toggleBtn.setAttribute("data-collapsed", "false");
+            toggleBtn.innerHTML = "▲ 접기";
+          } else {
+            tableContainer.style.display = "none";
+            toggleBtn.setAttribute("data-collapsed", "true");
+            toggleBtn.innerHTML = "▼ 펴기";
+          }
+        });
+      }
+    }
+  }
 
   const footer = document.createElement("div");
   footer.style.display = "flex";

@@ -221,35 +221,217 @@ export default function SaleSearchResults({
                 </p>
               </div>
             </div>
-          ) : /* 로딩, 에러, 빈 상태 처리 */
-          isLoading || error || items.length === 0 ? (
-            <ViewState
-              isLoading={isLoading}
-              error={error}
-              total={items.length}
-              onRetry={refetch}
-            >
-              <div className="flex flex-col items-center justify-center py-16">
-                <div className="text-center">
-                  <List className="w-16 h-16 mx-auto text-gray-300 mb-4" />
-                  <h3 className="text-lg font-semibold text-gray-700 mb-2">
-                    검색 결과가 없습니다
-                  </h3>
-                  <p className="text-gray-500 mb-4">
-                    선택하신 조건에 맞는 매매 데이터가 없습니다.
+          ) : /* 로딩 상태 */
+          isLoading ? (
+            <div className="flex flex-col items-center justify-center py-16">
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                <h3 className="text-lg font-semibold text-gray-700 mb-2">
+                  데이터를 불러오는 중입니다...
+                </h3>
+                <p className="text-sm text-gray-500">잠시만 기다려주세요</p>
+              </div>
+            </div>
+          ) : /* 에러 상태 */
+          error ? (
+            <div className="flex flex-col items-center justify-center py-16">
+              <div className="text-center max-w-md">
+                <div className="w-16 h-16 mx-auto mb-4 text-red-400">
+                  <svg
+                    className="w-full h-full"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                    />
+                  </svg>
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                  데이터를 불러오는 중 오류가 발생했습니다
+                </h3>
+
+                {/* 에러 종류별 메시지 */}
+                {(error as any)?.status === 500 ||
+                (error as any)?.code === "INTERNAL_SERVER_ERROR" ? (
+                  <>
+                    <p className="text-gray-600 mb-4">
+                      서버에서 일시적인 문제가 발생했습니다.
+                    </p>
+                    <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
+                      <p className="text-sm text-red-800">
+                        잠시 후 다시 시도해주세요. 문제가 계속되면 아래
+                        고객센터로 문의해주세요.
+                      </p>
+                    </div>
+                  </>
+                ) : (error as any)?.status === 404 ? (
+                  <>
+                    <p className="text-gray-600 mb-4">
+                      요청하신 데이터를 찾을 수 없습니다.
+                    </p>
+                    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
+                      <p className="text-sm text-yellow-800">
+                        다른 지역을 선택하거나 필터 조건을 변경해보세요.
+                      </p>
+                    </div>
+                  </>
+                ) : (error as any)?.code === "ECONNABORTED" ||
+                  (error as any)?.code === "ETIMEDOUT" ? (
+                  <>
+                    <p className="text-gray-600 mb-4">
+                      네트워크 연결이 불안정하거나 요청 시간이 초과되었습니다.
+                    </p>
+                    <div className="bg-orange-50 border border-orange-200 rounded-lg p-4 mb-4">
+                      <p className="text-sm text-orange-800">
+                        인터넷 연결을 확인하고 다시 시도해주세요.
+                      </p>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-gray-600 mb-4">
+                      예상치 못한 오류가 발생했습니다.
+                    </p>
+                    <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-4">
+                      <p className="text-sm text-gray-700">
+                        다시 시도해도 문제가 지속되면 고객센터로 문의해주세요.
+                      </p>
+                    </div>
+                  </>
+                )}
+
+                {/* 다시 시도 버튼 */}
+                <Button variant="outline" onClick={refetch} className="mb-4">
+                  <Download className="w-4 h-4 mr-2" />
+                  다시 시도
+                </Button>
+
+                {/* 고객센터 정보 */}
+                <div className="text-xs text-gray-500 mt-4 pt-4 border-t">
+                  <p className="mb-1">문제가 계속되시나요?</p>
+                  <p className="font-medium text-gray-700">
+                    고객센터: help@booster.com
                   </p>
-                  <div className="text-sm text-gray-600 space-y-1 max-w-md mx-auto">
-                    <p>💡 다음 사항을 확인해보세요:</p>
-                    <ul className="text-left list-disc list-inside space-y-1 mt-2">
-                      <li>거래 날짜 범위를 넓혀보세요</li>
-                      <li>가격 범위를 조정해보세요</li>
-                      <li>면적 조건을 완화해보세요</li>
-                      <li>건축연도 범위를 넓혀보세요</li>
-                    </ul>
+                </div>
+              </div>
+            </div>
+          ) : /* 데이터 없음 상태 */
+          items.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16">
+              <div className="text-center max-w-2xl">
+                <List className="w-16 h-16 mx-auto text-gray-300 mb-4" />
+                <h3 className="text-lg font-semibold text-gray-700 mb-2">
+                  검색 결과가 없습니다
+                </h3>
+                <p className="text-gray-500 mb-4">
+                  선택하신 조건에 맞는 매매 거래 내역이 없습니다.
+                </p>
+
+                {/* 현재 적용된 필터 조건 표시 */}
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                  <p className="text-sm font-medium text-blue-900 mb-2">
+                    📋 현재 조건
+                  </p>
+                  <div className="text-sm text-blue-800 space-y-1">
+                    <div className="flex items-center justify-center gap-2">
+                      <span className="font-medium">지역:</span>
+                      <span>
+                        {(allFilters as any)?.province} &gt;{" "}
+                        {(allFilters as any)?.cityDistrict}
+                        {(allFilters as any)?.town &&
+                          ` > ${(allFilters as any)?.town}`}
+                      </span>
+                    </div>
+                    {(allFilters as any)?.dateRange && (
+                      <div className="flex items-center justify-center gap-2">
+                        <span className="font-medium">기간:</span>
+                        <span>
+                          {(allFilters as any)?.dateRange?.join(" ~ ")}
+                        </span>
+                      </div>
+                    )}
+                    {(allFilters as any)?.transactionAmountRange && (
+                      <div className="flex items-center justify-center gap-2">
+                        <span className="font-medium">거래금액:</span>
+                        <span>
+                          {(allFilters as any)?.transactionAmountRange[0]}만원 ~{" "}
+                          {(allFilters as any)?.transactionAmountRange[1] >=
+                          500000
+                            ? "제한없음"
+                            : `${
+                                (allFilters as any)?.transactionAmountRange[1]
+                              }만원`}
+                        </span>
+                      </div>
+                    )}
+                    {(allFilters as any)?.exclusiveAreaRange && (
+                      <div className="flex items-center justify-center gap-2">
+                        <span className="font-medium">전용면적:</span>
+                        <span>
+                          {(allFilters as any)?.exclusiveAreaRange[0]}㎡ ~{" "}
+                          {(allFilters as any)?.exclusiveAreaRange[1]}㎡
+                        </span>
+                      </div>
+                    )}
+                    {(allFilters as any)?.buildYearRange && (
+                      <div className="flex items-center justify-center gap-2">
+                        <span className="font-medium">건축연도:</span>
+                        <span>
+                          {(allFilters as any)?.buildYearRange[0]}년 ~{" "}
+                          {(allFilters as any)?.buildYearRange[1]}년
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* 개선된 제안 */}
+                <div className="text-sm text-gray-600 space-y-3">
+                  <p className="font-medium text-gray-700">
+                    💡 다음을 시도해보세요:
+                  </p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-left">
+                    <div className="bg-gray-50 rounded-lg p-3">
+                      <p className="font-medium text-gray-700 mb-1">
+                        📅 기간 확대
+                      </p>
+                      <p className="text-xs text-gray-600">
+                        최근 거래가 적을 수 있습니다. 조회 기간을 넓혀보세요.
+                      </p>
+                    </div>
+                    <div className="bg-gray-50 rounded-lg p-3">
+                      <p className="font-medium text-gray-700 mb-1">
+                        💰 가격 범위 조정
+                      </p>
+                      <p className="text-xs text-gray-600">
+                        가격 필터를 해제하거나 범위를 넓혀보세요.
+                      </p>
+                    </div>
+                    <div className="bg-gray-50 rounded-lg p-3">
+                      <p className="font-medium text-gray-700 mb-1">
+                        📐 면적 조건 완화
+                      </p>
+                      <p className="text-xs text-gray-600">
+                        전용면적 범위를 넓히거나 필터를 해제해보세요.
+                      </p>
+                    </div>
+                    <div className="bg-gray-50 rounded-lg p-3">
+                      <p className="font-medium text-gray-700 mb-1">
+                        📍 지역 범위 확대
+                      </p>
+                      <p className="text-xs text-gray-600">
+                        읍면동 필터를 해제하고 시군구 전체를 조회해보세요.
+                      </p>
+                    </div>
                   </div>
                 </div>
               </div>
-            </ViewState>
+            </div>
           ) : (
             /* 뷰 렌더링 - 데이터가 있을 때만 */
             <>
@@ -463,7 +645,15 @@ export default function SaleSearchResults({
 
               {activeView === "map" && (
                 <div style={{ height: "600px" }}>
-                  <MapView items={mapItems} namespace="sale" />
+                  <MapView
+                    items={mapItems}
+                    namespace="sale"
+                    legendTitle="거래금액 범례(단위: 만원)"
+                    legendUnitLabel="만원"
+                    legendThresholds={[5000, 10000, 30000, 50000]}
+                    legendEditable={true}
+                    legendHint="네모박스 내용 Y=엘베 있음, N=엘베 없음"
+                  />
                 </div>
               )}
 
@@ -473,7 +663,15 @@ export default function SaleSearchResults({
                   <div className="space-y-4">
                     <h3 className="text-lg font-semibold">지도 보기</h3>
                     <div style={{ height: "400px" }}>
-                      <MapView items={mapItems} namespace="sale" />
+                      <MapView
+                        items={mapItems}
+                        namespace="sale"
+                        legendTitle="거래금액 범례(단위: 만원)"
+                        legendUnitLabel="만원"
+                        legendThresholds={[5000, 10000, 30000, 50000]}
+                        legendEditable={true}
+                        legendHint="네모박스 내용 Y=엘베 있음, N=엘베 없음"
+                      />
                     </div>
                   </div>
 

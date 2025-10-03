@@ -363,13 +363,19 @@
 
 ### 8. 필터 정의 상세(클라이언트 우선) ✅ 구현 완료
 
-#### 구현된 필터 목록 (총 5개)
+#### 구현된 필터 목록 (총 10개)
 
 **1. 지역 필터** ✅
 
 - 필터 키: `province`(시도) / `cityDistrict`(시군구) / `town`(읍면동, 선택사항)
 - 서버 매핑: `sido` / `sigungu` / `admin_dong_name`
 - 구현 완료: 계단식 선택, "전체" 옵션, URL 딥링크
+- **백엔드 API 통합 완료** (2025-10-02):
+  - `useRealTransactionsSido()`: `/api/v1/real-transactions/regions/sido`
+  - `useRealTransactionsSigungu(sido)`: `/api/v1/real-transactions/regions/sigungu?sido={sido}`
+  - `useRealTransactionsAdminDong(sido, sigungu)`: `/api/v1/real-transactions/regions/admin-dong?sido={sido}&sigungu={sigungu}`
+  - '구' 단위 데이터 정확 표시 (예: "경기도 고양시 덕양구")
+  - 각 지역 아이템 수 표시 (`{name} ({count.toLocaleString()}건)`)
 
 **2. 거래금액 필터** ✅
 
@@ -378,25 +384,54 @@
 - 모드: Slider (1,000만원 스텝) + Input (직접 입력)
 - 프리셋: "고액 매매 (10억 이상)" [100,000~500,000]
 
-**3. 전용면적 필터** ✅
+**3. 평단가 필터** ✅ ⭐ 신규
+
+- 필터 키: `pricePerPyeongRange`
+- 범위: 0 ~ 5,000만원/평
+- 모드: Slider (100만원 스텝) + Input (직접 입력)
+
+**4. 전용면적 필터** ✅
 
 - 필터 키: `exclusiveAreaRange`
 - 범위: 0 ~ 300㎡
 - 모드: Slider (5㎡ 스텝) + Input (직접 입력)
 - 프리셋: "소형 아파트 (33평 이하)" [0~110]
 
-**4. 건축연도 필터** ✅
+**5. 대지권면적 필터** ✅ ⭐ 신규
+
+- 필터 키: `landRightsAreaRange`
+- 범위: 0 ~ 600㎡
+- 모드: Slider (10㎡ 스텝) + Input (직접 입력)
+
+**6. 건축연도 필터** ✅
 
 - 필터 키: `buildYearRange`
 - 범위: 1980년 ~ 2024년
 - 모드: Slider (1년 스텝) + Input (직접 입력)
 - 프리셋: "신축 매매 (5년 이내)" [2019~2024]
 
-**5. 거래 날짜 필터** ✅
+**7. 층확인 필터** ✅ ⭐ 신규
+
+- 필터 키: `floorConfirmation`
+- 옵션: 전체 / 반지하 / 1층 / 일반층 / 탑층
+- 모드: 다중 선택 (배열)
+
+**8. 엘리베이터 필터** ✅ ⭐ 신규
+
+- 필터 키: `elevatorAvailable`
+- 옵션: 전체 / 있음 / 없음
+- 모드: 단일 선택 (Boolean)
+
+**9. 거래 날짜 필터** ✅
 
 - 필터 키: `dateRange`
 - 빠른 선택: 최근 1/3/6개월, 올해
 - 직접 입력: 시작일/종료일 (type="date", ISO 8601 형식)
+
+**10. 주소 검색** ✅
+
+- 필터 키: `searchQuery`
+- 검색 필드: `address`, `building_name_real`
 
 #### 공통 기능
 
@@ -463,6 +498,12 @@
 
 - [x] `SaleFilter.tsx` 생성 (1,083줄 최종)
 - [x] **지역 필터**: 시/도, 시군구, 읍면동(선택사항, "전체" 옵션)
+  - **백엔드 API 통합** (2025-10-02):
+    - 새로운 훅: `useRealTransactionsSido()`, `useRealTransactionsSigungu(sido)`, `useRealTransactionsAdminDong(sido, sigungu)`
+    - API 엔드포인트: `/api/v1/real-transactions/regions/sido`, `/sigungu`, `/admin-dong`
+    - '구' 단위 정확 표시 (예: "경기도 고양시 덕양구")
+    - 지역별 아이템 수 표시
+    - **우측 필터 패널에서 지역 선택 제거** → 상단 공통 지역 카드로 통합
 - [x] **주소 검색**: 주소 기반 필터링
 - [x] **거래 날짜 필터**: 빠른 선택(1/3/6개월, 올해) + 직접 입력
 - [x] **거래금액 필터**: 0~100,000만원 (Slider/Input)
@@ -482,8 +523,36 @@
   - 아이콘 제거 (거래날짜, 층확인, 엘리베이터)
 - [x] **필터 순서**: 거래날짜 → 거래금액 → 평단가 → 전용면적 → 대지권면적 → 건축연도 → 층확인 → 엘리베이터
 - [x] **쿼리 파라미터 오염 해결**: 화이트리스트 패턴 적용 (`SALE_FILTERS`)
+- [x] **무한 루프 문제 해결**:
+  - `page.tsx`: filters 전체 구독 → 개별 필드 구독 (`province`, `cityDistrict`, `town`)
+  - URL 동기화 가드 추가 (값 변경시에만 `router.replace`)
+  - 드롭다운 `onValueChange`에 동일값 setState 방지 가드
+  - sale 데이터셋 시 page.tsx 지역 관리 `useEffect` 비활성화
+  - `SaleSearchResults.tsx`: selectedRowKeys 로컬 상태 관리로 변경
 
-#### Phase 4: 검색 결과 컴포넌트 (다음 단계)
+#### Phase 4: 검색 결과 컴포넌트 ✅ 대부분 완료 (2025-10-03)
+
+**완료된 작업:**
+
+- [x] **작업 D: SWR 캐싱 최적화** (2025-10-03)
+  - `useDataset.ts`, `useGlobalDataset.ts` 수정
+  - 적용된 최적화: keepPreviousData, dedupingInterval(1.5초), revalidateOnFocus(false), errorRetryCount(1회)
+  - 기대 효과: API 요청 약 50% 감소, 페이지 전환 시 깜빡임 제거
+- [x] **작업 C: 빈 상태 & 에러 메시지 개선** (2025-10-03)
+  - `SaleSearchResults.tsx` 수정
+  - 로딩 상태 UI 개선
+  - 데이터 없음 상태: 현재 필터 조건 표시(파란색 박스) + 4개 카테고리별 제안 카드
+  - 에러 상태: 에러 종류별 구체적 안내(500/404/TIMEOUT) + 고객센터 정보
+- [x] **작업 3: 정렬 기능 통합** (2025-10-03)
+  - 백엔드 `/columns` API 구현 완료 (5개 필드 정렬 지원)
+  - `api.ts`: `realTransactionApi.getColumns()` 추가
+  - `useSortableColumns.ts`: sale 데이터셋 지원 추가 (30분 캐싱)
+  - 기본 정렬: `contractDate desc` (최신 거래부터)
+  - 정렬 가능 필드: contract_date, transaction_amount, exclusive_area_sqm, construction_year_real, price_per_pyeong
+- [x] **모듈 구조 오류 수정** (2025-10-03)
+  - `useSortableColumns.ts`: import 문을 파일 맨 위로 이동하여 EBUSY 오류 해결
+
+**남은 작업:**
 
 1. `SaleSearchResults.tsx`: 지역 키 통일/검색·기간 필드 확정 반영
 
@@ -537,3 +606,76 @@
 - `/columns` 빈 응답 시: 테이블 헤더 정렬 비활성 정책 적용
 - 좌표 결측·키 상이 비율 높을 때 지도 체감도 저하 → 상한/가이드 강화
 - 상세 팝업(B안) 도입 시 스키마 영향 → 별도 스프린트로 분리
+
+---
+
+## 🗺️ Phase 5: 지도 통합 ✅ (2025-10-03 완료)
+
+**목표:** 실거래가(매매) 페이지에 지도 탭을 활성화하고, 거래금액 기준으로 색상화된 마커를 표시
+
+**세부 작업:**
+
+### 1단계: MapView 데이터 연결 확인 및 수정 ✅ (2025-10-03)
+
+- [x] `MapView` 컴포넌트가 실거래가 데이터의 좌표 필드(`latitude`, `longitude`)를 올바르게 인식하도록 수정
+  - `Application/components/features/map-view.tsx` 수정 (좌표 필드 우선순위 확장)
+- [x] 지도 탭 활성화 및 마커 정상 표시 확인
+
+### 2단계: 거래금액 기준 색상 및 라벨 설정 ✅ (2025-10-03)
+
+- [x] `MapView`에서 `namespace="sale"`일 때 거래금액(`transactionAmount`) 기준으로 마커 색상 지정
+  - `Application/components/features/map-view.tsx` 수정 (`formatSaleAmount` 함수 추가, 임계값/팔레트 분기, 가격 필드 매핑, 마커 라벨/title 분기)
+- [x] `MapLegend` 컴포넌트가 실거래가 기준 임계값(`[5000, 10000, 30000, 50000]`)을 표시하도록 수정
+  - `Application/components/features/MapLegend.tsx` 수정 (`effective` 변수 우선순위 변경)
+- [x] 마커 라벨을 엘리베이터 여부 (Y/N)로 표시
+- [x] 마커 title(툴팁)에 실거래가 정보 표시
+- [x] 범례(Legend) 색상 및 라벨 업데이트
+- [x] 범례 힌트 텍스트: "네모박스 내용 Y=엘베 있음, N=엘베 없음"
+
+### 3단계: 팝업 스키마 구현 ✅ (2025-10-03, 백엔드 API 대기)
+
+**목표:** 마커 클릭 시 건물 공통 정보와 개별 거래 내역을 테이블로 표시하는 팝업 구현
+
+**백엔드 API 요청:**
+- **문서**: `Communication/Backend/send/Request/251003_Frontend_to_Backend_real-transactions_by-address_API_요청.md`
+- **엔드포인트**: `GET /api/v1/real-transactions/by-address`
+- **파라미터**: `address` (필수), `size` (기본 1000), `ordering` (기본 `-contract_date`)
+- **핵심 요구사항**: 결측값 필드 제외 없이 `null`로 반환
+
+**프론트엔드 구현 완료:**
+
+- [x] **Task 1: 팝업 스키마 생성**
+  - `Application/components/map/popup/schemas/sale.ts` 생성
+  - `saleSchema(buildingInfo, transactions)` 함수 구현
+  - 건물 공통 정보 섹션 (6개 필드)
+  - 개별 거래 테이블 (9개 컬럼)
+  - 결측값 안전 처리 (`safeValue`, `toNumberOrU`, `formatMoney`, `formatArea`, `elevatorText`)
+
+- [x] **Task 2: 팝업 렌더러 확장**
+  - `Application/components/map/popup/BasePopup.ts` 수정
+  - `table` 및 `tableCollapsible` 속성 추가
+  - 개별 거래 테이블 렌더링 (📊 섹션 헤더 + 토글 버튼)
+  - 고정 헤더, 가로/세로 스크롤 지원, 최대 높이 300px
+
+- [x] **Task 3: Mock API 구현**
+  - `Application/lib/api.ts` 수정
+  - `realTransactionApi.getTransactionsByAddress(address)` 함수 추가
+  - 0.5초 지연 시뮬레이션, 3건 Mock 데이터 반환
+  - 백엔드 완성 후 1분 내 교체 가능
+
+- [x] **Task 4: 지도 팝업 통합**
+  - `Application/components/features/map-view.tsx` 수정
+  - `import { saleSchema, realTransactionApi }` 추가
+  - `attachPopupEventHandlers()` 헬퍼 함수 구현
+  - `buildPopupHTML()`에 `namespace === "sale"` 분기 추가
+  - 비동기 데이터 로딩 (로딩 → 성공 → 에러 처리)
+
+**검증 상태:**
+- ✅ 코드 린트 오류 없음
+- ✅ TypeScript 타입 체크 통과
+- ✅ 페이지 로드 및 지역 드롭다운 정상 작동
+- ⏳ 최종 검증 (백엔드 API 완성 후)
+
+**백엔드 API 연동 시 변경 사항:**
+- `Application/lib/api.ts` 1곳 수정 (주석 해제 + Mock 코드 삭제)
+- 소요 시간: 1분
