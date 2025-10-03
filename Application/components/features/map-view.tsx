@@ -75,6 +75,10 @@ interface MapViewProps {
   onRefMarkerToggleLock?: () => void;
   onRefMarkerMove?: (nextCenter: { lat: number; lng: number }) => void;
   onMoveToRefMarker?: () => void;
+  // 🆕 원 중심 폴백 설정
+  // true (기본값): circleCenter → refMarker → 지도중심 (경매 방식)
+  // false: circleCenter만 사용, 폴백 없음 (실거래 방식)
+  useRefMarkerFallback?: boolean;
 }
 
 function MapView({
@@ -112,6 +116,8 @@ function MapView({
   onRefMarkerToggleLock,
   onRefMarkerMove,
   onMoveToRefMarker,
+  // 🆕 원 중심 폴백
+  useRefMarkerFallback,
 }: MapViewProps) {
   const mapRef = useRef<HTMLDivElement | null>(null);
   const [mapReady, setMapReady] = useState(false);
@@ -1600,15 +1606,21 @@ function MapView({
         return;
       }
 
-      // 중심 좌표 계산: 원 지정값 → 분석물건 마커 → 현재 지도 중심
+      // 🔧 중심 좌표 계산: useRefMarkerFallback에 따라 폴백 방식 변경
+      // true (경매): circleCenter → refMarker → 지도중심
+      // false (실거래): circleCenter만 사용 (폴백 없음)
       const centerLat =
-        (circleCenter as any)?.lat ??
-        (refMarkerCenter as any)?.lat ??
-        centerCoord?.lat;
+        useRefMarkerFallback !== false
+          ? (circleCenter as any)?.lat ??
+            (refMarkerCenter as any)?.lat ??
+            centerCoord?.lat
+          : (circleCenter as any)?.lat;
       const centerLng =
-        (circleCenter as any)?.lng ??
-        (refMarkerCenter as any)?.lng ??
-        centerCoord?.lng;
+        useRefMarkerFallback !== false
+          ? (circleCenter as any)?.lng ??
+            (refMarkerCenter as any)?.lng ??
+            centerCoord?.lng
+          : (circleCenter as any)?.lng;
       if (
         !Number.isFinite(centerLat as any) ||
         !Number.isFinite(centerLng as any) ||
@@ -2295,7 +2307,11 @@ function MapView({
         refLocked={Boolean(refMarkerLocked)}
         onToggleRefLock={onRefMarkerToggleLock}
         onMoveToRefMarker={() => {
-          const target = refMarkerCenter || centerCoord;
+          // 🔧 useRefMarkerFallback에 따라 이동 대상 변경
+          const target =
+            useRefMarkerFallback !== false
+              ? refMarkerCenter || centerCoord // 경매: 분석물건 또는 지도 중심
+              : circleCenter; // 실거래: 원 중심만
           if (!target) return;
           try {
             const w = window as any;
@@ -2306,6 +2322,12 @@ function MapView({
           } catch {}
           if (typeof onMoveToRefMarker === "function") onMoveToRefMarker();
         }}
+        // 🆕 버튼 텍스트 커스터마이징
+        moveToButtonText={
+          useRefMarkerFallback !== false
+            ? "물건 위치로 이동"
+            : "원 중앙 위치로 이동"
+        }
       />
       {/* 임시: 목록을 오버레이로 노출하여 선택 가능하도록 제공 */}
       <div className="absolute left-2 top-2 max-h-[380px] w-60 overflow-auto rounded bg-white/95 p-2 text-xs shadow">

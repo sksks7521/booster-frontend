@@ -105,6 +105,54 @@ export default function SaleSearchResults({
     (s: any) => s.setPendingMapTarget ?? NOOP
   );
 
+  // 🆕 원 그리기 + 영역 필터 상태 (네임스페이스 기반)
+  const nsState = useFilterStore((s: any) => s.ns);
+  const setNsFilter = useFilterStore((s: any) => s.setNsFilter);
+  const circleEnabled = Boolean(nsState?.sale?.circleEnabled);
+  const circleCenter = nsState?.sale?.circleCenter ?? null;
+  const circleRadiusM = nsState?.sale?.circleRadiusM ?? 1000;
+  const applyCircleFilter = Boolean(nsState?.sale?.applyCircleFilter);
+
+  // 🆕 원 이벤트 핸들러
+  const handleCircleToggle = () => {
+    if (typeof setNsFilter === "function") {
+      const next = !circleEnabled;
+      setNsFilter("sale", "circleEnabled" as any, next);
+      // 원을 켤 때 중심이 비어 있으면 기본 위치로 설정
+      if (next && !circleCenter) {
+        // refMarkerCenter가 있으면 사용, 없으면 null 유지
+        const refMarker = nsState?.sale?.refMarkerCenter as any;
+        if (
+          refMarker &&
+          Number.isFinite(refMarker.lat) &&
+          Number.isFinite(refMarker.lng)
+        ) {
+          setNsFilter("sale", "circleCenter" as any, refMarker);
+        }
+      }
+    }
+  };
+
+  const handleCircleChange = (next: {
+    center: { lat: number; lng: number } | null;
+    radiusM: number;
+  }) => {
+    if (typeof setNsFilter === "function") {
+      if (next.center) {
+        setNsFilter("sale", "circleCenter" as any, next.center);
+      }
+      if (Number.isFinite(next.radiusM)) {
+        setNsFilter("sale", "circleRadiusM" as any, next.radiusM);
+      }
+    }
+  };
+
+  const handleToggleApplyCircleFilter = () => {
+    if (typeof setNsFilter === "function") {
+      setNsFilter("sale", "applyCircleFilter" as any, !applyCircleFilter);
+    }
+  };
+
   // sale 데이터셋 설정 가져오기
   const datasetConfig = datasetConfigs["sale"];
   const schemaColumns = datasetConfig?.table?.columns;
@@ -688,6 +736,16 @@ export default function SaleSearchResults({
                     highlightIds={(selectedIds || []).map((k: any) =>
                       String(k)
                     )}
+                    // 🆕 원 그리기 + 영역 필터
+                    circleControlsEnabled={true}
+                    circleEnabled={circleEnabled}
+                    circleCenter={circleCenter}
+                    circleRadiusM={circleRadiusM}
+                    applyCircleFilter={applyCircleFilter}
+                    onCircleToggle={handleCircleToggle}
+                    onCircleChange={handleCircleChange}
+                    onToggleApplyCircleFilter={handleToggleApplyCircleFilter}
+                    useRefMarkerFallback={false} // 🆕 실거래가는 원 중심만 사용
                   />
                 </div>
               )}
@@ -709,6 +767,18 @@ export default function SaleSearchResults({
                         highlightIds={(selectedIds || []).map((k: any) =>
                           String(k)
                         )}
+                        // 🆕 원 그리기 + 영역 필터
+                        circleControlsEnabled={true}
+                        circleEnabled={circleEnabled}
+                        circleCenter={circleCenter}
+                        circleRadiusM={circleRadiusM}
+                        applyCircleFilter={applyCircleFilter}
+                        onCircleToggle={handleCircleToggle}
+                        onCircleChange={handleCircleChange}
+                        onToggleApplyCircleFilter={
+                          handleToggleApplyCircleFilter
+                        }
+                        useRefMarkerFallback={false} // 🆕 실거래가는 원 중심만 사용
                       />
                     </div>
                   </div>

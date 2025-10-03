@@ -12,6 +12,8 @@ interface MapCircleControlsProps {
   refLocked?: boolean;
   onToggleRefLock?: () => void;
   onMoveToRefMarker?: () => void;
+  // 🆕 버튼 텍스트 커스터마이징
+  moveToButtonText?: string; // 기본값: "물건 위치로 이동"
 }
 
 export default function MapCircleControls({
@@ -23,6 +25,7 @@ export default function MapCircleControls({
   refLocked,
   onToggleRefLock,
   onMoveToRefMarker,
+  moveToButtonText = "물건 위치로 이동", // 🆕 기본값
 }: MapCircleControlsProps) {
   if (!enabled) return null;
 
@@ -123,7 +126,7 @@ export default function MapCircleControls({
             className="flex-1 rounded border px-2 py-1 whitespace-nowrap text-[11px] bg-white text-gray-800 border-gray-300 hover:bg-gray-50"
             onClick={onMoveToRefMarker}
           >
-            물건 위치로 이동
+            {moveToButtonText}
           </button>
         </div>
         <div className="hidden">
