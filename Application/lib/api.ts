@@ -488,15 +488,15 @@ class ApiClient {
     }
     const queryParams = new URLSearchParams(finalParams).toString();
 
-    // 백엔드 응답 형식: {items, total_items} → 프론트엔드 기대 형식: {results, count}
+    // 백엔드 응답 형식: {items, total} → 프론트엔드 기대 형식: {results, count}
     const response = await this.request<{
       items: RealTransaction[];
-      total_items: number;
+      total: number;
     }>(`/api/v1/real-transactions/?${queryParams}`);
 
     return {
       results: response.items || [],
-      count: response.total_items || 0,
+      count: response.total || 0,
     };
   }
 
@@ -526,15 +526,15 @@ class ApiClient {
     }
     const queryParams = new URLSearchParams(finalParams).toString();
 
-    // 백엔드 응답 형식: {items, total_items} → 프론트엔드 기대 형식: {results, count}
+    // 백엔드 응답 형식: {items, total} → 프론트엔드 기대 형식: {results, count}
     const response = await this.request<{
       items: RealRent[];
-      total_items: number;
+      total: number;
     }>(`/api/v1/real-rents/?${queryParams}`);
 
     return {
       results: response.items || [],
-      count: response.total_items || 0,
+      count: response.total || 0,
     };
   }
 

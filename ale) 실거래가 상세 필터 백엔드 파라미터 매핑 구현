@@ -1,0 +1,10 @@
+.playwright-mcp/initial-state.png
+.playwright-mcp/sale-pagination-test.png
+Application/app/analysis/[id]/v2/page.tsx
+Application/components/features/sale/SaleSearchResults.tsx
+Application/datasets/registry.ts
+Application/lib/api.ts
+"Communication/Backend/send/Completed/251006_Backend_to_Frontend_real-transactions_area_API_\352\265\254\355\230\204\354\231\204\353\243\214.md"
+"Communication/Backend/send/Request/251006_Frontend_to_Backend_real-transactions_area_API_\354\232\224\354\262\255.md"
+Doc/RealTransactions/SALE_PLAN.md
+Log/251003.md

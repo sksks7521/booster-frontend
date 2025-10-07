@@ -609,20 +609,63 @@ onSelectionChange={(keys) => {
 - ✅ 여러 항목 선택: 모든 항목에 화살표 표시
 - ✅ 겹치는 좌표: MapView 클러스터링으로 자동 처리
 
-### 📋 그룹 B: 원 그리기 + 영역 필터 ⭐⭐⭐ (필수, 3시간)
+### 📋 그룹 B: 원 그리기 + 영역 필터 ⭐⭐⭐ (필수, 3시간) ✅ 완료 (2025-10-03)
 
-- [ ] **B-1. MapCircleControls 통합**
+- [x] **B-1. MapCircleControls 통합**
 
   - 원 상태 관리: circleEnabled, circleCenter, circleRadiusM, applyCircleFilter
   - MapView에 원 관련 props 전달
   - 원 이벤트 핸들러 구현
   - 참고: `AuctionEdSearchResults.tsx` Line 101-114, 178-208
-  - 참고: `AuctionEdMap.tsx` Line 22-32, 153-194
+  - ✅ 구현 완료:
+    - `SaleSearchResults.tsx` Line 109-154: 원 상태 읽기 및 핸들러 구현
+    - `SaleSearchResults.tsx` Line 740-748, 770-781: MapView에 원 props 전달
+    - useRefMarkerFallback={false} 추가 (실거래가 전용)
 
-- [ ] **B-2. useCircleFilterPipeline 훅**
+- [x] **B-2. useCircleFilterPipeline 훅**
   - 원 안의 항목만 필터링
   - 필터링된 데이터를 테이블/지도에 적용
   - 참고: `AuctionEdSearchResults.tsx` Line 15, 210-244, 417-527
+  - ✅ 구현 완료:
+    - `SaleSearchResults.tsx` Line 24: 훅 임포트
+    - `SaleSearchResults.tsx` Line 91-114: 훅 호출 및 데이터 분기
+    - `SaleSearchResults.tsx` Line 536, 552, 589, 753, 784, 815, 869, 944: 데이터 소스 교체 (finalPagedItems, finalMapItems, finalTotalCount)
+    - `SaleSearchResults.tsx` Line 217-237: 원 안 필터 개수 표시
+    - `SaleSearchResults.tsx` Line 289-317: "영역 안만 보기" 체크박스 추가
+
+**구현 세부 사항:**
+
+```typescript
+// 1. 훅 호출
+const { processedItemsSorted, pagedItems, mapItems: filteredMapItems, circleCount, applyCircle } =
+  useCircleFilterPipeline({
+    ns: "sale",
+    activeView,
+    page,
+    size,
+    items,
+    maxMarkersCap: 500,
+    getRowSortTs: (r: any) => r?.contract_date ? Date.parse(r.contract_date) : 0,
+  });
+
+// 2. 조건부 데이터
+const finalPagedItems = applyCircle ? pagedItems : items;
+const finalMapItems = applyCircle ? filteredMapItems : items;
+const finalTotalCount = applyCircle ? processedItemsSorted.length : totalCount;
+
+// 3. UI 표시
+전체 1,234건 → 원 안 필터 125건 (조건부)
+[ ] 영역 안만 보기 (map, both 뷰에서만)
+```
+
+**테스트 결과:**
+
+- ✅ 원 그리기 버튼 작동
+- ✅ "원 중앙으로 이동" 버튼 (실거래가 전용)
+- ✅ "영역 안만 보기" 체크박스 표시 (map, both 뷰)
+- ✅ 체크박스 ON → 원 안 데이터만 필터링
+- ✅ 테이블 페이지네이션 업데이트
+- ⚠️ "전체 0건" 이슈 (데이터 로딩 문제, 추후 수정 예정)
 
 ### 📋 그룹 C: 서버 영역 모드 ⭐⭐ (선택, 2시간)
 
@@ -645,24 +688,30 @@ onSelectionChange={(keys) => {
 ### 📊 Phase 4 진행 상황
 
 ```
-[████████░░] 80% 완료
+[█████████░] 90% 완료
 
-✅ 완료: 13개 작업
+✅ 완료: 15개 작업
   - 기본 컴포넌트: 11개
   - 그룹 A: 2개 ✅ (2025-10-03)
+  - 그룹 B: 2개 ✅ (2025-10-03)
 
-🔄 남은 작업: 5개 작업
-  - 그룹 B: 2개 (필수, 다음 단계)
-  - 그룹 C: 1개 (선택)
-  - 그룹 D: 2개 (선택)
+🔄 남은 작업: 3개 작업
+  - 그룹 C: 1개 (선택, 대용량 데이터)
+  - 그룹 D: 2개 (선택, 콜백/props)
+
+⚠️ Known Issues:
+  - "전체 0건" 데이터 로딩 문제 (추후 수정 예정)
 
 예상 소요 시간:
-  - 필수: 3시간 (그룹 B)
+  - 필수: 완료! 🎉
   - 선택: 3시간 (그룹 C+D)
-  - 전체: 6시간
+  - 전체: 3시간
 ```
 
-**다음 단계:** 그룹 B (원 그리기 + 영역 필터)
+**다음 단계:**
+
+1. 데이터 로딩 수정 ("전체 0건" 이슈 해결)
+2. 그룹 C/D (선택 사항) 또는 Phase 5로 진행
 
 ---
 
@@ -763,3 +812,147 @@ onSelectionChange={(keys) => {
 
 - `Application/lib/api.ts` 1곳 수정 (주석 해제 + Mock 코드 삭제)
 - 소요 시간: 1분
+
+---
+
+## 📝 Phase 6: 상세 필터 백엔드 통합 🔄 진행 중 (2025-10-07)
+
+**목표:** 실거래가 상세 필터의 백엔드 파라미터 매핑을 완료하여 필터가 실제로 데이터를 필터링하도록 구현
+
+### 1단계: 필터 파라미터 매핑 분석 ✅ (2025-10-07)
+
+**문제 발견:**
+
+- 상세 필터 UI는 구현되었으나 백엔드로 파라미터가 전달되지 않음
+- 거래금액 필터 적용 시 "2~3만원" 범위에서 43,000만원 데이터가 표시됨
+
+**원인 분석:**
+
+- `Application/datasets/registry.ts`의 `sale` 데이터셋에서 필터 매핑 로직 부재
+- 프론트엔드 필터 키(`transactionAmountRange`)와 백엔드 API 파라미터(`min_transaction_amount`, `max_transaction_amount`) 매핑 필요
+
+### 2단계: 필터 파라미터 매핑 구현 ✅ (2025-10-07)
+
+**구현된 매핑 (총 9개 필터):**
+
+1. **거래금액 범위** ✅
+
+   - Frontend: `transactionAmountRange: [min, max]`
+   - Backend: `min_transaction_amount`, `max_transaction_amount`
+
+2. **평단가 범위** ✅
+
+   - Frontend: `pricePerPyeongRange: [min, max]`
+   - Backend: `min_price_per_pyeong`, `max_price_per_pyeong`
+
+3. **전용면적 범위** ✅
+
+   - Frontend: `exclusiveAreaRange: [min, max]`
+   - Backend: `min_exclusive_area`, `max_exclusive_area`
+
+4. **대지권면적 범위** ✅
+
+   - Frontend: `landRightsAreaRange: [min, max]`
+   - Backend: `min_land_rights_area`, `max_land_rights_area`
+
+5. **건축연도 범위** ✅
+
+   - Frontend: `buildYearRange: [min, max]`
+   - Backend: `min_construction_year`, `max_construction_year`
+
+6. **날짜 범위** ✅
+
+   - Frontend: `dateRange: [startDate, endDate]`
+   - Backend: `contract_date_from`, `contract_date_to`
+
+7. **층확인** ⚠️ 문제 발견
+
+   - Frontend: `floorConfirmation: ["first_floor", "general"]`
+   - Backend: `floor_confirmation: "first_floor,general"`
+   - 현재 상태: "a,l,l,first_floor" 형식으로 잘못 전달됨
+   - 원인: 배열 → 문자열 변환 로직 누락
+
+8. **엘리베이터** ⚠️ 검증 필요
+
+   - Frontend: `elevatorAvailable: true/false`
+   - Backend: `elevator_available: true/false`
+
+9. **주소 검색** ✅
+   - Frontend: `searchQuery` + `searchField`
+   - Backend: `address_search` or `road_address_search`
+
+### 3단계: 층확인 필터 수정 🔄 (2025-10-07)
+
+**문제:**
+
+- UI에 "층확인: a,l,l,first_floor" 표시
+- 필터 적용되지 않음 (3,092건 → 3,092건)
+
+**수정 작업:**
+
+```typescript
+// Application/datasets/registry.ts (Line 810-816)
+// Before:
+cleanFilters.floor_confirmation = allowedFilters.floorConfirmation;
+
+// After:
+if (Array.isArray(allowedFilters.floorConfirmation)) {
+  cleanFilters.floor_confirmation = allowedFilters.floorConfirmation.join(",");
+} else {
+  cleanFilters.floor_confirmation = allowedFilters.floorConfirmation;
+}
+```
+
+### 4단계: 검증 계획 🔄 (2025-10-07)
+
+**검증 대상 (총 8개 필터):**
+
+1. ✅ 거래금액 필터
+2. ⏳ 평단가 필터
+3. ⏳ 전용면적 필터
+4. ⏳ 대지권면적 필터
+5. ⏳ 건축연도 필터
+6. ⏳ 거래 날짜 필터
+7. ⚠️ 층확인 필터 (수정 후 재검증 필요)
+8. ⚠️ 엘리베이터 필터 (검증 필요)
+
+**현재 진행률:**
+
+```
+[██░░░░░░░░] 20% 완료
+
+✅ 완료: 2개 작업
+  - 필터 파라미터 매핑 분석
+  - 필터 파라미터 매핑 구현 (9개)
+
+🔄 진행 중: 2개 작업
+  - 층확인 필터 문제 해결
+  - 8개 필터 개별 검증
+
+⚠️ 발견된 문제:
+  - 층확인 필터: "all" → 배열 변환 로직 문제
+  - 프론트엔드 SaleFilter 컴포넌트 초기화 로직 확인 필요
+
+예상 소요 시간:
+  - 층확인/엘리베이터 수정: 1시간
+  - 전체 필터 검증: 2시간
+  - 전체: 3시간
+```
+
+### 다음 단계:
+
+1. **즉시 수정 필요:**
+
+   - `SaleFilter.tsx` 컴포넌트의 `floorConfirmation` 초기화 로직 확인
+   - "all" → `[]` 변환 제대로 되는지 확인
+   - 배열 토글 로직 확인
+
+2. **검증 순서:**
+
+   - 층확인 필터 수정 후 테스트
+   - 엘리베이터 필터 테스트
+   - 나머지 6개 필터 순차 테스트
+
+3. **문서화:**
+   - 각 필터별 테스트 결과 기록
+   - 발견된 이슈 문서화

@@ -750,6 +750,92 @@ export const datasetConfigs: Record<DatasetId, DatasetConfig> = {
           }
         }
 
+        // 거래금액 범위 매핑
+        if (Array.isArray(allowedFilters.transactionAmountRange)) {
+          const [minAmount, maxAmount] = allowedFilters.transactionAmountRange;
+          if (typeof minAmount === "number" && minAmount > 0) {
+            cleanFilters.min_transaction_amount = minAmount;
+          }
+          if (
+            typeof maxAmount === "number" &&
+            maxAmount > 0 &&
+            maxAmount < 100000
+          ) {
+            cleanFilters.max_transaction_amount = maxAmount;
+          }
+          delete cleanFilters.transactionAmountRange;
+        }
+
+        // 전용면적 범위 매핑
+        if (Array.isArray(allowedFilters.exclusiveAreaRange)) {
+          const [minArea, maxArea] = allowedFilters.exclusiveAreaRange;
+          if (typeof minArea === "number" && minArea > 0) {
+            cleanFilters.min_exclusive_area = minArea;
+          }
+          if (typeof maxArea === "number" && maxArea > 0) {
+            cleanFilters.max_exclusive_area = maxArea;
+          }
+          delete cleanFilters.exclusiveAreaRange;
+        }
+
+        // 건축연도 범위 매핑
+        if (Array.isArray(allowedFilters.buildYearRange)) {
+          const [minYear, maxYear] = allowedFilters.buildYearRange;
+          if (typeof minYear === "number" && minYear > 1900) {
+            cleanFilters.min_construction_year = minYear;
+          }
+          if (typeof maxYear === "number" && maxYear > 1900) {
+            cleanFilters.max_construction_year = maxYear;
+          }
+          delete cleanFilters.buildYearRange;
+        }
+
+        // 날짜 범위 매핑
+        if (Array.isArray(allowedFilters.dateRange)) {
+          const [startDate, endDate] = allowedFilters.dateRange;
+          if (startDate) {
+            cleanFilters.contract_date_from = startDate;
+          }
+          if (endDate) {
+            cleanFilters.contract_date_to = endDate;
+          }
+          delete cleanFilters.dateRange;
+        }
+
+        // 층확인 매핑
+        if (
+          allowedFilters.floorConfirmation &&
+          allowedFilters.floorConfirmation !== "all"
+        ) {
+          if (Array.isArray(allowedFilters.floorConfirmation)) {
+            cleanFilters.floor_confirmation =
+              allowedFilters.floorConfirmation.join(",");
+          } else {
+            cleanFilters.floor_confirmation = allowedFilters.floorConfirmation;
+          }
+          delete cleanFilters.floorConfirmation;
+        }
+
+        // 엘리베이터 매핑
+        if (
+          allowedFilters.elevatorAvailable !== undefined &&
+          allowedFilters.elevatorAvailable !== "all"
+        ) {
+          cleanFilters.elevator_available = allowedFilters.elevatorAvailable;
+          delete cleanFilters.elevatorAvailable;
+        }
+
+        // 주소 검색 매핑
+        if (allowedFilters.searchQuery && allowedFilters.searchField) {
+          if (allowedFilters.searchField === "address") {
+            cleanFilters.address_search = allowedFilters.searchQuery;
+          } else if (allowedFilters.searchField === "road_address") {
+            cleanFilters.road_address_search = allowedFilters.searchQuery;
+          }
+          delete cleanFilters.searchQuery;
+          delete cleanFilters.searchField;
+        }
+
         return [
           "/api/v1/real-transactions/",
           {
@@ -788,6 +874,116 @@ export const datasetConfigs: Record<DatasetId, DatasetConfig> = {
             delete cleanFilters.sortBy;
             delete cleanFilters.sortOrder;
           }
+        }
+
+        // 거래금액 범위 매핑
+        if (Array.isArray(allowedFilters.transactionAmountRange)) {
+          const [minAmount, maxAmount] = allowedFilters.transactionAmountRange;
+          if (typeof minAmount === "number" && minAmount > 0) {
+            cleanFilters.min_transaction_amount = minAmount;
+          }
+          if (
+            typeof maxAmount === "number" &&
+            maxAmount > 0 &&
+            maxAmount < 100000
+          ) {
+            cleanFilters.max_transaction_amount = maxAmount;
+          }
+          delete cleanFilters.transactionAmountRange;
+        }
+
+        // 평단가 범위 매핑
+        if (Array.isArray(allowedFilters.pricePerPyeongRange)) {
+          const [minPrice, maxPrice] = allowedFilters.pricePerPyeongRange;
+          if (typeof minPrice === "number" && minPrice > 0) {
+            cleanFilters.min_price_per_pyeong = minPrice;
+          }
+          if (typeof maxPrice === "number" && maxPrice > 0) {
+            cleanFilters.max_price_per_pyeong = maxPrice;
+          }
+          delete cleanFilters.pricePerPyeongRange;
+        }
+
+        // 전용면적 범위 매핑
+        if (Array.isArray(allowedFilters.exclusiveAreaRange)) {
+          const [minArea, maxArea] = allowedFilters.exclusiveAreaRange;
+          if (typeof minArea === "number" && minArea > 0) {
+            cleanFilters.min_exclusive_area = minArea;
+          }
+          if (typeof maxArea === "number" && maxArea > 0) {
+            cleanFilters.max_exclusive_area = maxArea;
+          }
+          delete cleanFilters.exclusiveAreaRange;
+        }
+
+        // 대지권면적 범위 매핑
+        if (Array.isArray(allowedFilters.landRightsAreaRange)) {
+          const [minArea, maxArea] = allowedFilters.landRightsAreaRange;
+          if (typeof minArea === "number" && minArea > 0) {
+            cleanFilters.min_land_rights_area = minArea;
+          }
+          if (typeof maxArea === "number" && maxArea > 0) {
+            cleanFilters.max_land_rights_area = maxArea;
+          }
+          delete cleanFilters.landRightsAreaRange;
+        }
+
+        // 건축연도 범위 매핑
+        if (Array.isArray(allowedFilters.buildYearRange)) {
+          const [minYear, maxYear] = allowedFilters.buildYearRange;
+          if (typeof minYear === "number" && minYear > 1900) {
+            cleanFilters.min_construction_year = minYear;
+          }
+          if (typeof maxYear === "number" && maxYear > 1900) {
+            cleanFilters.max_construction_year = maxYear;
+          }
+          delete cleanFilters.buildYearRange;
+        }
+
+        // 날짜 범위 매핑
+        if (Array.isArray(allowedFilters.dateRange)) {
+          const [startDate, endDate] = allowedFilters.dateRange;
+          if (startDate) {
+            cleanFilters.contract_date_from = startDate;
+          }
+          if (endDate) {
+            cleanFilters.contract_date_to = endDate;
+          }
+          delete cleanFilters.dateRange;
+        }
+
+        // 층확인 매핑
+        if (
+          allowedFilters.floorConfirmation &&
+          allowedFilters.floorConfirmation !== "all"
+        ) {
+          if (Array.isArray(allowedFilters.floorConfirmation)) {
+            cleanFilters.floor_confirmation =
+              allowedFilters.floorConfirmation.join(",");
+          } else {
+            cleanFilters.floor_confirmation = allowedFilters.floorConfirmation;
+          }
+          delete cleanFilters.floorConfirmation;
+        }
+
+        // 엘리베이터 매핑
+        if (
+          allowedFilters.elevatorAvailable !== undefined &&
+          allowedFilters.elevatorAvailable !== "all"
+        ) {
+          cleanFilters.elevator_available = allowedFilters.elevatorAvailable;
+          delete cleanFilters.elevatorAvailable;
+        }
+
+        // 주소 검색 매핑
+        if (allowedFilters.searchQuery && allowedFilters.searchField) {
+          if (allowedFilters.searchField === "address") {
+            cleanFilters.address_search = allowedFilters.searchQuery;
+          } else if (allowedFilters.searchField === "road_address") {
+            cleanFilters.road_address_search = allowedFilters.searchQuery;
+          }
+          delete cleanFilters.searchQuery;
+          delete cleanFilters.searchField;
         }
 
         return realTransactionApi.getTransactions({

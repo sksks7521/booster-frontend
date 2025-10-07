@@ -21,6 +21,7 @@ import { useFeatureFlags } from "@/lib/featureFlags";
 import { formatArea, m2ToPyeong } from "@/lib/units";
 import { useDataset } from "@/hooks/useDataset";
 import { datasetConfigs } from "@/datasets/registry";
+import { useCircleFilterPipeline } from "@/components/features/shared/useCircleFilterPipeline";
 import { ViewState } from "@/components/ui/view-state";
 import { List, Map, Layers, Download, Bell } from "lucide-react";
 import {
@@ -58,8 +59,17 @@ export default function SaleSearchResults({
   bounds,
   onBoundsChange,
 }: SaleSearchResultsProps) {
-  // 필터 상태 가져오기
+  // 필터 상태 가져오기 (네임스페이스 필터 포함)
   const allFilters = useFilterStore();
+
+  // sale 네임스페이스 필터 병합
+  const namespace = "sale";
+  const nsOverrides = (
+    allFilters.ns && namespace ? (allFilters.ns as any)[namespace] : undefined
+  ) as any;
+  const mergedFilters: any =
+    namespace && nsOverrides ? { ...allFilters, ...nsOverrides } : allFilters;
+
   const setPage = useFilterStore((s) => s.setPage);
   const setSize = useFilterStore((s) => s.setSize);
   const setSortConfig = useFilterStore((s: any) => s.setSortConfig);
@@ -78,16 +88,117 @@ export default function SaleSearchResults({
     }
   }, [regionReady, setSortConfig]);
 
-  // sale 데이터셋 사용 (지역 조건 충족 시에만 요청)
-  const {
-    items,
-    total: totalCount,
-    isLoading,
-    error,
-    mutate: refetch,
-  } = useDataset("sale", allFilters as any, page, size, regionReady);
+  // 🆕 원 필터 상태 먼저 가져오기 (분기 조건 판단용)
+  const nsState = useFilterStore((s: any) => s.ns);
+  const applyCircleFilter = Boolean(nsState?.sale?.applyCircleFilter);
+  const circleCenter = nsState?.sale?.circleCenter ?? null;
+  const centerValid =
+    circleCenter &&
+    Number.isFinite(circleCenter.lat) &&
+    Number.isFinite(circleCenter.lng) &&
+    !(Number(circleCenter.lat) === 0 && Number(circleCenter.lng) === 0);
+  const centerForFilter = centerValid
+    ? { lat: Number(circleCenter.lat), lng: Number(circleCenter.lng) }
+    : null;
 
-  const mapItems = items;
+  // ✅ 실거래가는 항상 서버 페이지네이션 사용
+  // - 서버가 정렬, 페이지네이션을 모두 지원
+  // - 클라이언트 필터가 없음 (원 필터는 별도 파이프라인에서 처리)
+  // - useGlobalDataset 불필요 (경매결과와 달리 클라이언트 필터 없음)
+
+  // 🆕 페이지별 데이터 (서버 정렬+페이지네이션)
+  const pageHook = useDataset("sale", mergedFilters, page, size, regionReady);
+
+  // 🆕 데이터 소스 (항상 pageHook 사용)
+  const isLoading = pageHook.isLoading;
+  const error = pageHook.error;
+  const refetch = pageHook.mutate;
+  const rawItems = pageHook.items;
+  const serverTotal = pageHook.total;
+  const items = rawItems || [];
+  const totalCount = serverTotal;
+
+  // 📊 전체 데이터 개수 조회 (필터 없이)
+  const { total: totalAllData } = useDataset("sale", {}, 1, 1, true);
+
+  // 📊 지역필터 개수 조회 (지역 필터만)
+  const regionOnlyFilters = {
+    province: mergedFilters?.province,
+    cityDistrict: mergedFilters?.cityDistrict,
+    town: mergedFilters?.town,
+  };
+  const { total: regionTotal } = useDataset(
+    "sale",
+    regionOnlyFilters,
+    1,
+    1,
+    regionReady
+  );
+
+  // 📊 상세필터 감지 로직
+  const hasDetailFilters =
+    Array.isArray(mergedFilters?.transactionAmountRange) ||
+    Array.isArray(mergedFilters?.exclusiveAreaRange) ||
+    Array.isArray(mergedFilters?.landRightsAreaRange) ||
+    Array.isArray(mergedFilters?.pricePerPyeongRange) ||
+    Array.isArray(mergedFilters?.buildYearRange) ||
+    Array.isArray(mergedFilters?.dateRange) ||
+    (mergedFilters?.floorConfirmation &&
+      mergedFilters?.floorConfirmation !== "all") ||
+    (mergedFilters?.elevatorAvailable &&
+      mergedFilters?.elevatorAvailable !== "all");
+
+  // 🗺️ 지도용 대용량 데이터 요청
+  // - 지도/통합 뷰 또는 원 필터 활성 시 대용량 요청
+  // - 서버 페이지네이션으로 처리 (useGlobalDataset 불필요)
+  const wantAllForMap = activeView !== "table" || applyCircleFilter;
+
+  const BACKEND_MAX_PAGE_SIZE = 1000;
+  const MAP_GUARD = { maxMarkers: 5000 };
+
+  const mapRequestSize = wantAllForMap
+    ? Math.min(BACKEND_MAX_PAGE_SIZE, MAP_GUARD.maxMarkers)
+    : size;
+
+  const mapPage = 1;
+
+  // 지도용 데이터 (서버 페이지네이션)
+  const mapPageHook = useDataset(
+    "sale",
+    mergedFilters,
+    mapPage,
+    mapRequestSize,
+    regionReady && wantAllForMap // wantAllForMap일 때만 요청
+  );
+
+  // 지도 데이터 소스
+  const mapRawItems = mapPageHook.items;
+
+  // 🆕 원 영역 필터 파이프라인 (경매결과 패턴)
+  const {
+    processedItemsSorted,
+    pagedItems,
+    mapItems: filteredMapItems,
+    circleCount,
+    applyCircle,
+  } = useCircleFilterPipeline({
+    ns: "sale",
+    activeView,
+    page,
+    size,
+    items, // ✅ 테이블용 데이터 (현재 페이지)
+    globalSource: mapRawItems, // ✅ 지도용 데이터 (대용량)
+    maxMarkersCap: 500,
+    getRowSortTs: (r: any) =>
+      r?.contract_date ? Date.parse(r.contract_date) : 0,
+  });
+
+  // 🔄 최종 사용할 데이터 (원 필터 적용 여부에 따라 분기)
+  const finalPagedItems = applyCircle ? pagedItems : items;
+  const finalMapItems = applyCircle ? filteredMapItems : mapRawItems;
+  const finalTotalCount = applyCircle
+    ? processedItemsSorted.length
+    : totalCount;
 
   // 테이블 기능을 위한 추가 상태들
   const { sortableColumns } = useSortableColumns("sale");
@@ -105,13 +216,10 @@ export default function SaleSearchResults({
     (s: any) => s.setPendingMapTarget ?? NOOP
   );
 
-  // 🆕 원 그리기 + 영역 필터 상태 (네임스페이스 기반)
-  const nsState = useFilterStore((s: any) => s.ns);
+  // 🆕 원 그리기 상태 (네임스페이스 기반) - nsState는 위에서 이미 선언됨
   const setNsFilter = useFilterStore((s: any) => s.setNsFilter);
   const circleEnabled = Boolean(nsState?.sale?.circleEnabled);
-  const circleCenter = nsState?.sale?.circleCenter ?? null;
   const circleRadiusM = nsState?.sale?.circleRadiusM ?? 1000;
-  const applyCircleFilter = Boolean(nsState?.sale?.applyCircleFilter);
 
   // 🆕 원 이벤트 핸들러
   const handleCircleToggle = () => {
@@ -190,39 +298,47 @@ export default function SaleSearchResults({
           <h2 className="text-xl lg:text-2xl font-bold text-gray-900">
             실거래가(매매)
           </h2>
-          <div className="flex flex-wrap items-center gap-2 mt-2">
-            <p className="text-gray-600">
-              총{" "}
+          <p className="text-gray-600 mt-1">
+            <span className="inline-block">
+              전체{" "}
               <span className="font-semibold text-blue-600">
-                {(totalCount || 0).toLocaleString()}건
+                {(totalAllData || 0).toLocaleString()}
               </span>
-              의 매매 거래
-            </p>
-            {regionReady && (
-              <div className="flex flex-wrap items-center gap-1.5 text-sm text-gray-500">
-                <span>•</span>
-                <span className="font-medium">
-                  {(allFilters as any)?.province}
+              건
+            </span>
+            {" → "}
+            <span className="inline-block">
+              지역필터{" "}
+              <span className="font-semibold text-green-600">
+                {(regionTotal || 0).toLocaleString()}
+              </span>
+              건
+            </span>
+            {hasDetailFilters && (
+              <>
+                {" → "}
+                <span className="inline-block">
+                  상세필터{" "}
+                  <span className="font-semibold text-purple-600">
+                    {(totalCount || 0).toLocaleString()}
+                  </span>
+                  건
                 </span>
-                {(allFilters as any)?.cityDistrict && (
-                  <>
-                    <span className="text-gray-400">/</span>
-                    <span className="font-medium">
-                      {(allFilters as any)?.cityDistrict}
-                    </span>
-                  </>
-                )}
-                {(allFilters as any)?.town && (
-                  <>
-                    <span className="text-gray-400">/</span>
-                    <span className="font-medium">
-                      {(allFilters as any)?.town}
-                    </span>
-                  </>
-                )}
-              </div>
+              </>
             )}
-          </div>
+            {applyCircle && circleCount > 0 && (
+              <>
+                {" → "}
+                <span className="inline-block">
+                  원 안 필터{" "}
+                  <span className="font-semibold text-indigo-600">
+                    {circleCount.toLocaleString()}
+                  </span>
+                  건
+                </span>
+              </>
+            )}
+          </p>
         </div>
         <div className="flex gap-2 flex-wrap">
           <Button
@@ -272,6 +388,37 @@ export default function SaleSearchResults({
               </TabsTrigger>
             </TabsList>
           </Tabs>
+
+          {/* 🆕 영역 안만 보기 체크박스 (map, both 뷰에서만 표시) */}
+          {activeView !== "table" && (
+            <div className="mt-3 flex items-center justify-end">
+              <label className="flex items-center gap-2 text-xs text-gray-700 border rounded px-2 py-1 bg-white">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4"
+                  checked={applyCircleFilter}
+                  onChange={(e) => {
+                    const checked = Boolean(e.target.checked);
+                    if (typeof setNsFilter === "function") {
+                      // 체크 ON 시 원 중심 확인
+                      if (checked) {
+                        const center = circleCenter;
+                        if (center) {
+                          setNsFilter("sale", "circleCenter" as any, center);
+                        }
+                        const r = Number(circleRadiusM ?? 0);
+                        if (!Number.isFinite(r) || r <= 0) {
+                          setNsFilter("sale", "circleRadiusM" as any, 1000);
+                        }
+                      }
+                      setNsFilter("sale", "applyCircleFilter" as any, checked);
+                    }
+                  }}
+                />
+                <span>영역 안만 보기</span>
+              </label>
+            </div>
+          )}
         </div>
 
         <div className="p-4">
@@ -376,7 +523,11 @@ export default function SaleSearchResults({
                 )}
 
                 {/* 다시 시도 버튼 */}
-                <Button variant="outline" onClick={refetch} className="mb-4">
+                <Button
+                  variant="outline"
+                  onClick={() => refetch()}
+                  className="mb-4"
+                >
                   <Download className="w-4 h-4 mr-2" />
                   다시 시도
                 </Button>
@@ -509,7 +660,7 @@ export default function SaleSearchResults({
                 <div className="space-y-4">
                   {useVirtual ? (
                     <ItemTableVirtual
-                      items={items as any}
+                      items={finalPagedItems as any}
                       isLoading={false}
                       error={undefined}
                       sortBy={sortBy as any}
@@ -525,7 +676,7 @@ export default function SaleSearchResults({
                     />
                   ) : (
                     <ItemTable
-                      items={items as any}
+                      items={finalPagedItems as any}
                       isLoading={false}
                       error={undefined}
                       schemaColumns={schemaColumns}
@@ -562,7 +713,7 @@ export default function SaleSearchResults({
                       onSelectionChange={(keys) => {
                         setSelectedIds(Array.from(keys).map((k) => String(k)));
                       }}
-                      totalCount={totalCount || 0}
+                      totalCount={finalTotalCount || 0}
                       page={page}
                       pageSize={size}
                       onPageChange={(p) => setPage(p)}
@@ -607,9 +758,9 @@ export default function SaleSearchResults({
                         </div>
                       </div>
                       <div className="text-sm text-gray-600">
-                        전체 {(totalCount || 0).toLocaleString()}건 중{" "}
-                        {Math.min(size * (page - 1) + 1, totalCount || 0)}-
-                        {Math.min(size * page, totalCount || 0)}건 표시
+                        전체 {(finalTotalCount || 0).toLocaleString()}건 중{" "}
+                        {Math.min(size * (page - 1) + 1, finalTotalCount || 0)}-
+                        {Math.min(size * page, finalTotalCount || 0)}건 표시
                       </div>
                     </div>
                     <Pagination>
@@ -629,7 +780,7 @@ export default function SaleSearchResults({
                         {(() => {
                           const totalPages = Math.max(
                             1,
-                            Math.ceil((totalCount || 0) / size)
+                            Math.ceil((finalTotalCount || 0) / size)
                           );
                           const pages: JSX.Element[] = [];
                           const startPage = Math.max(1, page - 2);
@@ -726,7 +877,7 @@ export default function SaleSearchResults({
               {activeView === "map" && (
                 <div style={{ height: "600px" }}>
                   <MapView
-                    items={mapItems}
+                    items={finalMapItems}
                     namespace="sale"
                     legendTitle="거래금액 범례(단위: 만원)"
                     legendUnitLabel="만원"
@@ -757,7 +908,7 @@ export default function SaleSearchResults({
                     <h3 className="text-lg font-semibold">지도 보기</h3>
                     <div style={{ height: "400px" }}>
                       <MapView
-                        items={mapItems}
+                        items={finalMapItems}
                         namespace="sale"
                         legendTitle="거래금액 범례(단위: 만원)"
                         legendUnitLabel="만원"
@@ -788,7 +939,7 @@ export default function SaleSearchResults({
                     <h3 className="text-lg font-semibold">목록 보기</h3>
                     {useVirtual ? (
                       <ItemTableVirtual
-                        items={items as any}
+                        items={finalPagedItems as any}
                         isLoading={false}
                         error={undefined}
                         sortBy={sortBy as any}
@@ -810,7 +961,7 @@ export default function SaleSearchResults({
 
                           // 🆕 통합 뷰에서 체크박스 선택 시 지도 이동
                           if (added) {
-                            const found = items.find(
+                            const found = finalPagedItems.find(
                               (r: any) => String(r?.id ?? "") === added
                             );
                             const latRaw =
@@ -842,7 +993,7 @@ export default function SaleSearchResults({
                       />
                     ) : (
                       <ItemTable
-                        items={items as any}
+                        items={finalPagedItems as any}
                         isLoading={false}
                         error={undefined}
                         schemaColumns={schemaColumns}
@@ -891,7 +1042,7 @@ export default function SaleSearchResults({
 
                           // 🆕 통합 뷰에서 체크박스 선택 시 지도 이동
                           if (added) {
-                            const found = items.find(
+                            const found = finalPagedItems.find(
                               (r: any) => String(r?.id ?? "") === added
                             );
                             const latRaw =
@@ -917,7 +1068,7 @@ export default function SaleSearchResults({
                             }
                           }
                         }}
-                        totalCount={totalCount || 0}
+                        totalCount={finalTotalCount || 0}
                         page={page}
                         pageSize={size}
                         onPageChange={(p) => setPage(p)}
@@ -961,9 +1112,12 @@ export default function SaleSearchResults({
                           </div>
                         </div>
                         <div className="text-sm text-gray-600">
-                          전체 {(totalCount || 0).toLocaleString()}건 중{" "}
-                          {Math.min(size * (page - 1) + 1, totalCount || 0)}-
-                          {Math.min(size * page, totalCount || 0)}건 표시
+                          전체 {(finalTotalCount || 0).toLocaleString()}건 중{" "}
+                          {Math.min(
+                            size * (page - 1) + 1,
+                            finalTotalCount || 0
+                          )}
+                          -{Math.min(size * page, finalTotalCount || 0)}건 표시
                         </div>
                       </div>
                       <Pagination>
@@ -985,7 +1139,7 @@ export default function SaleSearchResults({
                           {(() => {
                             const totalPages = Math.max(
                               1,
-                              Math.ceil((totalCount || 0) / size)
+                              Math.ceil((finalTotalCount || 0) / size)
                             );
                             const pages: JSX.Element[] = [];
                             const startPage = Math.max(1, page - 2);
