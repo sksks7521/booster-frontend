@@ -28,7 +28,6 @@ import {
   DollarSign,
   Ruler,
   Calendar,
-  Search,
   ToggleLeft,
   ToggleRight,
   Save,
@@ -74,6 +73,16 @@ export default function SaleFilter({
   ) as any;
   const filters: any =
     namespace && nsOverrides ? { ...storeAll, ...nsOverrides } : storeAll;
+
+  // 선택 항목만 보기 토글/상태
+  const setShowSelectedOnly = useFilterStore((s: any) => s.setShowSelectedOnly);
+  const showSelectedOnly = useFilterStore((s: any) => s.showSelectedOnly);
+  const selectedIds = useFilterStore((s: any) => s.selectedIds || []);
+
+  // 실거래가 뷰 정책: 지역 선택(시/도, 시군구, 읍면동)은 페이지 상단 공통 영역에서 처리함
+  // → 필터 패널 내 지역 섹션은 숨긴다. 주소 검색은 패널 맨 하단에 배치한다.
+  const showRegionSection = false;
+  const showTopAddressSearch = false;
 
   // 네임스페이스 라우팅 래퍼
   const setFilter = (key: any, value: any) => {
@@ -131,6 +140,10 @@ export default function SaleFilter({
 
   // 검색 상태
   const [addressSearch, setAddressSearch] = useState<string>("");
+  // 주소 검색 유형: 도로명(address) | 지번(jibun_address)
+  const [addressSearchField, setAddressSearchField] = useState<
+    "address" | "jibun_address"
+  >("address");
 
   // 날짜 범위
   const [startDate, setStartDate] = useState<string>("");
@@ -180,7 +193,7 @@ export default function SaleFilter({
 
   const handleAddressSearch = () => {
     const q = addressSearch.trim();
-    setFilter("searchField", q ? "address" : "all");
+    setFilter("searchField", q ? (addressSearchField as any) : "all");
     setFilter("searchQuery", q);
     setPageStore(1);
   };
@@ -312,13 +325,21 @@ export default function SaleFilter({
               variant="outline"
               size="sm"
               onClick={() => {
-                // TODO: 선택 항목만 보기 기능 구현
-                console.log("선택 항목만 보기 클릭");
+                try {
+                  const hasSelection =
+                    Array.isArray(selectedIds) && selectedIds.length > 0;
+                  if (!hasSelection && !showSelectedOnly) {
+                    alert("선택된 행이 없습니다. 먼저 목록에서 체크하세요.");
+                    return;
+                  }
+                  setShowSelectedOnly(!showSelectedOnly);
+                  setPageStore(1);
+                } catch {}
               }}
               className="text-xs"
             >
               <Eye className="w-3 h-3 mr-1" />
-              선택 항목만 보기
+              {showSelectedOnly ? "선택만 해제" : "선택 항목만 보기"}
             </Button>
             <Button
               variant="outline"
@@ -330,19 +351,37 @@ export default function SaleFilter({
             </Button>
           </div>
 
-          {/* 검색 섹션 */}
-          {!showLocationOnly && !showDetailsOnly && (
+          {/* 검색 섹션(상단) - 숨김, 하단에 재배치 */}
+          {showTopAddressSearch && !showLocationOnly && !showDetailsOnly && (
             <div className="space-y-4">
-              <Label className="text-sm font-medium flex items-center">
-                <Search className="w-4 h-4 mr-2" />
-                검색
-              </Label>
+              <Label className="text-sm font-medium">검색</Label>
 
               <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <Label className="text-xs text-gray-600">주소 유형</Label>
+                  <Select
+                    value={addressSearchField}
+                    onValueChange={(v) =>
+                      setAddressSearchField(v as "address" | "jibun_address")
+                    }
+                  >
+                    <SelectTrigger className="h-8 w-40">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="address">도로명주소</SelectItem>
+                      <SelectItem value="jibun_address">지번주소</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
                 <Label className="text-xs text-gray-600">주소 검색</Label>
                 <div className="flex space-x-2">
                   <Input
-                    placeholder="도로명주소로 검색하세요"
+                    placeholder={
+                      addressSearchField === "address"
+                        ? "도로명주소로 검색하세요"
+                        : "지번주소(예: ○○동 123-45)로 검색하세요"
+                    }
                     value={addressSearch}
                     onChange={(e) => setAddressSearch(e.target.value)}
                     onKeyPress={(e) =>
@@ -363,8 +402,8 @@ export default function SaleFilter({
             </div>
           )}
 
-          {/* 지역 선택 */}
-          {!showDetailsOnly && (
+          {/* 지역 선택 - 숨김 */}
+          {showRegionSection && !showDetailsOnly && (
             <div className="space-y-4">
               <Label className="text-sm font-medium flex items-center">
                 <MapPin className="w-4 h-4 mr-2" />
@@ -1103,6 +1142,58 @@ export default function SaleFilter({
                     );
                   })}
                 </div>
+              </div>
+
+              {/* 주소 검색 (하단으로 이동) */}
+              <div className="space-y-4">
+                <Label className="text-sm font-medium">주소 검색</Label>
+
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Label className="text-xs text-gray-600">주소 유형</Label>
+                    <Select
+                      value={addressSearchField}
+                      onValueChange={(v) =>
+                        setAddressSearchField(v as "address" | "jibun_address")
+                      }
+                    >
+                      <SelectTrigger className="h-8 w-40">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="address">도로명주소</SelectItem>
+                        <SelectItem value="jibun_address">지번주소</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <Label className="text-xs text-gray-600">검색어</Label>
+                  <div className="flex space-x-2">
+                    <Input
+                      placeholder={
+                        addressSearchField === "address"
+                          ? "도로명주소로 검색하세요"
+                          : "지번주소(예: ○○동 123-45)로 검색하세요"
+                      }
+                      value={addressSearch}
+                      onChange={(e) => setAddressSearch(e.target.value)}
+                      onKeyPress={(e) =>
+                        e.key === "Enter" && handleAddressSearch()
+                      }
+                    />
+                    <Button size="sm" onClick={handleAddressSearch}>
+                      검색
+                    </Button>
+                  </div>
+                </div>
+                {addressSearch && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleClearSearch}
+                  >
+                    검색 초기화
+                  </Button>
+                )}
               </div>
             </div>
           )}

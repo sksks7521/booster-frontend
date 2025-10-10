@@ -4,8 +4,7 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import Header from "@/components/layout/header";
-import Footer from "@/components/layout/footer";
+// Header/Footer are provided globally by AppShell
 import FilterControl from "@/components/features/filter-control";
 import SelectedFilterBar from "@/components/features/selected-filter-bar";
 import dynamic from "next/dynamic";
@@ -528,6 +527,9 @@ export default function AnalysisPage() {
                         onRetry={undefined}
                         highlightIds={selectedRowKeys.map((k) => String(k))}
                         onBoundsChange={(b) => setBounds(b)}
+                        // 클러스터 토글: 기본 on, UI 노출
+                        clusterToggleEnabled={true}
+                        useClustering={true}
                       />
                     </div>
                   </ViewState>
@@ -558,6 +560,9 @@ export default function AnalysisPage() {
                             onRetry={undefined}
                             highlightIds={selectedRowKeys.map((k) => String(k))}
                             onBoundsChange={(b) => setBounds(b)}
+                            // 클러스터 토글: 기본 on, UI 노출
+                            clusterToggleEnabled={true}
+                            useClustering={true}
                           />
                         </div>
                       </ViewState>
@@ -772,8 +777,7 @@ export default function AnalysisPage() {
         </div>
       </div>
 
-      {/* 푸터 */}
-      <Footer />
+      {/* 푸터는 AppShell 공통 컴포넌트 사용 */}
       {/* 전역 상세 다이얼로그 */}
       <PropertyDetailDialog
         open={detailOpen}

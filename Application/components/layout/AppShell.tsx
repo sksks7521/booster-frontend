@@ -2,6 +2,7 @@
 
 import { usePathname } from "next/navigation";
 import Header from "@/components/layout/header";
+import Footer from "@/components/layout/Footer";
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -13,6 +14,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     <>
       {!isAuthRoute && <Header />}
       {children}
+      {!isAuthRoute && <Footer />}
     </>
   );
 }

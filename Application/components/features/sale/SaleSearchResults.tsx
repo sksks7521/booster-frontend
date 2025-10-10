@@ -25,6 +25,12 @@ import { useCircleFilterPipeline } from "@/components/features/shared/useCircleF
 import { ViewState } from "@/components/ui/view-state";
 import { List, Map, Layers, Download, Bell } from "lucide-react";
 import {
+  TooltipProvider,
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+} from "@/components/ui/tooltip";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -169,6 +175,25 @@ export default function SaleSearchResults({
 
   const mapPage = 1;
 
+  // 표시 상한(지도 렌더 개수) - 경매결과 패턴 적용
+  const markerCaps = [100, 300, 500, 1000, 2000, 3000] as const;
+  const [maxMarkersCap, setMaxMarkersCap] = useState<number>(() => {
+    try {
+      const raw =
+        typeof window !== "undefined" &&
+        localStorage.getItem("sale:maxMarkersCap");
+      return raw ? parseInt(raw) : 500;
+    } catch {}
+    return 500;
+  });
+  useEffect(() => {
+    try {
+      if (typeof window !== "undefined") {
+        localStorage.setItem("sale:maxMarkersCap", String(maxMarkersCap));
+      }
+    } catch {}
+  }, [maxMarkersCap]);
+
   // 지도용 데이터 (서버 페이지네이션)
   const mapPageHook = useDataset(
     "sale",
@@ -195,14 +220,15 @@ export default function SaleSearchResults({
     size,
     items, // ✅ 테이블용 데이터 (현재 페이지)
     globalSource: mapRawItems, // ✅ 지도용 데이터 (대용량)
-    maxMarkersCap: 500,
+    maxMarkersCap,
     getRowSortTs: (r: any) =>
       r?.contract_date ? Date.parse(r.contract_date) : 0,
   });
 
   // 🔄 최종 사용할 데이터 (원 필터 적용 여부에 따라 분기)
   const finalPagedItems = applyCircle ? pagedItems : items;
-  const finalMapItems = applyCircle ? filteredMapItems : mapRawItems;
+  // 경매결과와 동일하게 지도는 항상 파이프라인 결과(mapItems=filteredMapItems)에 표시 상한을 적용
+  const finalMapItems = filteredMapItems;
   const finalTotalCount = applyCircle
     ? processedItemsSorted.length
     : totalCount;
@@ -270,7 +296,20 @@ export default function SaleSearchResults({
 
   // sale 데이터셋 설정 가져오기
   const datasetConfig = datasetConfigs["sale"];
-  const schemaColumns = datasetConfig?.table?.columns;
+  // 기본 스키마에서 특정 컬럼 숨김: 광역시도(sido), 시군구(sigungu), 행정동(adminDong), 법정동단위(legalDongUnit), 엘리베이터유무(elevatorAvailable), 우편번호(postalCode)
+  const schemaColumns = (datasetConfig?.table?.columns || []).filter(
+    (c: any) => {
+      const hideKeys = new Set([
+        "sido",
+        "sigungu",
+        "adminDong",
+        "legalDongUnit",
+        "elevatorAvailable",
+        "postalCode",
+      ]);
+      return !hideKeys.has(c.key);
+    }
+  );
 
   // 정렬 핸들러(분석 페이지와 동일 시그니처)
   const handleSort = (column?: string, direction?: "asc" | "desc") => {
@@ -400,9 +439,48 @@ export default function SaleSearchResults({
             </TabsList>
           </Tabs>
 
-          {/* 🆕 영역 안만 보기 체크박스 (map, both 뷰에서만 표시) */}
+          {/* 🆕 표시 상한 + 영역 안만 보기 (map, both 뷰에서만) - 경매결과 UI와 동일한 톤 */}
           {activeView !== "table" && (
-            <div className="mt-3 flex items-center justify-end">
+            <div className="mt-3 flex items-center justify-between text-xs text-gray-600">
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-gray-700">표시 상한</span>
+                  <select
+                    className="h-7 rounded border px-2 bg-white"
+                    value={String(maxMarkersCap)}
+                    onChange={(e) => setMaxMarkersCap(parseInt(e.target.value))}
+                  >
+                    {markerCaps.map((cap) => (
+                      <option key={cap} value={cap}>
+                        {cap.toLocaleString()}개
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <TooltipProvider delayDuration={0}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span
+                        className="inline-flex h-5 w-5 items-center justify-center rounded-full border text-gray-600 cursor-help select-none"
+                        aria-label="도움말"
+                      >
+                        ?
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent
+                      side="bottom"
+                      align="start"
+                      className="bg-white text-gray-800 border border-gray-200 shadow-md max-w-[280px]"
+                    >
+                      최대 마커 개수를 설정합니다.
+                      <br />
+                      너무 크게 선택하면 브라우저가 느려질 수 있어요.
+                      <br />
+                      최신 계약일자부터 우선 표시합니다.
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
               <label className="flex items-center gap-2 text-xs text-gray-700 border rounded px-2 py-1 bg-white">
                 <input
                   type="checkbox"
@@ -713,6 +791,22 @@ export default function SaleSearchResults({
                             });
                           }
                         }
+                        // 건축연도 포맷: 1980년 형태로 반환
+                        if (key === "constructionYearReal") {
+                          const raw =
+                            (row as any)?.[key] ?? (row as any)?.extra?.[key];
+                          let y: number | undefined;
+                          if (typeof raw === "number" && Number.isFinite(raw))
+                            y = Math.round(raw);
+                          else if (typeof raw === "string") {
+                            const n = parseInt(
+                              String(raw).replace(/[^0-9]/g, ""),
+                              10
+                            );
+                            if (Number.isFinite(n)) y = n;
+                          }
+                          return y ? `${y}년` : "-";
+                        }
                         const direct = row?.[key];
                         if (direct !== undefined) return direct;
                         return row?.extra?.[key];
@@ -886,10 +980,13 @@ export default function SaleSearchResults({
               )}
 
               {activeView === "map" && (
-                <div style={{ height: "600px" }}>
+                <div className="h-[calc(100vh-240px)]">
                   <MapView
                     items={finalMapItems}
                     namespace="sale"
+                    // 클러스터 토글: 기본 on, UI 노출
+                    clusterToggleEnabled={true}
+                    useClustering={true}
                     legendTitle="거래금액 범례(단위: 만원)"
                     legendUnitLabel="만원"
                     legendThresholds={[5000, 10000, 30000, 50000]}
@@ -917,10 +1014,13 @@ export default function SaleSearchResults({
                   {/* 지도 섹션 */}
                   <div className="space-y-4">
                     <h3 className="text-lg font-semibold">지도 보기</h3>
-                    <div style={{ height: "400px" }}>
+                    <div className="h-[calc(100vh-360px)]">
                       <MapView
                         items={finalMapItems}
                         namespace="sale"
+                        // 클러스터 토글: 기본 on, UI 노출
+                        clusterToggleEnabled={true}
+                        useClustering={true}
                         legendTitle="거래금액 범례(단위: 만원)"
                         legendUnitLabel="만원"
                         legendThresholds={[5000, 10000, 30000, 50000]}
@@ -1029,6 +1129,22 @@ export default function SaleSearchResults({
                                 rounding: areaDisplay?.rounding,
                               });
                             }
+                          }
+                          // 건축연도 포맷: 1980년 형태로 반환
+                          if (key === "constructionYearReal") {
+                            const raw =
+                              (row as any)?.[key] ?? (row as any)?.extra?.[key];
+                            let y: number | undefined;
+                            if (typeof raw === "number" && Number.isFinite(raw))
+                              y = Math.round(raw);
+                            else if (typeof raw === "string") {
+                              const n = parseInt(
+                                String(raw).replace(/[^0-9]/g, ""),
+                                10
+                              );
+                              if (Number.isFinite(n)) y = n;
+                            }
+                            return y ? `${y}년` : "-";
                           }
                           const direct = row?.[key];
                           if (direct !== undefined) return direct;

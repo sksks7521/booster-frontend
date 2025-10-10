@@ -30,35 +30,25 @@ export default function Header() {
 
           {/* Desktop Navigation - 4 dropdown groups */}
           <nav className="hidden md:flex items-center space-x-6">
-            {/* 회사소개 */}
-            <DropdownMenu>
-              <DropdownMenuTrigger className="flex items-center text-gray-700 hover:text-blue-600 font-medium">
-                회사소개 <ChevronDown className="w-4 h-4 ml-1" />
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start">
-                <DropdownMenuLabel>회사소개</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem disabled>
-                  브랜드 소개 (준비중)
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            {/* 기능소개 */}
+            <Link
+              href="/features"
+              className="flex items-center text-gray-700 hover:text-blue-600 font-medium"
+            >
+              기능소개
+            </Link>
 
             {/* 요금제 */}
-            <DropdownMenu>
-              <DropdownMenuTrigger className="flex items-center text-gray-700 hover:text-blue-600 font-medium">
-                요금제 <ChevronDown className="w-4 h-4 ml-1" />
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start">
-                <DropdownMenuItem asChild>
-                  <Link href="/pricing">요금제</Link>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <Link
+              href="/pricing"
+              className="flex items-center text-gray-700 hover:text-blue-600 font-medium"
+            >
+              요금제
+            </Link>
 
             {/* 서비스 */}
             <DropdownMenu>
-              <DropdownMenuTrigger className="flex items-center text-gray-700 hover:text-blue-600 font-medium">
+              <DropdownMenuTrigger className="flex items-center text-gray-700 hover:text-blue-600 font-medium cursor-pointer">
                 서비스 <ChevronDown className="w-4 h-4 ml-1" />
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start">
@@ -72,15 +62,13 @@ export default function Header() {
                   <Link href="/favorites">관심 물건</Link>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem asChild>
-                  <Link href="/features">기능 소개</Link>
-                </DropdownMenuItem>
+                {/* 기능소개로 이동됨 */}
               </DropdownMenuContent>
             </DropdownMenu>
 
             {/* 고객지원 */}
             <DropdownMenu>
-              <DropdownMenuTrigger className="flex items-center text-gray-700 hover:text-blue-600 font-medium">
+              <DropdownMenuTrigger className="flex items-center text-gray-700 hover:text-blue-600 font-medium cursor-pointer">
                 고객지원 <ChevronDown className="w-4 h-4 ml-1" />
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start">
@@ -118,7 +106,12 @@ export default function Header() {
                     <User className="w-4 h-4 mr-2" />내 정보
                   </Link>
                 </Button>
-                <Button variant="ghost" size="sm">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={logout}
+                  className="cursor-pointer"
+                >
                   <LogOut className="w-4 h-4 mr-2" />
                   로그아웃
                 </Button>
@@ -157,12 +150,15 @@ export default function Header() {
             <div className="flex flex-col space-y-3">
               <div>
                 <div className="text-xs tracking-wider text-gray-500 mb-1">
-                  회사소개
+                  기능소개
                 </div>
                 <div className="flex flex-col">
-                  <span className="text-gray-400 text-sm">
-                    브랜드 소개 (준비중)
-                  </span>
+                  <Link
+                    href="/features"
+                    className="text-gray-700 hover:text-blue-600 text-sm"
+                  >
+                    기능 소개
+                  </Link>
                 </div>
               </div>
               <div className="pt-2 border-t border-gray-100">
@@ -200,12 +196,6 @@ export default function Header() {
                     className="text-gray-700 hover:text-blue-600 text-sm"
                   >
                     관심 물건
-                  </Link>
-                  <Link
-                    href="/features"
-                    className="text-gray-700 hover:text-blue-600 text-sm"
-                  >
-                    기능 소개
                   </Link>
                 </div>
               </div>
@@ -259,7 +249,7 @@ export default function Header() {
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="justify-start"
+                      className="justify-start cursor-pointer"
                       onClick={logout}
                     >
                       <LogOut className="w-4 h-4 mr-2" />

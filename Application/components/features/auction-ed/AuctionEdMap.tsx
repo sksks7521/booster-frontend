@@ -142,6 +142,9 @@ export default function AuctionEdMap({
       onBoundsChange={onBoundsChange}
       locationKey={locationKey}
       highlightIds={highlightIds}
+      // 🆕 클러스터 토글: 기본 ON, UI 노출
+      clusterToggleEnabled={true}
+      useClustering={true}
       markerColorFn={markerColorFn}
       namespace="auction_ed"
       legendTitle="매각가 범례(단위: 만원)"

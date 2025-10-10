@@ -402,7 +402,15 @@ export function useItems(): UseItemsResult {
   }
 
   // 🔍 실제 데이터 구조 확인 및 클라이언트 사이드 필터링
-  let items = (data as any)?.items ?? (data as any) ?? [];
+  // 응답 형태가 {items,total} 또는 {results,count} 또는 배열일 수 있음
+  const resp: any = data as any;
+  let items = Array.isArray(resp?.items)
+    ? resp.items
+    : Array.isArray(resp?.results)
+    ? resp.results
+    : Array.isArray(resp)
+    ? resp
+    : [];
   // 🆕 선택 항목만 보기: 선택된 id만 남긴다
   if ((filters as any).showSelectedOnly === true) {
     const sel: string[] = Array.isArray((filters as any).selectedIds)
@@ -439,10 +447,10 @@ export function useItems(): UseItemsResult {
     });
   }
   let originalTotalCount =
-    (data as any)?.total_items ??
-    (data as any)?.totalItems ??
-    (data as any)?.total ??
-    (data as any)?.count ??
+    (resp as any)?.total_items ??
+    (resp as any)?.totalItems ??
+    (resp as any)?.total ??
+    (resp as any)?.count ??
     0;
 
   // 🎯 클라이언트 사이드 층확인 필터링 (백엔드 미지원으로)

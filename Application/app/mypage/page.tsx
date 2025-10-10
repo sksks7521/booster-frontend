@@ -3,6 +3,7 @@
 import type React from "react";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,6 +13,8 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import Header from "@/components/layout/header";
+import { useAuthUser } from "@/hooks/useAuthUser";
+import { useToast } from "@/hooks/use-toast";
 import {
   User,
   Mail,
@@ -60,6 +63,9 @@ interface ActivityItem {
 }
 
 export default function MyPage() {
+  const router = useRouter();
+  const { user, isLoading: isAuthLoading } = useAuthUser();
+  const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("profile");
   const [isEditing, setIsEditing] = useState(false);
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
@@ -126,9 +132,24 @@ export default function MyPage() {
     },
   ];
 
+  // 미로그인 접근 가드: 안내 후 로그인 페이지로 이동
   useEffect(() => {
+    if (isAuthLoading) return;
+    if (!user) {
+      try {
+        toast({
+          title: "로그인이 필요합니다",
+          description: "로그인하면 마이페이지로 자동 이동합니다.",
+        });
+      } catch {}
+      router.replace(`/login?redirect=/mypage`);
+    }
+  }, [isAuthLoading, user, router, toast]);
+
+  useEffect(() => {
+    if (isAuthLoading || !user) return;
     loadUserData();
-  }, []);
+  }, [isAuthLoading, user]);
 
   const loadUserData = async () => {
     setIsLoading(true);
@@ -265,6 +286,9 @@ export default function MyPage() {
   };
 
   // 로딩 중이거나 사용자 정보가 없는 경우
+  if (!isAuthLoading && !user) {
+    return null;
+  }
   if (isLoading && !userProfile) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -294,7 +318,7 @@ export default function MyPage() {
   }
 
   // 사용자 정보 (Header에 전달)
-  const user = {
+  const headerUser = {
     email: userProfile.email,
     subscription: {
       plan: subscription.plan,
@@ -1075,101 +1099,7 @@ export default function MyPage() {
         </div>
       </div>
 
-      {/* 푸터 */}
-      <footer className="bg-gray-900 text-white py-12 mt-16">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid md:grid-cols-4 gap-8">
-            <div className="md:col-span-2">
-              <div className="flex items-center mb-4">
-                <div className="text-2xl font-bold text-blue-400">부스터</div>
-                <div className="ml-2 text-sm text-gray-400">Booster</div>
-              </div>
-              <p className="text-gray-400 mb-4">
-                부동산 투자의 새로운 기준을 제시하는 AI 기반 분석 플랫폼입니다.
-              </p>
-              <div className="text-sm text-gray-500">
-                <p>© 2024 Booster. All rights reserved.</p>
-              </div>
-            </div>
-
-            <div>
-              <h3 className="text-lg font-semibold mb-4">서비스</h3>
-              <ul className="space-y-2 text-gray-400">
-                <li>
-                  <Link
-                    href="/analysis"
-                    className="hover:text-white transition-colors"
-                  >
-                    부동산 분석
-                  </Link>
-                </li>
-                <li>
-                  <Link
-                    href="/calculator"
-                    className="hover:text-white transition-colors"
-                  >
-                    수익률 계산기
-                  </Link>
-                </li>
-                <li>
-                  <Link
-                    href="/favorites"
-                    className="hover:text-white transition-colors"
-                  >
-                    관심 물건
-                  </Link>
-                </li>
-                <li>
-                  <Link
-                    href="/pricing"
-                    className="hover:text-white transition-colors"
-                  >
-                    요금제
-                  </Link>
-                </li>
-              </ul>
-            </div>
-
-            <div>
-              <h3 className="text-lg font-semibold mb-4">고객지원</h3>
-              <ul className="space-y-2 text-gray-400">
-                <li>
-                  <Link
-                    href="/support"
-                    className="hover:text-white transition-colors"
-                  >
-                    고객센터
-                  </Link>
-                </li>
-                <li>
-                  <Link
-                    href="/notices"
-                    className="hover:text-white transition-colors"
-                  >
-                    공지사항
-                  </Link>
-                </li>
-                <li>
-                  <Link
-                    href="/terms"
-                    className="hover:text-white transition-colors"
-                  >
-                    이용약관
-                  </Link>
-                </li>
-                <li>
-                  <Link
-                    href="/privacy"
-                    className="hover:text-white transition-colors"
-                  >
-                    개인정보처리방침
-                  </Link>
-                </li>
-              </ul>
-            </div>
-          </div>
-        </div>
-      </footer>
+      {/* Footer removed: now provided by AppShell */}
     </div>
   );
 }

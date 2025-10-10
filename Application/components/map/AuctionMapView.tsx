@@ -38,6 +38,9 @@ interface AuctionMapViewProps {
   // 🆕 경매 결과 전용 설정
   maxMarkers?: number; // 최대 표시 마커 수
   displayInfo?: { shown: number; total: number }; // 표시 정보
+  // 🆕 클러스터 토글 옵션
+  useClustering?: boolean; // 초기 상태 기본값
+  clusterToggleEnabled?: boolean; // 좌상단 토글 UI 노출 여부
 }
 
 function AuctionMapView({
@@ -52,6 +55,8 @@ function AuctionMapView({
   highlightIds = [],
   maxMarkers = 500,
   displayInfo,
+  useClustering = true,
+  clusterToggleEnabled = true,
 }: AuctionMapViewProps) {
   console.log("🔍 [AuctionMapView] 렌더링:", {
     enabled,
@@ -69,6 +74,9 @@ function AuctionMapView({
   const focusCircleRef = useRef<any>(null);
   const markersRef = useRef<any[]>([]);
   const clustererRef = useRef<any>(null);
+  const [clusterEnabled, setClusterEnabled] = useState<boolean>(
+    Boolean(useClustering)
+  );
   const markerIndexRef = useRef<Map<string, any>>(new Map());
   const highlightedIdsRef = useRef<Set<string>>(new Set());
   const selectedOverlayMarkersRef = useRef<Map<string, any>>(new Map());
@@ -150,26 +158,30 @@ function AuctionMapView({
         const map = new kakao.maps.Map(mapRef.current, options);
         kakaoMapRef.current = map;
 
-        // 클러스터러 생성
-        const clusterer = new kakao.maps.MarkerClusterer({
-          map: map,
-          averageCenter: true,
-          minLevel: 10,
-          disableClickZoom: true,
-          styles: [
-            {
-              width: "30px",
-              height: "30px",
-              background: "rgba(255, 51, 51, 0.8)",
-              borderRadius: "15px",
-              color: "#fff",
-              textAlign: "center",
-              fontWeight: "bold",
-              lineHeight: "30px",
-            },
-          ],
-        });
-        clustererRef.current = clusterer;
+        // 클러스터러 생성(옵션)
+        if (clusterEnabled && kakao.maps.MarkerClusterer) {
+          const clusterer = new kakao.maps.MarkerClusterer({
+            map: map,
+            averageCenter: true,
+            minLevel: 10,
+            disableClickZoom: true,
+            styles: [
+              {
+                width: "30px",
+                height: "30px",
+                background: "rgba(255, 51, 51, 0.8)",
+                borderRadius: "15px",
+                color: "#fff",
+                textAlign: "center",
+                fontWeight: "bold",
+                lineHeight: "30px",
+              },
+            ],
+          });
+          clustererRef.current = clusterer;
+        } else {
+          clustererRef.current = null;
+        }
 
         // 바운드 변경 이벤트
         if (onBoundsChange) {
@@ -197,7 +209,7 @@ function AuctionMapView({
     return () => {
       isMounted = false;
     };
-  }, [enabled, onBoundsChange]);
+  }, [enabled, onBoundsChange, clusterEnabled]);
 
   // 🆕 경매 결과 전용 마커 생성 및 업데이트
   useEffect(() => {
@@ -258,8 +270,11 @@ function AuctionMapView({
         const marker = new kakao.maps.Marker({
           position: position,
           image: markerImage,
-          map: map,
         });
+        // 클러스터 비활성 시 개별 마커로 지도에 올림
+        if (!clustererRef.current) {
+          marker.setMap(map);
+        }
 
         // 마커 클릭 이벤트
         kakao.maps.event.addListener(marker, "click", () => {
@@ -324,7 +339,15 @@ function AuctionMapView({
       map.setBounds(bounds);
       hasPerformedInitialFitRef.current = true;
     }
-  }, [mapReady, items, maxMarkers, locationKey, onItemSelect, isMobile]);
+  }, [
+    mapReady,
+    items,
+    maxMarkers,
+    locationKey,
+    onItemSelect,
+    isMobile,
+    clusterEnabled,
+  ]);
 
   // 전체화면 토글
   const toggleFullscreen = () => {
@@ -435,7 +458,7 @@ function AuctionMapView({
         </div>
       )}
 
-      {/* 전체화면 토글 + 지도타입 토글 */}
+      {/* 전체화면 토글 + 지도타입 토글 + 클러스터 토글 */}
       <div className="absolute top-2 left-2 flex gap-2 z-10">
         <button
           onClick={toggleFullscreen}
@@ -465,6 +488,19 @@ function AuctionMapView({
             </button>
           </div>
         </div>
+        {clusterToggleEnabled && (
+          <div className="rounded bg-white/90 px-2 py-1 text-xs text-gray-800 shadow border flex items-center gap-2">
+            <label className="flex items-center gap-1 cursor-pointer">
+              <input
+                type="checkbox"
+                className="h-3 w-3"
+                checked={clusterEnabled}
+                onChange={(e) => setClusterEnabled(Boolean(e.target.checked))}
+              />
+              <span className="text-[11px] text-gray-600">클러스터</span>
+            </label>
+          </div>
+        )}
       </div>
 
       {/* 🆕 표시 정보 */}

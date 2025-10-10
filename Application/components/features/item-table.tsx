@@ -969,6 +969,11 @@ const ItemTable: React.FC<ItemTableProps> = ({
   // 🆕 동적 컬럼 모드 지원
   const schemaBasedColumns: ColumnWithId[] | null = React.useMemo(() => {
     if (!schemaColumns || schemaColumns.length === 0) return null;
+    // 스키마 기반 컬럼의 기본 너비 맵(키별 우선값)
+    const DEFAULT_SCHEMA_WIDTHS: Record<string, number> = {
+      // 실거래가(매매): 도로명주소 기본값을 기존 대비 2배로 확장
+      roadAddressReal: 280,
+    };
     const getVal = (row: any, key: string) => {
       if (typeof getValueForKey === "function") return getValueForKey(row, key);
       const direct = (row as any)?.[key];
@@ -1011,7 +1016,7 @@ const ItemTable: React.FC<ItemTableProps> = ({
       title: makeHeader(c.key, c.header),
       dataIndex: c.key as any,
       key: c.key,
-      width: getWidth?.(c.key) ?? 140,
+      width: getWidth?.(c.key) ?? DEFAULT_SCHEMA_WIDTHS[c.key] ?? 140,
       render: (_: any, row: any) => {
         const v = getVal(row, c.key);
         const isNum = typeof v === "number";
@@ -1107,7 +1112,13 @@ const ItemTable: React.FC<ItemTableProps> = ({
       );
       return [...fromOrder, ...rest];
     }
-    return columnOrder
+    // 기본(정적) 컬럼 모드: 저장된 columnOrder가 오염되었을 수 있음 → 유효 키만 사용하고 폴백
+    const allowedIds = new Set(baseColumns.map((c) => c.id));
+    const filteredOrder = columnOrder.filter((id) => allowedIds.has(id));
+    const effectiveOrder =
+      filteredOrder.length > 0 ? filteredOrder : baseColumns.map((c) => c.id);
+
+    return effectiveOrder
       .map((id) => baseColumns.find((col) => col.id === id))
       .filter(Boolean) as ColumnWithId[];
   }, [schemaBasedColumns, columnOrder, baseColumns]);

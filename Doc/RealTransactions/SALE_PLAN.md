@@ -460,6 +460,11 @@
 - 빈 상태: 아이템 0건이어도 중심/레벨 리셋 금지, 좌표 오버레이 유지
 - 팝업 락: 전역 토글로 자동 닫힘 방지 지원(지도 상호작용 시)
 - 클러스터러: minLevel=9, gridSize=60(권장), fitBounds padding=40px, 이벤트 디바운스=200ms
+- 클러스터 토글: 공통 `MapView`에 `useClustering`(기본 true), `clusterToggleEnabled`(UI 노출) 추가
+  - 실거래가/경매결과/통합검색 지도에 토글 활성화 전달(`clusterToggleEnabled={true}`, `useClustering={true}`)
+  - 토글 OFF 시 개별 마커로 렌더, ON 시 `MarkerClusterer` 생성·적용
+  - 확대/축소 시 minLevel/gridSize를 동적으로 조정
+  - 지도 높이: 지도 단독 `h-[calc(100vh-240px)]`, 통합 지도 `h-[calc(100vh-360px)]`로 통일
 - 범례/마커 기준(확정): 거래금액 기준, 임계값 t1~t4=6000/8000/10000/13000(만원)
 
 ### 10. 팝업/상세 정책

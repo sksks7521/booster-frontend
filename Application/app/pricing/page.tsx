@@ -21,7 +21,6 @@ import {
   X,
   Crown,
   Zap,
-  Shield,
   BarChart3,
   Headphones,
   Star,
@@ -81,8 +80,8 @@ export default function PricingPage() {
       color: "border-gray-200",
     },
     {
-      id: "basic",
-      name: "Basic",
+      id: "plus",
+      name: "Plus",
       description: "개인 투자자를 위한 기본 플랜",
       price: {
         monthly: 29000,
@@ -100,6 +99,7 @@ export default function PricingPage() {
       ],
       icon: <BarChart3 className="w-6 h-6" />,
       color: "border-blue-200",
+      popular: true,
     },
     {
       id: "pro",
@@ -119,30 +119,8 @@ export default function PricingPage() {
         { name: "우선 지원", included: true },
         { name: "데이터 내보내기", included: true },
       ],
-      popular: true,
       icon: <Crown className="w-6 h-6" />,
-      color: "border-purple-200",
-    },
-    {
-      id: "enterprise",
-      name: "Enterprise",
-      description: "기업 및 대규모 투자자를 위한 플랜",
-      price: {
-        monthly: 199000,
-        yearly: 1990000,
-      },
-      features: [
-        { name: "무제한 분석", included: true, limit: "무제한" },
-        { name: "관심 물건 저장", included: true, limit: "무제한" },
-        { name: "프리미엄 분석 리포트", included: true },
-        { name: "전화 지원", included: true },
-        { name: "고급 분석 도구", included: true },
-        { name: "API 접근", included: true },
-        { name: "전담 지원", included: true },
-        { name: "데이터 내보내기", included: true },
-      ],
-      icon: <Shield className="w-6 h-6" />,
-      color: "border-gold-200",
+      color: "border-gray-200",
     },
   ];
 
@@ -194,13 +172,15 @@ export default function PricingPage() {
         </div>
 
         {/* 요금제 카드 */}
-        <div className="grid lg:grid-cols-4 md:grid-cols-2 gap-8 mb-16">
+        <div className="grid lg:grid-cols-3 md:grid-cols-2 gap-8 mb-16">
           {plans.map((plan) => (
             <Card
               key={plan.id}
               className={`relative ${plan.color} ${
                 plan.popular
                   ? "ring-2 ring-purple-500 shadow-lg scale-105"
+                  : plan.id === "pro"
+                  ? "opacity-70"
                   : "hover:shadow-lg"
               } transition-all duration-200`}
             >
@@ -212,19 +192,20 @@ export default function PricingPage() {
                   </Badge>
                 </div>
               )}
+              {!plan.popular && plan.id === "pro" && (
+                <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
+                  <Badge className="bg-gray-300 text-gray-700 px-4 py-1">
+                    <Star className="w-4 h-4 mr-1" />
+                    준비중
+                  </Badge>
+                </div>
+              )}
 
               <CardHeader className="text-center pb-4">
-                <div className="flex items-center justify-center mb-4">
-                  <div
-                    className={`p-3 rounded-full ${
-                      plan.popular ? "bg-purple-100" : "bg-gray-100"
-                    }`}
-                  >
-                    {plan.icon}
-                  </div>
-                </div>
-                <CardTitle className="text-xl font-bold">{plan.name}</CardTitle>
-                <CardDescription className="text-gray-600">
+                <CardTitle className="text-2xl font-bold">
+                  {plan.name}
+                </CardTitle>
+                <CardDescription className="text-base text-gray-600">
                   {plan.description}
                 </CardDescription>
               </CardHeader>
@@ -286,27 +267,36 @@ export default function PricingPage() {
               </CardContent>
 
               <CardFooter>
-                <Button
-                  className={`w-full ${
-                    plan.popular
-                      ? "bg-purple-600 hover:bg-purple-700"
-                      : plan.id === "free"
-                      ? "bg-gray-600 hover:bg-gray-700"
-                      : "bg-blue-600 hover:bg-blue-700"
-                  }`}
-                  asChild
-                >
-                  <Link
-                    href={
-                      plan.id === "free"
-                        ? "/signup"
-                        : `/checkout?plan=${plan.id}`
-                    }
+                {plan.id === "pro" ? (
+                  <Button
+                    className="w-full bg-gray-300 text-gray-700 cursor-not-allowed"
+                    disabled
                   >
-                    {plan.id === "free" ? "무료로 시작하기" : "플랜 선택하기"}
-                    <ArrowRight className="w-4 h-4 ml-2" />
-                  </Link>
-                </Button>
+                    준비중
+                  </Button>
+                ) : (
+                  <Button
+                    className={`w-full ${
+                      plan.popular
+                        ? "bg-purple-600 hover:bg-purple-700"
+                        : plan.id === "free"
+                        ? "bg-gray-600 hover:bg-gray-700"
+                        : "bg-blue-600 hover:bg-blue-700"
+                    }`}
+                    asChild
+                  >
+                    <Link
+                      href={
+                        plan.id === "free"
+                          ? "/signup"
+                          : `/checkout?plan=${plan.id}`
+                      }
+                    >
+                      {plan.id === "free" ? "무료로 시작하기" : "플랜 선택하기"}
+                      <ArrowRight className="w-4 h-4 ml-2" />
+                    </Link>
+                  </Button>
+                )}
               </CardFooter>
             </Card>
           ))}
@@ -341,22 +331,22 @@ export default function PricingPage() {
                 {[
                   {
                     name: "월간 분석 횟수",
-                    values: ["5회", "50회", "200회", "무제한"],
+                    values: ["5회", "50회", "200회"],
                   },
                   {
                     name: "관심 물건 저장",
-                    values: ["10개", "100개", "500개", "무제한"],
+                    values: ["10개", "100개", "500개"],
                   },
                   {
                     name: "분석 리포트",
-                    values: ["기본", "기본", "고급", "프리미엄"],
+                    values: ["기본", "기본", "고급"],
                   },
-                  { name: "고급 분석 도구", values: ["✗", "✓", "✓", "✓"] },
-                  { name: "API 접근", values: ["✗", "✗", "✓", "✓"] },
-                  { name: "데이터 내보내기", values: ["✗", "✓", "✓", "✓"] },
+                  { name: "고급 분석 도구", values: ["✗", "✓", "✓"] },
+                  { name: "API 접근", values: ["✗", "✗", "✓"] },
+                  { name: "데이터 내보내기", values: ["✗", "✓", "✓"] },
                   {
                     name: "고객 지원",
-                    values: ["이메일", "이메일", "우선 지원", "전담 지원"],
+                    values: ["이메일", "이메일", "우선 지원"],
                   },
                 ].map((row, index) => (
                   <tr key={index} className="hover:bg-gray-50">
@@ -490,101 +480,7 @@ export default function PricingPage() {
         </div>
       </div>
 
-      {/* 푸터 */}
-      <footer className="bg-gray-900 text-white py-12 mt-16">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid md:grid-cols-4 gap-8">
-            <div className="md:col-span-2">
-              <div className="flex items-center mb-4">
-                <div className="text-2xl font-bold text-blue-400">부스터</div>
-                <div className="ml-2 text-sm text-gray-400">Booster</div>
-              </div>
-              <p className="text-gray-400 mb-4">
-                부동산 투자의 새로운 기준을 제시하는 AI 기반 분석 플랫폼입니다.
-              </p>
-              <div className="text-sm text-gray-500">
-                <p>© 2024 Booster. All rights reserved.</p>
-              </div>
-            </div>
-
-            <div>
-              <h3 className="text-lg font-semibold mb-4">서비스</h3>
-              <ul className="space-y-2 text-gray-400">
-                <li>
-                  <Link
-                    href="/analysis"
-                    className="hover:text-white transition-colors"
-                  >
-                    부동산 분석
-                  </Link>
-                </li>
-                <li>
-                  <Link
-                    href="/calculator"
-                    className="hover:text-white transition-colors"
-                  >
-                    수익률 계산기
-                  </Link>
-                </li>
-                <li>
-                  <Link
-                    href="/favorites"
-                    className="hover:text-white transition-colors"
-                  >
-                    관심 물건
-                  </Link>
-                </li>
-                <li>
-                  <Link
-                    href="/pricing"
-                    className="hover:text-white transition-colors"
-                  >
-                    요금제
-                  </Link>
-                </li>
-              </ul>
-            </div>
-
-            <div>
-              <h3 className="text-lg font-semibold mb-4">고객지원</h3>
-              <ul className="space-y-2 text-gray-400">
-                <li>
-                  <Link
-                    href="/support"
-                    className="hover:text-white transition-colors"
-                  >
-                    고객센터
-                  </Link>
-                </li>
-                <li>
-                  <Link
-                    href="/notices"
-                    className="hover:text-white transition-colors"
-                  >
-                    공지사항
-                  </Link>
-                </li>
-                <li>
-                  <Link
-                    href="/terms"
-                    className="hover:text-white transition-colors"
-                  >
-                    이용약관
-                  </Link>
-                </li>
-                <li>
-                  <Link
-                    href="/privacy"
-                    className="hover:text-white transition-colors"
-                  >
-                    개인정보처리방침
-                  </Link>
-                </li>
-              </ul>
-            </div>
-          </div>
-        </div>
-      </footer>
+      {/* Footer removed: now provided by AppShell */}
     </div>
   );
 }

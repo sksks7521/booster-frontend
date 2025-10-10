@@ -1248,7 +1248,7 @@ export default function PropertyDetailV2Page() {
                   searchQuery={searchQuery}
                   setSearchQuery={setSearchQuery}
                   handleSearch={handleSearch}
-                  showDetailsOnly={true}
+                  showDetailsOnly={false}
                   namespace={activeDataset}
                 />
               ) : activeDataset === "rent" ? (

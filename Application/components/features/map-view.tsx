@@ -56,6 +56,10 @@ interface MapViewProps {
     red: string;
   }>;
   legendThresholds?: number[];
+  // 클러스터링 사용 여부(초기 상태)
+  useClustering?: boolean;
+  // 클러스터 토글 UI 노출 여부
+  clusterToggleEnabled?: boolean;
   // 반경(원) 컨트롤/오버레이
   circleControlsEnabled?: boolean;
   circleEnabled?: boolean;
@@ -100,6 +104,9 @@ function MapView({
   legendEditable,
   legendPaletteOverride,
   legendThresholds,
+  // clustering
+  useClustering = true,
+  clusterToggleEnabled = false,
   // circle
   circleControlsEnabled,
   circleEnabled,
@@ -129,6 +136,9 @@ function MapView({
   const focusCircleRef = useRef<any>(null);
   const markersRef = useRef<any[]>([]);
   const clustererRef = useRef<any>(null);
+  const [clusterEnabled, setClusterEnabled] = useState<boolean>(
+    Boolean(useClustering)
+  );
   // 원 오버레이/중심 마커
   const drawCircleRef = useRef<any>(null);
   const drawCircleCenterMarkerRef = useRef<any>(null);
@@ -1173,13 +1183,17 @@ function MapView({
 
     // 클러스터러 생성(가능한 경우)
     try {
-      clustererRef.current = new w.kakao.maps.MarkerClusterer({
-        map,
-        averageCenter: true,
-        minLevel: 9, // 기본값. 정책은 아래 applyClusterPolicy에서 동적으로 조정
-        gridSize: 60,
-        disableClickZoom: true, // 클릭 시 사용자 정의 동작
-      });
+      if (clusterEnabled && w.kakao.maps.MarkerClusterer) {
+        clustererRef.current = new w.kakao.maps.MarkerClusterer({
+          map,
+          averageCenter: true,
+          minLevel: 9, // 기본값. 정책은 아래 applyClusterPolicy에서 동적으로 조정
+          gridSize: 60,
+          disableClickZoom: true, // 클릭 시 사용자 정의 동작
+        });
+      } else {
+        clustererRef.current = null;
+      }
       // 클러스터 클릭 정책
       // - level > 2: bounds로 확대(일반 동작)
       // - level == 2: 동일좌표만이면 멀티팝업, 아니면 강제 level 1로 즉시 확대
@@ -1269,7 +1283,7 @@ function MapView({
       );
     } catch {}
 
-    // 줌 정책 적용: level 기준 병합/부분/개별
+    // 줌 정책 적용: level 기준 병합/부분/개별 (클러스터 사용 시에만)
     try {
       const applyClusterPolicy = () => {
         const level = map.getLevel?.();
@@ -1286,11 +1300,13 @@ function MapView({
         }
       };
       applyClusterPolicy();
-      w.kakao.maps.event.addListener(
-        map,
-        "zoom_changed",
-        debounce(applyClusterPolicy, MAP_GUARD.clusterPolicyDebounceMs)
-      );
+      if (clustererRef.current) {
+        w.kakao.maps.event.addListener(
+          map,
+          "zoom_changed",
+          debounce(applyClusterPolicy, MAP_GUARD.clusterPolicyDebounceMs)
+        );
+      }
     } catch {}
 
     // 최대 N개만 표시(성능 보호) - 면적 상한과 분리된 표시 상한 사용
@@ -1583,7 +1599,7 @@ function MapView({
         markersRef.current = [];
       } catch {}
     };
-  }, [items, isLoading, mapReady, provider]);
+  }, [items, isLoading, mapReady, provider, clusterEnabled]);
 
   // Kakao: 원(반경) 오버레이 적용/갱신
   useEffect(() => {
@@ -2141,7 +2157,7 @@ function MapView({
           지도 초기화 중...
         </div>
       )}
-      {/* 전체화면 토글 + 지도타입 토글 (좌상단) */}
+      {/* 전체화면 토글 + 지도타입 토글 + 클러스터 토글(옵션) (좌상단) */}
       <div className="absolute top-2 left-2 flex gap-2 z-10">
         <button
           className="rounded bg-white/90 px-2 py-1 text-xs text-gray-800 shadow border"
@@ -2185,6 +2201,19 @@ function MapView({
             >
               하이브리드
             </button>
+          </div>
+        )}
+        {provider === "kakao" && clusterToggleEnabled && (
+          <div className="rounded bg-white/90 px-2 py-1 text-xs text-gray-800 shadow border flex items-center gap-2">
+            <label className="flex items-center gap-1 cursor-pointer">
+              <input
+                type="checkbox"
+                className="h-3 w-3"
+                checked={clusterEnabled}
+                onChange={(e) => setClusterEnabled(Boolean(e.target.checked))}
+              />
+              <span className="text-[11px] text-gray-600">클러스터</span>
+            </label>
           </div>
         )}
       </div>

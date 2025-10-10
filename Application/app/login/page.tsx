@@ -1,72 +1,77 @@
-"use client"
+"use client";
 
-import type React from "react"
+import type React from "react";
 
-import { useState } from "react"
-import Link from "next/link"
-import { useRouter } from "next/navigation"
-import { identifyUser, setSuperProperties } from "@/lib/analytics"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Checkbox } from "@/components/ui/checkbox"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Eye, EyeOff, Mail, Lock, ArrowLeft, AlertCircle } from "lucide-react"
+import { useState } from "react";
+import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
+import { identifyUser, setSuperProperties } from "@/lib/analytics";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Eye, EyeOff, Mail, Lock, ArrowLeft, AlertCircle } from "lucide-react";
 
 export default function LoginPage() {
-  const router = useRouter()
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const redirect = searchParams.get("redirect");
   const [formData, setFormData] = useState({
     email: "",
     password: "",
     rememberMe: false,
-  })
-  const [showPassword, setShowPassword] = useState(false)
-  const [isLoading, setIsLoading] = useState(false)
-  const [error, setError] = useState("")
+  });
+  const [showPassword, setShowPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState("");
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target
+    const { name, value } = e.target;
     setFormData((prev) => ({
       ...prev,
       [name]: value,
-    }))
+    }));
     // 입력 시 에러 메시지 제거
-    if (error) setError("")
-  }
+    if (error) setError("");
+  };
 
   const handleRememberMeChange = (checked: boolean) => {
     setFormData((prev) => ({
       ...prev,
       rememberMe: checked,
-    }))
-  }
+    }));
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setIsLoading(true)
-    setError("")
+    e.preventDefault();
+    setIsLoading(true);
+    setError("");
 
     // 기본 유효성 검사
     if (!formData.email || !formData.password) {
-      setError("이메일과 비밀번호를 모두 입력해주세요.")
-      setIsLoading(false)
-      return
+      setError("이메일과 비밀번호를 모두 입력해주세요.");
+      setIsLoading(false);
+      return;
     }
 
     if (!formData.email.includes("@")) {
-      setError("올바른 이메일 형식을 입력해주세요.")
-      setIsLoading(false)
-      return
+      setError("올바른 이메일 형식을 입력해주세요.");
+      setIsLoading(false);
+      return;
     }
 
     try {
       // 실제 구현에서는 API 호출
-      await new Promise((resolve) => setTimeout(resolve, 1500)) // 로딩 시뮬레이션
+      await new Promise((resolve) => setTimeout(resolve, 1500)); // 로딩 시뮬레이션
 
       // 임시 로그인 로직 (실제로는 백엔드 API 연동)
-      if (formData.email === "demo@booster.com" && formData.password === "demo123") {
+      if (
+        formData.email === "demo@booster.com" &&
+        formData.password === "demo123"
+      ) {
         // 성공 시 토큰 저장 (실제로는 secure storage 사용)
-        localStorage.setItem("booster_token", "demo_token_123")
+        localStorage.setItem("booster_token", "demo_token_123");
         localStorage.setItem(
           "booster_user",
           JSON.stringify({
@@ -75,33 +80,43 @@ export default function LoginPage() {
               plan: "Pro",
               expiresAt: "2024-12-31",
             },
-          }),
-        )
+          })
+        );
 
         // Mixpanel identify + super props
         try {
-          identifyUser(formData.email)
-          setSuperProperties({ environment: process.env.NODE_ENV, route: "/login" })
+          identifyUser(formData.email);
+          setSuperProperties({
+            environment: process.env.NODE_ENV,
+            route: "/login",
+          });
         } catch {}
 
-        // 분석 페이지로 리다이렉트
-        router.push("/analysis")
+        // 리디렉션 복귀: redirect 파라미터가 있으면 해당 경로로, 없으면 분석 페이지로 이동
+        const target =
+          redirect && redirect.startsWith("/") ? redirect : "/analysis";
+        router.push(target);
       } else {
-        setError("이메일 또는 비밀번호가 올바르지 않습니다.")
+        setError("이메일 또는 비밀번호가 올바르지 않습니다.");
       }
     } catch (err) {
-      setError("로그인 중 오류가 발생했습니다. 다시 시도해주세요.")
+      setError("로그인 중 오류가 발생했습니다. 다시 시도해주세요.");
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         {/* 뒤로가기 버튼 */}
         <div className="mb-8">
-          <Button variant="ghost" size="sm" asChild className="text-gray-600 hover:text-gray-900">
+          <Button
+            variant="ghost"
+            size="sm"
+            asChild
+            className="text-gray-600 hover:text-gray-900"
+          >
             <Link href="/">
               <ArrowLeft className="w-4 h-4 mr-2" />
               홈으로 돌아가기
@@ -121,6 +136,13 @@ export default function LoginPage() {
             <p className="text-gray-600">부동산 분석을 시작하세요</p>
           </div>
 
+          {/* redirect 안내 배너 */}
+          {redirect && (
+            <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-md text-amber-800 text-sm">
+              로그인 완료 후 이전 페이지로 돌아갑니다.
+            </div>
+          )}
+
           {/* 데모 계정 안내 */}
           <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
             <div className="text-sm text-blue-800">
@@ -137,7 +159,9 @@ export default function LoginPage() {
           {error && (
             <Alert className="mb-6 border-red-200 bg-red-50">
               <AlertCircle className="h-4 w-4 text-red-600" />
-              <AlertDescription className="text-red-800">{error}</AlertDescription>
+              <AlertDescription className="text-red-800">
+                {error}
+              </AlertDescription>
             </Alert>
           )}
 
@@ -145,7 +169,10 @@ export default function LoginPage() {
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* 이메일 입력 */}
             <div className="space-y-2">
-              <Label htmlFor="email" className="text-sm font-medium text-gray-700">
+              <Label
+                htmlFor="email"
+                className="text-sm font-medium text-gray-700"
+              >
                 이메일
               </Label>
               <div className="relative">
@@ -165,7 +192,10 @@ export default function LoginPage() {
 
             {/* 비밀번호 입력 */}
             <div className="space-y-2">
-              <Label htmlFor="password" className="text-sm font-medium text-gray-700">
+              <Label
+                htmlFor="password"
+                className="text-sm font-medium text-gray-700"
+              >
                 비밀번호
               </Label>
               <div className="relative">
@@ -186,7 +216,11 @@ export default function LoginPage() {
                   className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
                   disabled={isLoading}
                 >
-                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  {showPassword ? (
+                    <EyeOff className="w-5 h-5" />
+                  ) : (
+                    <Eye className="w-5 h-5" />
+                  )}
                 </button>
               </div>
             </div>
@@ -200,11 +234,17 @@ export default function LoginPage() {
                   onCheckedChange={handleRememberMeChange}
                   disabled={isLoading}
                 />
-                <Label htmlFor="rememberMe" className="text-sm text-gray-600 cursor-pointer">
+                <Label
+                  htmlFor="rememberMe"
+                  className="text-sm text-gray-600 cursor-pointer"
+                >
                   로그인 상태 유지
                 </Label>
               </div>
-              <Link href="/forgot-password" className="text-sm text-blue-600 hover:text-blue-700 font-medium">
+              <Link
+                href="/forgot-password"
+                className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+              >
                 비밀번호 찾기
               </Link>
             </div>
@@ -236,7 +276,11 @@ export default function LoginPage() {
           {/* 회원가입 링크 */}
           <div className="text-center">
             <p className="text-gray-600 mb-4">아직 계정이 없으신가요?</p>
-            <Button variant="outline" className="w-full h-12 border-gray-300 text-gray-700 bg-transparent" asChild>
+            <Button
+              variant="outline"
+              className="w-full h-12 border-gray-300 text-gray-700 bg-transparent"
+              asChild
+            >
               <Link href="/signup">회원가입</Link>
             </Button>
           </div>
@@ -256,5 +300,5 @@ export default function LoginPage() {
         </div>
       </div>
     </div>
-  )
+  );
 }
