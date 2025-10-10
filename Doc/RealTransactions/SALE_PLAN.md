@@ -547,6 +547,16 @@
   - 팝업 너비 확대 (270px → 540px) ✅
   - 팝업 경고 메시지 처리 ✅
 
+**후속 완료(2025-10-10):**
+
+- 선택 항목만 보기(서버 필터 ids) 연동 ✅
+  - `datasetConfigs.sale`에 `ids` 파라미터 매핑 추가 (showSelectedOnly+selectedIds)
+  - 최대 500개 상한, 문자열 조인 적용
+  - 응답 로그 포맷을 `{results,count}`에 맞춰 보정
+- 주소 검색 지번 지원(프론트 매핑) ✅
+  - `SaleFilter`: 주소 유형 선택(도로명/지번) UI 추가, `searchField`에 `address|jibun_address` 저장
+  - `datasetConfigs.sale`: 백엔드 옵션 A/B 모두 지원 (address_search+address_search_type 또는 road/jibun 전용 파라미터)
+
 **남은 작업 (경매결과 패리티):**
 
 ### 📋 그룹 A: 테이블-지도 연동 ⭐⭐⭐ (필수, 2시간) ✅ 완료 (2025-10-03)
@@ -925,6 +935,12 @@ const finalTotalCount = applyCircle ? processedItemsSorted.length : totalCount;
 **프론트엔드 준비 완료:**
 
 - 백엔드 구현 완료 시 **즉시 작동** (프론트엔드 수정 불필요)
+
+**업데이트(2025-10-10): 백엔드 답신 반영**
+
+- 계약일 범위 `contract_date_from/to` 지원 확인 → 프론트 매핑 동작 검증 완료
+- 주소 검색 Option A/B 지원 확인 → 프론트 매핑에서 address_search_type 적용(지번/도로명)
+- 선택 ID 필터 `ids` 지원 확인 → 프론트에서 서버 연동 및 동작 검증 완료
   }
 
 ```

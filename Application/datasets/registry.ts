@@ -724,6 +724,21 @@ export const datasetConfigs: Record<DatasetId, DatasetConfig> = {
         const allowedFilters = pickAllowed(filters as any, SALE_FILTERS);
         const cleanFilters = { ...allowedFilters } as Record<string, unknown>;
 
+        // 선택 항목만 보기(ids) 서버 필터 연동: showSelectedOnly && selectedIds 있을 때만 적용
+        try {
+          const selOnly = (filters as any)?.showSelectedOnly === true;
+          const idsArr = Array.isArray((filters as any)?.selectedIds)
+            ? ((filters as any)?.selectedIds as any[])
+            : [];
+          if (selOnly && idsArr.length > 0) {
+            const capped = idsArr
+              .slice(0, 500)
+              .map((v) => String(v))
+              .filter((s) => s && s !== "undefined" && s !== "null");
+            if (capped.length > 0) (cleanFilters as any).ids = capped.join(",");
+          }
+        } catch {}
+
         // 지역 필터를 real_transactions 백엔드 필드명으로 매핑
         if (allowedFilters.province) {
           cleanFilters.sido = allowedFilters.province;
@@ -841,12 +856,23 @@ export const datasetConfigs: Record<DatasetId, DatasetConfig> = {
           delete cleanFilters.elevatorAvailable;
         }
 
-        // 주소 검색 매핑
+        // 주소 검색 매핑 (백엔드 옵션 A/B 모두 지원)
         if (allowedFilters.searchQuery && allowedFilters.searchField) {
-          if (allowedFilters.searchField === "address") {
-            cleanFilters.address_search = allowedFilters.searchQuery;
-          } else if (allowedFilters.searchField === "road_address") {
-            cleanFilters.road_address_search = allowedFilters.searchQuery;
+          const sf = String(allowedFilters.searchField);
+          const q = allowedFilters.searchQuery as string;
+          if (sf === "address") {
+            // 도로명 주소 검색 (Option A)
+            (cleanFilters as any).address_search = q;
+            (cleanFilters as any).address_search_type = "road";
+          } else if (sf === "jibun_address") {
+            // 지번 주소 검색 (Option A)
+            (cleanFilters as any).address_search = q;
+            (cleanFilters as any).address_search_type = "jibun";
+            // Option B(병행)도 추가로 세팅 가능: 서버가 우선순위 처리
+            // (cleanFilters as any).jibun_address_search = q;
+          } else if (sf === "road_address") {
+            // 전용 도로명 파라미터 (Option B)
+            (cleanFilters as any).road_address_search = q;
           }
           delete cleanFilters.searchQuery;
           delete cleanFilters.searchField;
@@ -867,6 +893,21 @@ export const datasetConfigs: Record<DatasetId, DatasetConfig> = {
         // 화이트리스트로 허용된 필터만 선택
         const allowedFilters = pickAllowed(filters as any, SALE_FILTERS);
         const cleanFilters = { ...allowedFilters } as Record<string, unknown>;
+
+        // 선택 항목만 보기(ids) 서버 필터 연동
+        try {
+          const selOnly = (filters as any)?.showSelectedOnly === true;
+          const idsArr = Array.isArray((filters as any)?.selectedIds)
+            ? ((filters as any)?.selectedIds as any[])
+            : [];
+          if (selOnly && idsArr.length > 0) {
+            const capped = idsArr
+              .slice(0, 500)
+              .map((v) => String(v))
+              .filter((s) => s && s !== "undefined" && s !== "null");
+            if (capped.length > 0) (cleanFilters as any).ids = capped.join(",");
+          }
+        } catch {}
 
         // 지역 필터를 real_transactions 백엔드 필드명으로 매핑
         if (allowedFilters.province) {
@@ -1007,12 +1048,19 @@ export const datasetConfigs: Record<DatasetId, DatasetConfig> = {
           delete cleanFilters.elevatorAvailable;
         }
 
-        // 주소 검색 매핑
+        // 주소 검색 매핑 (백엔드 옵션 A/B 모두 지원)
         if (allowedFilters.searchQuery && allowedFilters.searchField) {
-          if (allowedFilters.searchField === "address") {
-            cleanFilters.address_search = allowedFilters.searchQuery;
-          } else if (allowedFilters.searchField === "road_address") {
-            cleanFilters.road_address_search = allowedFilters.searchQuery;
+          const sf = String(allowedFilters.searchField);
+          const q = allowedFilters.searchQuery as string;
+          if (sf === "address") {
+            (cleanFilters as any).address_search = q;
+            (cleanFilters as any).address_search_type = "road";
+          } else if (sf === "jibun_address") {
+            (cleanFilters as any).address_search = q;
+            (cleanFilters as any).address_search_type = "jibun";
+            // (cleanFilters as any).jibun_address_search = q; // 필요 시 병행
+          } else if (sf === "road_address") {
+            (cleanFilters as any).road_address_search = q;
           }
           delete cleanFilters.searchQuery;
           delete cleanFilters.searchField;
@@ -1027,8 +1075,10 @@ export const datasetConfigs: Record<DatasetId, DatasetConfig> = {
         });
 
         console.log("🟢 [sale fetchList] 백엔드 응답:", {
-          total: result.total,
-          itemsCount: result.items?.length,
+          total: (result as any)?.count,
+          itemsCount: Array.isArray((result as any)?.results)
+            ? (result as any)?.results.length
+            : undefined,
           hasContractDateFilter: !!(
             cleanFilters.contract_date_from || cleanFilters.contract_date_to
           ),
