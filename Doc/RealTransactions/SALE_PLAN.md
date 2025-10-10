@@ -865,42 +865,68 @@ const finalTotalCount = applyCircle ? processedItemsSorted.length : totalCount;
    - Frontend: `dateRange: [startDate, endDate]`
    - Backend: `contract_date_from`, `contract_date_to`
 
-7. **층확인** ⚠️ 문제 발견
+7. **층확인** ❌ 백엔드 미구현 (2025-10-07)
 
-   - Frontend: `floorConfirmation: ["first_floor", "general"]`
-   - Backend: `floor_confirmation: "first_floor,general"`
-   - 현재 상태: "a,l,l,first_floor" 형식으로 잘못 전달됨
-   - 원인: 배열 → 문자열 변환 로직 누락
+   - Frontend: `floorConfirmation: ["first_floor", "general"]` ✅
+   - Backend: `floor_confirmation: "first_floor,general"` ✅
+   - 프론트엔드 변환: 정상 작동 (registry.ts 955-967줄)
+   - **문제**: 백엔드 API가 `floor_confirmation` 파라미터를 처리하지 않음
+   - **백엔드 요청**: `Communication/Backend/send/Request/251007_Frontend_to_Backend_실거래가매매_필터링_구현요청.md`
 
-8. **엘리베이터** ⚠️ 검증 필요
+8. **엘리베이터** ❌ 백엔드 미구현 (2025-10-07)
 
-   - Frontend: `elevatorAvailable: true/false`
-   - Backend: `elevator_available: true/false`
+   - Frontend: `elevatorAvailable: true/false` ✅
+   - Backend: `elevator_available: true/false` ✅
+   - 프론트엔드 변환: 정상 작동 (registry.ts 969-976줄)
+   - **문제**: 백엔드 API가 `elevator_available` 파라미터를 처리하지 않음
+   - **백엔드 요청**: `Communication/Backend/send/Request/251007_Frontend_to_Backend_실거래가매매_필터링_구현요청.md`
 
 9. **주소 검색** ✅
    - Frontend: `searchQuery` + `searchField`
    - Backend: `address_search` or `road_address_search`
 
-### 3단계: 층확인 필터 수정 🔄 (2025-10-07)
+### 3단계: 층확인/엘리베이터 필터 문제 분석 ✅ (2025-10-07)
 
-**문제:**
+**초기 가설 (잘못됨):**
 
-- UI에 "층확인: a,l,l,first_floor" 표시
-- 필터 적용되지 않음 (3,092건 → 3,092건)
+- ❌ 빈 배열 체크 누락
+- ❌ 클라이언트 사이드 필터링 필요
 
-**수정 작업:**
+**정확한 원인 (코드 비교 분석):**
 
-```typescript
-// Application/datasets/registry.ts (Line 810-816)
-// Before:
-cleanFilters.floor_confirmation = allowedFilters.floorConfirmation;
+1. **프론트엔드 코드 검증** ✅
 
-// After:
-if (Array.isArray(allowedFilters.floorConfirmation)) {
-  cleanFilters.floor_confirmation = allowedFilters.floorConfirmation.join(",");
-} else {
-  cleanFilters.floor_confirmation = allowedFilters.floorConfirmation;
-}
+   - `Application/datasets/registry.ts` (805-826줄, 955-976줄)
+   - 층확인: 배열 → 콤마 구분 문자열 변환 정상
+   - 엘리베이터: Boolean 값 전달 정상
+   - 경매결과와 동일한 로직
+
+2. **백엔드 API 비교** ✅
+   - 경매결과 API (`/api/v1/auction-completed/`): 층확인/엘리베이터 필터 **정상 작동**
+   - 실거래가 API (`/api/v1/real-transactions/`): 층확인/엘리베이터 필터 **미구현**
+
+**결론:**
+
+- 프론트엔드: 완벽하게 구현됨 ✅
+- 백엔드: 구현 필요 ❌
+
+**백엔드 요청 문서 작성 완료:**
+
+- `Communication/Backend/send/Request/251007_Frontend_to_Backend_실거래가매매_필터링_구현요청.md` (275줄)
+- 상세 구현 가이드, 테스트 케이스, 체크리스트 포함
+
+### 4단계: 백엔드 구현 대기 ⏳ (2025-10-07)
+
+**대기 사항:**
+
+- `/api/v1/real-transactions/` API에 `floor_confirmation`, `elevator_available` 필터 추가
+- 예상 소요 시간: 1-2시간 (경매결과 API 패턴 참고)
+
+**프론트엔드 준비 완료:**
+
+- 백엔드 구현 완료 시 **즉시 작동** (프론트엔드 수정 불필요)
+  }
+
 ```
 
 ### 4단계: 검증 계획 🔄 (2025-10-07)
@@ -919,24 +945,30 @@ if (Array.isArray(allowedFilters.floorConfirmation)) {
 **현재 진행률:**
 
 ```
+
 [██░░░░░░░░] 20% 완료
 
 ✅ 완료: 2개 작업
-  - 필터 파라미터 매핑 분석
-  - 필터 파라미터 매핑 구현 (9개)
+
+- 필터 파라미터 매핑 분석
+- 필터 파라미터 매핑 구현 (9개)
 
 🔄 진행 중: 2개 작업
-  - 층확인 필터 문제 해결
-  - 8개 필터 개별 검증
+
+- 층확인 필터 문제 해결
+- 8개 필터 개별 검증
 
 ⚠️ 발견된 문제:
-  - 층확인 필터: "all" → 배열 변환 로직 문제
-  - 프론트엔드 SaleFilter 컴포넌트 초기화 로직 확인 필요
+
+- 층확인 필터: "all" → 배열 변환 로직 문제
+- 프론트엔드 SaleFilter 컴포넌트 초기화 로직 확인 필요
 
 예상 소요 시간:
-  - 층확인/엘리베이터 수정: 1시간
-  - 전체 필터 검증: 2시간
-  - 전체: 3시간
+
+- 층확인/엘리베이터 수정: 1시간
+- 전체 필터 검증: 2시간
+- 전체: 3시간
+
 ```
 
 ### 다음 단계:
@@ -956,3 +988,4 @@ if (Array.isArray(allowedFilters.floorConfirmation)) {
 3. **문서화:**
    - 각 필터별 테스트 결과 기록
    - 발견된 이슈 문서화
+```

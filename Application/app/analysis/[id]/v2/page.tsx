@@ -832,7 +832,6 @@ export default function PropertyDetailV2Page() {
   if (isLoading || isRefreshing) {
     return (
       <div className="min-h-screen bg-gray-50">
-        <Header user={user} />
         <div className="container mx-auto px-4 py-8">
           <LoadingState title="불러오는 중입니다..." />
         </div>
@@ -843,7 +842,6 @@ export default function PropertyDetailV2Page() {
   if (error) {
     return (
       <div className="min-h-screen bg-gray-50">
-        <Header user={user} />
         <div className="container mx-auto px-4 py-8 space-y-4">
           <ErrorState
             title={mapApiErrorToMessage(error)}
@@ -866,7 +864,6 @@ export default function PropertyDetailV2Page() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Header user={user} />
       <div className="container mx-auto px-4 py-8 space-y-8">
         {/* 상단 네비게이션 */}
         <div className="flex items-center justify-between">

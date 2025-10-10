@@ -1,4 +1,4 @@
-import Header from "@/components/layout/header"
+import Header from "@/components/layout/header";
 
 export default function PropertyDetailLoading() {
   const user = {
@@ -7,12 +7,10 @@ export default function PropertyDetailLoading() {
       plan: "Pro",
       expiresAt: "2024-12-31",
     },
-  }
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Header user={user} />
-
       <div className="container mx-auto px-4 py-8">
         <div className="animate-pulse">
           {/* 상단 네비게이션 */}
@@ -54,7 +52,10 @@ export default function PropertyDetailLoading() {
                 <div className="h-6 bg-gray-200 rounded w-24 mb-4"></div>
                 <div className="grid grid-cols-2 gap-4">
                   {[...Array(4)].map((_, i) => (
-                    <div key={i} className="aspect-video bg-gray-200 rounded-lg"></div>
+                    <div
+                      key={i}
+                      className="aspect-video bg-gray-200 rounded-lg"
+                    ></div>
                   ))}
                 </div>
               </div>
@@ -64,14 +65,20 @@ export default function PropertyDetailLoading() {
                 <div className="border-b">
                   <div className="flex space-x-8 p-6">
                     {[...Array(4)].map((_, i) => (
-                      <div key={i} className="h-4 bg-gray-200 rounded w-16"></div>
+                      <div
+                        key={i}
+                        className="h-4 bg-gray-200 rounded w-16"
+                      ></div>
                     ))}
                   </div>
                 </div>
                 <div className="p-6">
                   <div className="space-y-4">
                     {[...Array(6)].map((_, i) => (
-                      <div key={i} className="h-4 bg-gray-200 rounded w-full"></div>
+                      <div
+                        key={i}
+                        className="h-4 bg-gray-200 rounded w-full"
+                      ></div>
                     ))}
                   </div>
                 </div>
@@ -105,5 +112,5 @@ export default function PropertyDetailLoading() {
         </div>
       </div>
     </div>
-  )
+  );
 }

@@ -1,11 +1,17 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from "react"
-import Link from "next/link"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Badge } from "@/components/ui/badge"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { useState, useEffect } from "react";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   ArrowLeft,
   Megaphone,
@@ -29,44 +35,44 @@ import {
   MessageSquare,
   ThumbsUp,
   Download,
-} from "lucide-react"
+} from "lucide-react";
 
 interface Notice {
-  id: string
-  title: string
-  content: string
-  summary: string
-  category: "announcement" | "update" | "maintenance" | "event" | "policy"
-  priority: "normal" | "important" | "urgent"
-  isPinned: boolean
-  isNew: boolean
-  author: string
-  publishedAt: string
-  updatedAt?: string
-  views: number
-  likes: number
-  comments: number
-  tags: string[]
+  id: string;
+  title: string;
+  content: string;
+  summary: string;
+  category: "announcement" | "update" | "maintenance" | "event" | "policy";
+  priority: "normal" | "important" | "urgent";
+  isPinned: boolean;
+  isNew: boolean;
+  author: string;
+  publishedAt: string;
+  updatedAt?: string;
+  views: number;
+  likes: number;
+  comments: number;
+  tags: string[];
   attachments?: {
-    name: string
-    url: string
-    size: string
-  }[]
-  relatedNotices?: string[]
+    name: string;
+    url: string;
+    size: string;
+  }[];
+  relatedNotices?: string[];
 }
 
 export default function NoticesPage() {
-  const [notices, setNotices] = useState<Notice[]>([])
-  const [filteredNotices, setFilteredNotices] = useState<Notice[]>([])
-  const [selectedNotice, setSelectedNotice] = useState<Notice | null>(null)
-  const [searchTerm, setSearchTerm] = useState("")
-  const [selectedCategory, setSelectedCategory] = useState("all")
-  const [selectedPriority, setSelectedPriority] = useState("all")
-  const [sortBy, setSortBy] = useState("publishedAt")
-  const [isLoading, setIsLoading] = useState(true)
-  const [bookmarkedNotices, setBookmarkedNotices] = useState<string[]>([])
-  const [currentPage, setCurrentPage] = useState(1)
-  const [itemsPerPage] = useState(10)
+  const [notices, setNotices] = useState<Notice[]>([]);
+  const [filteredNotices, setFilteredNotices] = useState<Notice[]>([]);
+  const [selectedNotice, setSelectedNotice] = useState<Notice | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("all");
+  const [selectedPriority, setSelectedPriority] = useState("all");
+  const [sortBy, setSortBy] = useState("publishedAt");
+  const [isLoading, setIsLoading] = useState(true);
+  const [bookmarkedNotices, setBookmarkedNotices] = useState<string[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(10);
 
   // 모의 공지사항 데이터
   const mockNotices: Notice[] = [
@@ -183,7 +189,8 @@ export default function NoticesPage() {
 - 전담 고객 지원
 
 지금 바로 가입하고 부스터의 강력한 기능을 체험해보세요!`,
-      summary: "신규 회원 대상으로 무료 체험 기간을 기존 7일에서 14일로 연장하는 특별 이벤트를 진행합니다.",
+      summary:
+        "신규 회원 대상으로 무료 체험 기간을 기존 7일에서 14일로 연장하는 특별 이벤트를 진행합니다.",
       category: "event",
       priority: "normal",
       isPinned: false,
@@ -210,7 +217,8 @@ export default function NoticesPage() {
 2024년 2월 15일부터 시행됩니다.
 
 자세한 내용은 개인정보처리방침 페이지에서 확인하실 수 있습니다.`,
-      summary: "개인정보보호법 개정에 따른 개인정보처리방침 개정 사항을 안내드립니다.",
+      summary:
+        "개인정보보호법 개정에 따른 개인정보처리방침 개정 사항을 안내드립니다.",
       category: "policy",
       priority: "normal",
       isPinned: false,
@@ -245,7 +253,8 @@ export default function NoticesPage() {
 3. 고객 지원 채널 확대
 
 소중한 의견을 주신 모든 분들께 감사드립니다.`,
-      summary: "2023년 4분기 사용자 만족도 조사 결과와 향후 개선 계획을 안내드립니다.",
+      summary:
+        "2023년 4분기 사용자 만족도 조사 결과와 향후 개선 계획을 안내드립니다.",
       category: "announcement",
       priority: "normal",
       isPinned: false,
@@ -257,39 +266,51 @@ export default function NoticesPage() {
       comments: 12,
       tags: ["만족도조사", "결과발표", "개선계획"],
     },
-  ]
+  ];
 
   const categories = [
     { value: "all", label: "전체", icon: <Megaphone className="w-4 h-4" /> },
-    { value: "announcement", label: "공지사항", icon: <Info className="w-4 h-4" /> },
+    {
+      value: "announcement",
+      label: "공지사항",
+      icon: <Info className="w-4 h-4" />,
+    },
     { value: "update", label: "업데이트", icon: <Zap className="w-4 h-4" /> },
-    { value: "maintenance", label: "점검", icon: <Settings className="w-4 h-4" /> },
+    {
+      value: "maintenance",
+      label: "점검",
+      icon: <Settings className="w-4 h-4" />,
+    },
     { value: "event", label: "이벤트", icon: <Gift className="w-4 h-4" /> },
-    { value: "policy", label: "정책", icon: <AlertTriangle className="w-4 h-4" /> },
-  ]
+    {
+      value: "policy",
+      label: "정책",
+      icon: <AlertTriangle className="w-4 h-4" />,
+    },
+  ];
 
   const priorities = [
     { value: "all", label: "전체" },
     { value: "urgent", label: "긴급" },
     { value: "important", label: "중요" },
     { value: "normal", label: "일반" },
-  ]
+  ];
 
   useEffect(() => {
     // 데이터 로딩 시뮬레이션
     const loadNotices = async () => {
-      setIsLoading(true)
-      await new Promise((resolve) => setTimeout(resolve, 1000))
-      setNotices(mockNotices)
-      setIsLoading(false)
-    }
+      setIsLoading(true);
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      setNotices(mockNotices);
+      setIsLoading(false);
+    };
 
-    loadNotices()
-  }, [])
+    loadNotices();
+  }, []);
 
   useEffect(() => {
     // 필터링 및 정렬 적용
-    let filtered = [...notices]
+    let filtered = [...notices];
 
     // 검색 필터
     if (searchTerm) {
@@ -297,96 +318,113 @@ export default function NoticesPage() {
         (notice) =>
           notice.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
           notice.content.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          notice.tags.some((tag) => tag.toLowerCase().includes(searchTerm.toLowerCase())),
-      )
+          notice.tags.some((tag) =>
+            tag.toLowerCase().includes(searchTerm.toLowerCase())
+          )
+      );
     }
 
     // 카테고리 필터
     if (selectedCategory !== "all") {
-      filtered = filtered.filter((notice) => notice.category === selectedCategory)
+      filtered = filtered.filter(
+        (notice) => notice.category === selectedCategory
+      );
     }
 
     // 우선순위 필터
     if (selectedPriority !== "all") {
-      filtered = filtered.filter((notice) => notice.priority === selectedPriority)
+      filtered = filtered.filter(
+        (notice) => notice.priority === selectedPriority
+      );
     }
 
     // 정렬
     filtered.sort((a, b) => {
       // 고정된 공지사항을 맨 위로
-      if (a.isPinned && !b.isPinned) return -1
-      if (!a.isPinned && b.isPinned) return 1
+      if (a.isPinned && !b.isPinned) return -1;
+      if (!a.isPinned && b.isPinned) return 1;
 
       // 우선순위별 정렬
-      const priorityOrder = { urgent: 3, important: 2, normal: 1 }
+      const priorityOrder = { urgent: 3, important: 2, normal: 1 };
       if (a.priority !== b.priority) {
-        return priorityOrder[b.priority] - priorityOrder[a.priority]
+        return priorityOrder[b.priority] - priorityOrder[a.priority];
       }
 
       // 선택된 정렬 기준 적용
       switch (sortBy) {
         case "publishedAt":
-          return new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime()
+          return (
+            new Date(b.publishedAt).getTime() -
+            new Date(a.publishedAt).getTime()
+          );
         case "views":
-          return b.views - a.views
+          return b.views - a.views;
         case "likes":
-          return b.likes - a.likes
+          return b.likes - a.likes;
         case "title":
-          return a.title.localeCompare(b.title)
+          return a.title.localeCompare(b.title);
         default:
-          return 0
+          return 0;
       }
-    })
+    });
 
-    setFilteredNotices(filtered)
-    setCurrentPage(1)
-  }, [notices, searchTerm, selectedCategory, selectedPriority, sortBy])
+    setFilteredNotices(filtered);
+    setCurrentPage(1);
+  }, [notices, searchTerm, selectedCategory, selectedPriority, sortBy]);
 
   const handleBookmark = (noticeId: string) => {
     setBookmarkedNotices((prev) =>
-      prev.includes(noticeId) ? prev.filter((id) => id !== noticeId) : [...prev, noticeId],
-    )
-  }
+      prev.includes(noticeId)
+        ? prev.filter((id) => id !== noticeId)
+        : [...prev, noticeId]
+    );
+  };
 
   const handleNoticeClick = (notice: Notice) => {
-    setSelectedNotice(notice)
+    setSelectedNotice(notice);
     // 조회수 증가 (실제로는 API 호출)
-    setNotices((prev) => prev.map((n) => (n.id === notice.id ? { ...n, views: n.views + 1 } : n)))
-  }
+    setNotices((prev) =>
+      prev.map((n) => (n.id === notice.id ? { ...n, views: n.views + 1 } : n))
+    );
+  };
 
   const getCategoryIcon = (category: string) => {
-    const categoryData = categories.find((cat) => cat.value === category)
-    return categoryData?.icon || <Info className="w-4 h-4" />
-  }
+    const categoryData = categories.find((cat) => cat.value === category);
+    return categoryData?.icon || <Info className="w-4 h-4" />;
+  };
 
   const getCategoryLabel = (category: string) => {
-    const categoryData = categories.find((cat) => cat.value === category)
-    return categoryData?.label || category
-  }
+    const categoryData = categories.find((cat) => cat.value === category);
+    return categoryData?.label || category;
+  };
 
   const getPriorityBadge = (priority: string) => {
     const variants: { [key: string]: any } = {
       urgent: "destructive",
       important: "default",
       normal: "secondary",
-    }
+    };
 
     const labels: { [key: string]: string } = {
       urgent: "긴급",
       important: "중요",
       normal: "일반",
-    }
+    };
 
-    return <Badge variant={variants[priority] || "secondary"}>{labels[priority] || priority}</Badge>
-  }
+    return (
+      <Badge variant={variants[priority] || "secondary"}>
+        {labels[priority] || priority}
+      </Badge>
+    );
+  };
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString("ko-KR", {
       year: "numeric",
       month: "long",
       day: "numeric",
-    })
-  }
+    });
+  };
 
   const formatDateTime = (dateString: string) => {
     return new Date(dateString).toLocaleString("ko-KR", {
@@ -395,14 +433,14 @@ export default function NoticesPage() {
       day: "numeric",
       hour: "2-digit",
       minute: "2-digit",
-    })
-  }
+    });
+  };
 
   // 페이지네이션
-  const totalPages = Math.ceil(filteredNotices.length / itemsPerPage)
-  const startIndex = (currentPage - 1) * itemsPerPage
-  const endIndex = startIndex + itemsPerPage
-  const currentNotices = filteredNotices.slice(startIndex, endIndex)
+  const totalPages = Math.ceil(filteredNotices.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const currentNotices = filteredNotices.slice(startIndex, endIndex);
 
   if (selectedNotice) {
     // 공지사항 상세 보기
@@ -438,7 +476,11 @@ export default function NoticesPage() {
                   variant="ghost"
                   size="sm"
                   onClick={() => handleBookmark(selectedNotice.id)}
-                  className={bookmarkedNotices.includes(selectedNotice.id) ? "text-blue-600" : ""}
+                  className={
+                    bookmarkedNotices.includes(selectedNotice.id)
+                      ? "text-blue-600"
+                      : ""
+                  }
                 >
                   {bookmarkedNotices.includes(selectedNotice.id) ? (
                     <BookmarkCheck className="w-4 h-4 mr-2" />
@@ -459,21 +501,31 @@ export default function NoticesPage() {
               <div className="flex-1">
                 <div className="flex items-center space-x-3 mb-4">
                   {getCategoryIcon(selectedNotice.category)}
-                  <span className="text-sm font-medium text-gray-600">{getCategoryLabel(selectedNotice.category)}</span>
+                  <span className="text-sm font-medium text-gray-600">
+                    {getCategoryLabel(selectedNotice.category)}
+                  </span>
                   {getPriorityBadge(selectedNotice.priority)}
                   {selectedNotice.isPinned && (
-                    <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">
+                    <Badge
+                      variant="outline"
+                      className="bg-yellow-50 text-yellow-700 border-yellow-200"
+                    >
                       <Pin className="w-3 h-3 mr-1" />
                       고정
                     </Badge>
                   )}
                   {selectedNotice.isNew && (
-                    <Badge variant="secondary" className="bg-red-100 text-red-800">
+                    <Badge
+                      variant="secondary"
+                      className="bg-red-100 text-red-800"
+                    >
                       NEW
                     </Badge>
                   )}
                 </div>
-                <h1 className="text-3xl font-bold text-gray-900 mb-4">{selectedNotice.title}</h1>
+                <h1 className="text-3xl font-bold text-gray-900 mb-4">
+                  {selectedNotice.title}
+                </h1>
                 <div className="flex items-center space-x-6 text-sm text-gray-500">
                   <div className="flex items-center">
                     <User className="w-4 h-4 mr-1" />
@@ -513,45 +565,60 @@ export default function NoticesPage() {
           {/* 공지사항 내용 */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 mb-6">
             <div className="prose max-w-none">
-              <div className="whitespace-pre-wrap text-gray-700 leading-relaxed">{selectedNotice.content}</div>
+              <div className="whitespace-pre-wrap text-gray-700 leading-relaxed">
+                {selectedNotice.content}
+              </div>
             </div>
 
             {/* 첨부파일 */}
-            {selectedNotice.attachments && selectedNotice.attachments.length > 0 && (
-              <div className="mt-8 pt-6 border-t border-gray-200">
-                <h3 className="font-semibold text-gray-900 mb-4">첨부파일</h3>
-                <div className="space-y-2">
-                  {selectedNotice.attachments.map((file, index) => (
-                    <div
-                      key={index}
-                      className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
-                    >
-                      <div className="flex items-center space-x-3">
-                        <Download className="w-5 h-5 text-blue-600" />
-                        <div>
-                          <div className="font-medium text-gray-900">{file.name}</div>
-                          <div className="text-sm text-gray-500">{file.size}</div>
+            {selectedNotice.attachments &&
+              selectedNotice.attachments.length > 0 && (
+                <div className="mt-8 pt-6 border-t border-gray-200">
+                  <h3 className="font-semibold text-gray-900 mb-4">첨부파일</h3>
+                  <div className="space-y-2">
+                    {selectedNotice.attachments.map((file, index) => (
+                      <div
+                        key={index}
+                        className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+                      >
+                        <div className="flex items-center space-x-3">
+                          <Download className="w-5 h-5 text-blue-600" />
+                          <div>
+                            <div className="font-medium text-gray-900">
+                              {file.name}
+                            </div>
+                            <div className="text-sm text-gray-500">
+                              {file.size}
+                            </div>
+                          </div>
                         </div>
+                        <Button variant="ghost" size="sm">
+                          <Download className="w-4 h-4" />
+                        </Button>
                       </div>
-                      <Button variant="ghost" size="sm">
-                        <Download className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
           </div>
 
           {/* 액션 버튼 */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-4">
-                <Button variant="ghost" size="sm" className="text-blue-600 hover:text-blue-700">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-blue-600 hover:text-blue-700"
+                >
                   <ThumbsUp className="w-4 h-4 mr-2" />
                   도움됨 ({selectedNotice.likes})
                 </Button>
-                <Button variant="ghost" size="sm" className="text-gray-600 hover:text-gray-700">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-gray-600 hover:text-gray-700"
+                >
                   <MessageSquare className="w-4 h-4 mr-2" />
                   댓글 ({selectedNotice.comments})
                 </Button>
@@ -565,7 +632,11 @@ export default function NoticesPage() {
                   variant="outline"
                   size="sm"
                   onClick={() => handleBookmark(selectedNotice.id)}
-                  className={bookmarkedNotices.includes(selectedNotice.id) ? "text-blue-600 border-blue-200" : ""}
+                  className={
+                    bookmarkedNotices.includes(selectedNotice.id)
+                      ? "text-blue-600 border-blue-200"
+                      : ""
+                  }
                 >
                   {bookmarkedNotices.includes(selectedNotice.id) ? (
                     <BookmarkCheck className="w-4 h-4 mr-2" />
@@ -579,72 +650,51 @@ export default function NoticesPage() {
           </div>
 
           {/* 관련 공지사항 */}
-          {selectedNotice.relatedNotices && selectedNotice.relatedNotices.length > 0 && (
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-              <h3 className="font-semibold text-gray-900 mb-4">관련 공지사항</h3>
-              <div className="space-y-3">
-                {selectedNotice.relatedNotices.map((relatedId) => {
-                  const relatedNotice = notices.find((n) => n.id === relatedId)
-                  if (!relatedNotice) return null
+          {selectedNotice.relatedNotices &&
+            selectedNotice.relatedNotices.length > 0 && (
+              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                <h3 className="font-semibold text-gray-900 mb-4">
+                  관련 공지사항
+                </h3>
+                <div className="space-y-3">
+                  {selectedNotice.relatedNotices.map((relatedId) => {
+                    const relatedNotice = notices.find(
+                      (n) => n.id === relatedId
+                    );
+                    if (!relatedNotice) return null;
 
-                  return (
-                    <div
-                      key={relatedId}
-                      className="flex items-center justify-between p-3 hover:bg-gray-50 rounded-lg cursor-pointer transition-colors"
-                      onClick={() => handleNoticeClick(relatedNotice)}
-                    >
-                      <div className="flex items-center space-x-3">
-                        {getCategoryIcon(relatedNotice.category)}
-                        <div>
-                          <div className="font-medium text-gray-900">{relatedNotice.title}</div>
-                          <div className="text-sm text-gray-500">{formatDate(relatedNotice.publishedAt)}</div>
+                    return (
+                      <div
+                        key={relatedId}
+                        className="flex items-center justify-between p-3 hover:bg-gray-50 rounded-lg cursor-pointer transition-colors"
+                        onClick={() => handleNoticeClick(relatedNotice)}
+                      >
+                        <div className="flex items-center space-x-3">
+                          {getCategoryIcon(relatedNotice.category)}
+                          <div>
+                            <div className="font-medium text-gray-900">
+                              {relatedNotice.title}
+                            </div>
+                            <div className="text-sm text-gray-500">
+                              {formatDate(relatedNotice.publishedAt)}
+                            </div>
+                          </div>
                         </div>
+                        <ChevronRight className="w-5 h-5 text-gray-400" />
                       </div>
-                      <ChevronRight className="w-5 h-5 text-gray-400" />
-                    </div>
-                  )
-                })}
+                    );
+                  })}
+                </div>
               </div>
-            </div>
-          )}
+            )}
         </div>
       </div>
-    )
+    );
   }
 
   // 공지사항 목록 보기
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* 헤더 */}
-      <div className="bg-white border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center space-x-4">
-              <Button variant="ghost" size="sm" asChild className="text-gray-600 hover:text-gray-900">
-                <Link href="/">
-                  <ArrowLeft className="w-4 h-4 mr-2" />
-                  홈으로
-                </Link>
-              </Button>
-              <div className="h-6 w-px bg-gray-300"></div>
-              <Link href="/" className="flex items-center">
-                <div className="text-xl font-bold text-blue-600">부스터</div>
-                <div className="ml-2 text-sm text-gray-500">Booster</div>
-              </Link>
-            </div>
-
-            <div className="flex items-center space-x-3">
-              <Button variant="outline" size="sm" asChild>
-                <Link href="/support">
-                  <Bell className="w-4 h-4 mr-2" />
-                  알림 설정
-                </Link>
-              </Button>
-            </div>
-          </div>
-        </div>
-      </div>
-
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* 페이지 헤더 */}
         <div className="text-center mb-12">
@@ -652,7 +702,9 @@ export default function NoticesPage() {
             <Megaphone className="w-12 h-12 text-blue-600" />
           </div>
           <h1 className="text-4xl font-bold text-gray-900 mb-4">공지사항</h1>
-          <p className="text-lg text-gray-600">부스터의 최신 소식과 업데이트를 확인하세요</p>
+          <p className="text-lg text-gray-600">
+            부스터의 최신 소식과 업데이트를 확인하세요
+          </p>
         </div>
 
         {/* 검색 및 필터 */}
@@ -673,7 +725,10 @@ export default function NoticesPage() {
 
             {/* 필터 */}
             <div className="flex flex-col sm:flex-row gap-3">
-              <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+              <Select
+                value={selectedCategory}
+                onValueChange={setSelectedCategory}
+              >
                 <SelectTrigger className="w-full sm:w-40">
                   <SelectValue />
                 </SelectTrigger>
@@ -689,7 +744,10 @@ export default function NoticesPage() {
                 </SelectContent>
               </Select>
 
-              <Select value={selectedPriority} onValueChange={setSelectedPriority}>
+              <Select
+                value={selectedPriority}
+                onValueChange={setSelectedPriority}
+              >
                 <SelectTrigger className="w-full sm:w-32">
                   <SelectValue />
                 </SelectTrigger>
@@ -726,8 +784,12 @@ export default function NoticesPage() {
         ) : filteredNotices.length === 0 ? (
           <div className="text-center py-12">
             <Megaphone className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">공지사항이 없습니다</h3>
-            <p className="text-gray-500">검색 조건을 변경하거나 나중에 다시 확인해주세요.</p>
+            <h3 className="text-lg font-medium text-gray-900 mb-2">
+              공지사항이 없습니다
+            </h3>
+            <p className="text-gray-500">
+              검색 조건을 변경하거나 나중에 다시 확인해주세요.
+            </p>
           </div>
         ) : (
           <div className="space-y-4">
@@ -741,16 +803,24 @@ export default function NoticesPage() {
                   <div className="flex-1">
                     <div className="flex items-center space-x-3 mb-3">
                       {getCategoryIcon(notice.category)}
-                      <span className="text-sm font-medium text-gray-600">{getCategoryLabel(notice.category)}</span>
+                      <span className="text-sm font-medium text-gray-600">
+                        {getCategoryLabel(notice.category)}
+                      </span>
                       {getPriorityBadge(notice.priority)}
                       {notice.isPinned && (
-                        <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">
+                        <Badge
+                          variant="outline"
+                          className="bg-yellow-50 text-yellow-700 border-yellow-200"
+                        >
                           <Pin className="w-3 h-3 mr-1" />
                           고정
                         </Badge>
                       )}
                       {notice.isNew && (
-                        <Badge variant="secondary" className="bg-red-100 text-red-800">
+                        <Badge
+                          variant="secondary"
+                          className="bg-red-100 text-red-800"
+                        >
                           NEW
                         </Badge>
                       )}
@@ -760,7 +830,9 @@ export default function NoticesPage() {
                       {notice.title}
                     </h2>
 
-                    <p className="text-gray-600 mb-4 line-clamp-2">{notice.summary}</p>
+                    <p className="text-gray-600 mb-4 line-clamp-2">
+                      {notice.summary}
+                    </p>
 
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-6 text-sm text-gray-500">
@@ -791,10 +863,14 @@ export default function NoticesPage() {
                           variant="ghost"
                           size="sm"
                           onClick={(e) => {
-                            e.stopPropagation()
-                            handleBookmark(notice.id)
+                            e.stopPropagation();
+                            handleBookmark(notice.id);
                           }}
-                          className={bookmarkedNotices.includes(notice.id) ? "text-blue-600" : "text-gray-400"}
+                          className={
+                            bookmarkedNotices.includes(notice.id)
+                              ? "text-blue-600"
+                              : "text-gray-400"
+                          }
                         >
                           {bookmarkedNotices.includes(notice.id) ? (
                             <BookmarkCheck className="w-4 h-4" />
@@ -810,12 +886,19 @@ export default function NoticesPage() {
                     {notice.tags.length > 0 && (
                       <div className="flex flex-wrap gap-2 mt-3">
                         {notice.tags.slice(0, 4).map((tag, index) => (
-                          <Badge key={index} variant="outline" className="text-xs bg-gray-50">
+                          <Badge
+                            key={index}
+                            variant="outline"
+                            className="text-xs bg-gray-50"
+                          >
                             {tag}
                           </Badge>
                         ))}
                         {notice.tags.length > 4 && (
-                          <Badge variant="outline" className="text-xs bg-gray-50">
+                          <Badge
+                            variant="outline"
+                            className="text-xs bg-gray-50"
+                          >
                             +{notice.tags.length - 4}
                           </Badge>
                         )}
@@ -841,7 +924,8 @@ export default function NoticesPage() {
             </Button>
 
             {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-              const pageNum = Math.max(1, Math.min(totalPages - 4, currentPage - 2)) + i
+              const pageNum =
+                Math.max(1, Math.min(totalPages - 4, currentPage - 2)) + i;
               return (
                 <Button
                   key={pageNum}
@@ -851,13 +935,15 @@ export default function NoticesPage() {
                 >
                   {pageNum}
                 </Button>
-              )
+              );
             })}
 
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+              onClick={() =>
+                setCurrentPage(Math.min(totalPages, currentPage + 1))
+              }
               disabled={currentPage === totalPages}
             >
               다음
@@ -867,9 +953,10 @@ export default function NoticesPage() {
 
         {/* 통계 정보 */}
         <div className="mt-8 text-center text-sm text-gray-500">
-          총 {filteredNotices.length}개의 공지사항 • 페이지 {currentPage} / {totalPages}
+          총 {filteredNotices.length}개의 공지사항 • 페이지 {currentPage} /{" "}
+          {totalPages}
         </div>
       </div>
     </div>
-  )
+  );
 }

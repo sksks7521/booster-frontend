@@ -1,17 +1,23 @@
-"use client"
+"use client";
 
-import type React from "react"
+import type React from "react";
 
-import { useState } from "react"
-import Link from "next/link"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
-import { Badge } from "@/components/ui/badge"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { useState } from "react";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   ArrowLeft,
   Headphones,
@@ -40,34 +46,34 @@ import {
   MessageSquare,
   Zap,
   ChevronDown,
-} from "lucide-react"
+} from "lucide-react";
 
 interface FAQ {
-  id: string
-  category: string
-  question: string
-  answer: string
-  helpful: number
-  tags: string[]
+  id: string;
+  category: string;
+  question: string;
+  answer: string;
+  helpful: number;
+  tags: string[];
 }
 
 interface SupportTicket {
-  id: string
-  subject: string
-  category: string
-  status: "open" | "in-progress" | "resolved" | "closed"
-  priority: "low" | "medium" | "high" | "urgent"
-  createdAt: string
-  lastUpdate: string
+  id: string;
+  subject: string;
+  category: string;
+  status: "open" | "in-progress" | "resolved" | "closed";
+  priority: "low" | "medium" | "high" | "urgent";
+  createdAt: string;
+  lastUpdate: string;
 }
 
 export default function SupportPage() {
-  const [activeTab, setActiveTab] = useState("contact")
-  const [searchTerm, setSearchTerm] = useState("")
-  const [selectedCategory, setSelectedCategory] = useState("all")
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [success, setSuccess] = useState("")
-  const [error, setError] = useState("")
+  const [activeTab, setActiveTab] = useState("contact");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("all");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [success, setSuccess] = useState("");
+  const [error, setError] = useState("");
 
   // 문의 폼 상태
   const [contactForm, setContactForm] = useState({
@@ -79,7 +85,7 @@ export default function SupportPage() {
     message: "",
     priority: "medium",
     attachments: [] as File[],
-  })
+  });
 
   // FAQ 데이터
   const faqs: FAQ[] = [
@@ -155,7 +161,7 @@ export default function SupportPage() {
       helpful: 27,
       tags: ["모바일", "앱", "접속"],
     },
-  ]
+  ];
 
   // 최근 티켓 데이터
   const recentTickets: SupportTicket[] = [
@@ -177,51 +183,81 @@ export default function SupportPage() {
       createdAt: "2024-01-30T16:45:00Z",
       lastUpdate: "2024-01-31T09:15:00Z",
     },
-  ]
+  ];
 
   const categories = [
     { value: "all", label: "전체", icon: <HelpCircle className="w-4 h-4" /> },
-    { value: "account", label: "계정/회원", icon: <Users className="w-4 h-4" /> },
-    { value: "service", label: "서비스 이용", icon: <Settings className="w-4 h-4" /> },
-    { value: "billing", label: "결제/요금", icon: <CreditCard className="w-4 h-4" /> },
-    { value: "technical", label: "기술 문제", icon: <Bug className="w-4 h-4" /> },
-    { value: "suggestion", label: "제안/개선", icon: <Lightbulb className="w-4 h-4" /> },
-  ]
+    {
+      value: "account",
+      label: "계정/회원",
+      icon: <Users className="w-4 h-4" />,
+    },
+    {
+      value: "service",
+      label: "서비스 이용",
+      icon: <Settings className="w-4 h-4" />,
+    },
+    {
+      value: "billing",
+      label: "결제/요금",
+      icon: <CreditCard className="w-4 h-4" />,
+    },
+    {
+      value: "technical",
+      label: "기술 문제",
+      icon: <Bug className="w-4 h-4" />,
+    },
+    {
+      value: "suggestion",
+      label: "제안/개선",
+      icon: <Lightbulb className="w-4 h-4" />,
+    },
+  ];
 
   const filteredFAQs = faqs.filter((faq) => {
     const matchesSearch =
       faq.question.toLowerCase().includes(searchTerm.toLowerCase()) ||
       faq.answer.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      faq.tags.some((tag) => tag.toLowerCase().includes(searchTerm.toLowerCase()))
-    const matchesCategory = selectedCategory === "all" || faq.category === selectedCategory
-    return matchesSearch && matchesCategory
-  })
+      faq.tags.some((tag) =>
+        tag.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    const matchesCategory =
+      selectedCategory === "all" || faq.category === selectedCategory;
+    return matchesSearch && matchesCategory;
+  });
 
   const handleContactFormChange = (field: string, value: string) => {
     setContactForm((prev) => ({
       ...prev,
       [field]: value,
-    }))
-  }
+    }));
+  };
 
   const handleSubmitContact = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setIsSubmitting(true)
-    setError("")
-    setSuccess("")
+    e.preventDefault();
+    setIsSubmitting(true);
+    setError("");
+    setSuccess("");
 
     // 유효성 검사
-    if (!contactForm.name || !contactForm.email || !contactForm.subject || !contactForm.message) {
-      setError("필수 항목을 모두 입력해주세요.")
-      setIsSubmitting(false)
-      return
+    if (
+      !contactForm.name ||
+      !contactForm.email ||
+      !contactForm.subject ||
+      !contactForm.message
+    ) {
+      setError("필수 항목을 모두 입력해주세요.");
+      setIsSubmitting(false);
+      return;
     }
 
     try {
       // 실제 구현에서는 API 호출
-      await new Promise((resolve) => setTimeout(resolve, 2000))
+      await new Promise((resolve) => setTimeout(resolve, 2000));
 
-      setSuccess("문의가 성공적으로 접수되었습니다. 빠른 시일 내에 답변드리겠습니다.")
+      setSuccess(
+        "문의가 성공적으로 접수되었습니다. 빠른 시일 내에 답변드리겠습니다."
+      );
       setContactForm({
         name: "",
         email: "",
@@ -231,13 +267,13 @@ export default function SupportPage() {
         message: "",
         priority: "medium",
         attachments: [],
-      })
+      });
     } catch (err) {
-      setError("문의 접수 중 오류가 발생했습니다. 다시 시도해주세요.")
+      setError("문의 접수 중 오류가 발생했습니다. 다시 시도해주세요.");
     } finally {
-      setIsSubmitting(false)
+      setIsSubmitting(false);
     }
-  }
+  };
 
   const getStatusBadge = (status: string) => {
     const variants: { [key: string]: any } = {
@@ -245,32 +281,36 @@ export default function SupportPage() {
       "in-progress": "secondary",
       resolved: "outline",
       closed: "destructive",
-    }
+    };
 
     const labels: { [key: string]: string } = {
       open: "접수",
       "in-progress": "처리중",
       resolved: "해결",
       closed: "종료",
-    }
+    };
 
-    return <Badge variant={variants[status] || "outline"}>{labels[status] || status}</Badge>
-  }
+    return (
+      <Badge variant={variants[status] || "outline"}>
+        {labels[status] || status}
+      </Badge>
+    );
+  };
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
       case "urgent":
-        return "text-red-600"
+        return "text-red-600";
       case "high":
-        return "text-orange-600"
+        return "text-orange-600";
       case "medium":
-        return "text-blue-600"
+        return "text-blue-600";
       case "low":
-        return "text-gray-600"
+        return "text-gray-600";
       default:
-        return "text-gray-600"
+        return "text-gray-600";
     }
-  }
+  };
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString("ko-KR", {
@@ -278,39 +318,11 @@ export default function SupportPage() {
       day: "numeric",
       hour: "2-digit",
       minute: "2-digit",
-    })
-  }
+    });
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* 헤더 */}
-      <div className="bg-white border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center space-x-4">
-              <Button variant="ghost" size="sm" asChild className="text-gray-600 hover:text-gray-900">
-                <Link href="/">
-                  <ArrowLeft className="w-4 h-4 mr-2" />
-                  홈으로
-                </Link>
-              </Button>
-              <div className="h-6 w-px bg-gray-300"></div>
-              <Link href="/" className="flex items-center">
-                <div className="text-xl font-bold text-blue-600">부스터</div>
-                <div className="ml-2 text-sm text-gray-500">Booster</div>
-              </Link>
-            </div>
-
-            <div className="flex items-center space-x-3">
-              <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-                <Clock className="w-3 h-3 mr-1" />
-                평일 09:00-18:00
-              </Badge>
-            </div>
-          </div>
-        </div>
-      </div>
-
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* 페이지 헤더 */}
         <div className="text-center mb-12">
@@ -318,7 +330,9 @@ export default function SupportPage() {
             <Headphones className="w-12 h-12 text-blue-600" />
           </div>
           <h1 className="text-4xl font-bold text-gray-900 mb-4">고객센터</h1>
-          <p className="text-lg text-gray-600 mb-8">궁금한 점이 있으시면 언제든지 문의해주세요</p>
+          <p className="text-lg text-gray-600 mb-8">
+            궁금한 점이 있으시면 언제든지 문의해주세요
+          </p>
 
           {/* 빠른 연락처 */}
           <div className="grid md:grid-cols-3 gap-6 max-w-4xl mx-auto">
@@ -332,7 +346,9 @@ export default function SupportPage() {
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
               <Mail className="w-8 h-8 text-green-600 mx-auto mb-3" />
               <h3 className="font-semibold text-gray-900 mb-2">이메일 문의</h3>
-              <p className="text-lg font-bold text-green-600 mb-1">support@booster.com</p>
+              <p className="text-lg font-bold text-green-600 mb-1">
+                support@booster.com
+              </p>
               <p className="text-sm text-gray-500">24시간 접수</p>
             </div>
 
@@ -351,20 +367,28 @@ export default function SupportPage() {
         {success && (
           <Alert className="mb-6 border-green-200 bg-green-50 max-w-4xl mx-auto">
             <CheckCircle className="h-4 w-4 text-green-600" />
-            <AlertDescription className="text-green-800">{success}</AlertDescription>
+            <AlertDescription className="text-green-800">
+              {success}
+            </AlertDescription>
           </Alert>
         )}
 
         {error && (
           <Alert className="mb-6 border-red-200 bg-red-50 max-w-4xl mx-auto">
             <AlertCircle className="h-4 w-4 text-red-600" />
-            <AlertDescription className="text-red-800">{error}</AlertDescription>
+            <AlertDescription className="text-red-800">
+              {error}
+            </AlertDescription>
           </Alert>
         )}
 
         {/* 메인 탭 */}
         <div className="max-w-6xl mx-auto">
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <Tabs
+            value={activeTab}
+            onValueChange={setActiveTab}
+            className="w-full"
+          >
             <TabsList className="grid w-full grid-cols-4 mb-8">
               <TabsTrigger value="contact" className="text-sm font-medium">
                 <Send className="w-4 h-4 mr-2" />
@@ -389,32 +413,44 @@ export default function SupportPage() {
                 {/* 문의 폼 */}
                 <div className="lg:col-span-2">
                   <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                    <h2 className="text-xl font-semibold text-gray-900 mb-6">문의 작성</h2>
+                    <h2 className="text-xl font-semibold text-gray-900 mb-6">
+                      문의 작성
+                    </h2>
 
                     <form onSubmit={handleSubmitContact} className="space-y-6">
                       <div className="grid md:grid-cols-2 gap-4">
                         <div className="space-y-2">
-                          <Label htmlFor="name" className="text-sm font-medium text-gray-700">
+                          <Label
+                            htmlFor="name"
+                            className="text-sm font-medium text-gray-700"
+                          >
                             이름 <span className="text-red-500">*</span>
                           </Label>
                           <Input
                             id="name"
                             value={contactForm.name}
-                            onChange={(e) => handleContactFormChange("name", e.target.value)}
+                            onChange={(e) =>
+                              handleContactFormChange("name", e.target.value)
+                            }
                             placeholder="이름을 입력하세요"
                             disabled={isSubmitting}
                           />
                         </div>
 
                         <div className="space-y-2">
-                          <Label htmlFor="email" className="text-sm font-medium text-gray-700">
+                          <Label
+                            htmlFor="email"
+                            className="text-sm font-medium text-gray-700"
+                          >
                             이메일 <span className="text-red-500">*</span>
                           </Label>
                           <Input
                             id="email"
                             type="email"
                             value={contactForm.email}
-                            onChange={(e) => handleContactFormChange("email", e.target.value)}
+                            onChange={(e) =>
+                              handleContactFormChange("email", e.target.value)
+                            }
                             placeholder="이메일을 입력하세요"
                             disabled={isSubmitting}
                           />
@@ -423,25 +459,35 @@ export default function SupportPage() {
 
                       <div className="grid md:grid-cols-2 gap-4">
                         <div className="space-y-2">
-                          <Label htmlFor="phone" className="text-sm font-medium text-gray-700">
+                          <Label
+                            htmlFor="phone"
+                            className="text-sm font-medium text-gray-700"
+                          >
                             전화번호
                           </Label>
                           <Input
                             id="phone"
                             value={contactForm.phone}
-                            onChange={(e) => handleContactFormChange("phone", e.target.value)}
+                            onChange={(e) =>
+                              handleContactFormChange("phone", e.target.value)
+                            }
                             placeholder="010-0000-0000"
                             disabled={isSubmitting}
                           />
                         </div>
 
                         <div className="space-y-2">
-                          <Label htmlFor="category" className="text-sm font-medium text-gray-700">
+                          <Label
+                            htmlFor="category"
+                            className="text-sm font-medium text-gray-700"
+                          >
                             문의 유형 <span className="text-red-500">*</span>
                           </Label>
                           <Select
                             value={contactForm.category}
-                            onValueChange={(value) => handleContactFormChange("category", value)}
+                            onValueChange={(value) =>
+                              handleContactFormChange("category", value)
+                            }
                             disabled={isSubmitting}
                           >
                             <SelectTrigger>
@@ -449,10 +495,15 @@ export default function SupportPage() {
                             </SelectTrigger>
                             <SelectContent>
                               {categories.slice(1).map((category) => (
-                                <SelectItem key={category.value} value={category.value}>
+                                <SelectItem
+                                  key={category.value}
+                                  value={category.value}
+                                >
                                   <div className="flex items-center">
                                     {category.icon}
-                                    <span className="ml-2">{category.label}</span>
+                                    <span className="ml-2">
+                                      {category.label}
+                                    </span>
                                   </div>
                                 </SelectItem>
                               ))}
@@ -462,12 +513,17 @@ export default function SupportPage() {
                       </div>
 
                       <div className="space-y-2">
-                        <Label htmlFor="priority" className="text-sm font-medium text-gray-700">
+                        <Label
+                          htmlFor="priority"
+                          className="text-sm font-medium text-gray-700"
+                        >
                           우선순위
                         </Label>
                         <Select
                           value={contactForm.priority}
-                          onValueChange={(value) => handleContactFormChange("priority", value)}
+                          onValueChange={(value) =>
+                            handleContactFormChange("priority", value)
+                          }
                           disabled={isSubmitting}
                         >
                           <SelectTrigger>
@@ -483,26 +539,36 @@ export default function SupportPage() {
                       </div>
 
                       <div className="space-y-2">
-                        <Label htmlFor="subject" className="text-sm font-medium text-gray-700">
+                        <Label
+                          htmlFor="subject"
+                          className="text-sm font-medium text-gray-700"
+                        >
                           제목 <span className="text-red-500">*</span>
                         </Label>
                         <Input
                           id="subject"
                           value={contactForm.subject}
-                          onChange={(e) => handleContactFormChange("subject", e.target.value)}
+                          onChange={(e) =>
+                            handleContactFormChange("subject", e.target.value)
+                          }
                           placeholder="문의 제목을 입력하세요"
                           disabled={isSubmitting}
                         />
                       </div>
 
                       <div className="space-y-2">
-                        <Label htmlFor="message" className="text-sm font-medium text-gray-700">
+                        <Label
+                          htmlFor="message"
+                          className="text-sm font-medium text-gray-700"
+                        >
                           문의 내용 <span className="text-red-500">*</span>
                         </Label>
                         <Textarea
                           id="message"
                           value={contactForm.message}
-                          onChange={(e) => handleContactFormChange("message", e.target.value)}
+                          onChange={(e) =>
+                            handleContactFormChange("message", e.target.value)
+                          }
                           placeholder="문의 내용을 자세히 작성해주세요"
                           rows={6}
                           disabled={isSubmitting}
@@ -553,7 +619,10 @@ export default function SupportPage() {
                       </div>
                     </div>
                     <div className="mt-4 p-3 bg-blue-50 rounded-lg">
-                      <p className="text-xs text-blue-800">점심시간(12:00-13:00)에는 전화 상담이 어려울 수 있습니다.</p>
+                      <p className="text-xs text-blue-800">
+                        점심시간(12:00-13:00)에는 전화 상담이 어려울 수
+                        있습니다.
+                      </p>
                     </div>
                   </div>
 
@@ -565,13 +634,20 @@ export default function SupportPage() {
                     </h3>
                     <div className="space-y-3">
                       <div className="flex items-center justify-between">
-                        <span className="text-sm text-gray-600">실시간 채팅</span>
-                        <Badge variant="secondary" className="bg-green-100 text-green-800">
+                        <span className="text-sm text-gray-600">
+                          실시간 채팅
+                        </span>
+                        <Badge
+                          variant="secondary"
+                          className="bg-green-100 text-green-800"
+                        >
                           즉시
                         </Badge>
                       </div>
                       <div className="flex items-center justify-between">
-                        <span className="text-sm text-gray-600">이메일 문의</span>
+                        <span className="text-sm text-gray-600">
+                          이메일 문의
+                        </span>
                         <Badge variant="outline">24시간 이내</Badge>
                       </div>
                       <div className="flex items-center justify-between">
@@ -629,13 +705,19 @@ export default function SupportPage() {
 
                   {/* 카테고리 필터 */}
                   <div className="lg:w-48">
-                    <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+                    <Select
+                      value={selectedCategory}
+                      onValueChange={setSelectedCategory}
+                    >
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
                         {categories.map((category) => (
-                          <SelectItem key={category.value} value={category.value}>
+                          <SelectItem
+                            key={category.value}
+                            value={category.value}
+                          >
                             <div className="flex items-center">
                               {category.icon}
                               <span className="ml-2">{category.label}</span>
@@ -652,19 +734,32 @@ export default function SupportPage() {
                   {filteredFAQs.length === 0 ? (
                     <div className="text-center py-12">
                       <HelpCircle className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                      <h3 className="text-lg font-medium text-gray-900 mb-2">검색 결과가 없습니다</h3>
-                      <p className="text-gray-500">다른 검색어나 카테고리를 시도해보세요.</p>
+                      <h3 className="text-lg font-medium text-gray-900 mb-2">
+                        검색 결과가 없습니다
+                      </h3>
+                      <p className="text-gray-500">
+                        다른 검색어나 카테고리를 시도해보세요.
+                      </p>
                     </div>
                   ) : (
                     filteredFAQs.map((faq) => (
-                      <div key={faq.id} className="border border-gray-200 rounded-lg">
+                      <div
+                        key={faq.id}
+                        className="border border-gray-200 rounded-lg"
+                      >
                         <details className="group">
                           <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-50">
                             <div className="flex-1">
-                              <h3 className="font-medium text-gray-900 group-open:text-blue-600">{faq.question}</h3>
+                              <h3 className="font-medium text-gray-900 group-open:text-blue-600">
+                                {faq.question}
+                              </h3>
                               <div className="flex items-center space-x-2 mt-2">
                                 {faq.tags.map((tag, index) => (
-                                  <Badge key={index} variant="secondary" className="text-xs">
+                                  <Badge
+                                    key={index}
+                                    variant="secondary"
+                                    className="text-xs"
+                                  >
                                     {tag}
                                   </Badge>
                                 ))}
@@ -679,15 +774,27 @@ export default function SupportPage() {
                             </div>
                           </summary>
                           <div className="px-4 pb-4 border-t border-gray-100">
-                            <p className="text-gray-700 leading-relaxed mt-3">{faq.answer}</p>
+                            <p className="text-gray-700 leading-relaxed mt-3">
+                              {faq.answer}
+                            </p>
                             <div className="flex items-center justify-between mt-4 pt-3 border-t border-gray-100">
-                              <div className="text-sm text-gray-500">이 답변이 도움이 되었나요?</div>
+                              <div className="text-sm text-gray-500">
+                                이 답변이 도움이 되었나요?
+                              </div>
                               <div className="flex items-center space-x-2">
-                                <Button variant="ghost" size="sm" className="text-green-600 hover:text-green-700">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="text-green-600 hover:text-green-700"
+                                >
                                   <ThumbsUp className="w-4 h-4 mr-1" />
                                   도움됨
                                 </Button>
-                                <Button variant="ghost" size="sm" className="text-gray-500 hover:text-gray-600">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="text-gray-500 hover:text-gray-600"
+                                >
                                   개선 요청
                                 </Button>
                               </div>
@@ -705,7 +812,9 @@ export default function SupportPage() {
             <TabsContent value="tickets" className="space-y-6">
               <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
                 <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-xl font-semibold text-gray-900">내 문의내역</h2>
+                  <h2 className="text-xl font-semibold text-gray-900">
+                    내 문의내역
+                  </h2>
                   <Button variant="outline" asChild>
                     <Link href="#contact">
                       <Send className="w-4 h-4 mr-2" />새 문의 작성
@@ -716,8 +825,12 @@ export default function SupportPage() {
                 {recentTickets.length === 0 ? (
                   <div className="text-center py-12">
                     <FileText className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                    <h3 className="text-lg font-medium text-gray-900 mb-2">문의내역이 없습니다</h3>
-                    <p className="text-gray-500 mb-4">궁금한 점이 있으시면 언제든지 문의해주세요.</p>
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">
+                      문의내역이 없습니다
+                    </h3>
+                    <p className="text-gray-500 mb-4">
+                      궁금한 점이 있으시면 언제든지 문의해주세요.
+                    </p>
                     <Button asChild>
                       <Link href="#contact">문의하기</Link>
                     </Button>
@@ -732,16 +845,25 @@ export default function SupportPage() {
                         <div className="flex items-start justify-between">
                           <div className="flex-1">
                             <div className="flex items-center space-x-3 mb-2">
-                              <h3 className="font-medium text-gray-900">{ticket.subject}</h3>
+                              <h3 className="font-medium text-gray-900">
+                                {ticket.subject}
+                              </h3>
                               {getStatusBadge(ticket.status)}
-                              <Badge variant="outline" className={`text-xs ${getPriorityColor(ticket.priority)}`}>
+                              <Badge
+                                variant="outline"
+                                className={`text-xs ${getPriorityColor(
+                                  ticket.priority
+                                )}`}
+                              >
                                 {ticket.priority}
                               </Badge>
                             </div>
                             <div className="flex items-center space-x-4 text-sm text-gray-500">
                               <span>티켓 번호: {ticket.id}</span>
                               <span>생성: {formatDate(ticket.createdAt)}</span>
-                              <span>최근 업데이트: {formatDate(ticket.lastUpdate)}</span>
+                              <span>
+                                최근 업데이트: {formatDate(ticket.lastUpdate)}
+                              </span>
                             </div>
                           </div>
                           <Button variant="ghost" size="sm">
@@ -761,8 +883,12 @@ export default function SupportPage() {
                 {/* 사용자 가이드 */}
                 <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
                   <BookOpen className="w-8 h-8 text-blue-600 mb-4" />
-                  <h3 className="font-semibold text-gray-900 mb-2">사용자 가이드</h3>
-                  <p className="text-sm text-gray-600 mb-4">부스터 서비스 이용 방법을 단계별로 안내합니다.</p>
+                  <h3 className="font-semibold text-gray-900 mb-2">
+                    사용자 가이드
+                  </h3>
+                  <p className="text-sm text-gray-600 mb-4">
+                    부스터 서비스 이용 방법을 단계별로 안내합니다.
+                  </p>
                   <Button variant="outline" className="w-full bg-transparent">
                     <BookOpen className="w-4 h-4 mr-2" />
                     가이드 보기
@@ -772,8 +898,12 @@ export default function SupportPage() {
                 {/* 동영상 튜토리얼 */}
                 <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
                   <Video className="w-8 h-8 text-red-600 mb-4" />
-                  <h3 className="font-semibold text-gray-900 mb-2">동영상 튜토리얼</h3>
-                  <p className="text-sm text-gray-600 mb-4">영상으로 쉽게 배우는 부스터 사용법입니다.</p>
+                  <h3 className="font-semibold text-gray-900 mb-2">
+                    동영상 튜토리얼
+                  </h3>
+                  <p className="text-sm text-gray-600 mb-4">
+                    영상으로 쉽게 배우는 부스터 사용법입니다.
+                  </p>
                   <Button variant="outline" className="w-full bg-transparent">
                     <Video className="w-4 h-4 mr-2" />
                     영상 보기
@@ -784,7 +914,9 @@ export default function SupportPage() {
                 <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
                   <FileText className="w-8 h-8 text-green-600 mb-4" />
                   <h3 className="font-semibold text-gray-900 mb-2">API 문서</h3>
-                  <p className="text-sm text-gray-600 mb-4">개발자를 위한 API 연동 가이드입니다.</p>
+                  <p className="text-sm text-gray-600 mb-4">
+                    개발자를 위한 API 연동 가이드입니다.
+                  </p>
                   <Button variant="outline" className="w-full bg-transparent">
                     <ExternalLink className="w-4 h-4 mr-2" />
                     문서 보기
@@ -794,8 +926,12 @@ export default function SupportPage() {
                 {/* 릴리즈 노트 */}
                 <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
                   <Calendar className="w-8 h-8 text-purple-600 mb-4" />
-                  <h3 className="font-semibold text-gray-900 mb-2">릴리즈 노트</h3>
-                  <p className="text-sm text-gray-600 mb-4">최신 업데이트와 새로운 기능을 확인하세요.</p>
+                  <h3 className="font-semibold text-gray-900 mb-2">
+                    릴리즈 노트
+                  </h3>
+                  <p className="text-sm text-gray-600 mb-4">
+                    최신 업데이트와 새로운 기능을 확인하세요.
+                  </p>
                   <Button variant="outline" className="w-full bg-transparent">
                     <Calendar className="w-4 h-4 mr-2" />
                     업데이트 보기
@@ -805,8 +941,12 @@ export default function SupportPage() {
                 {/* 커뮤니티 */}
                 <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
                   <Users className="w-8 h-8 text-orange-600 mb-4" />
-                  <h3 className="font-semibold text-gray-900 mb-2">사용자 커뮤니티</h3>
-                  <p className="text-sm text-gray-600 mb-4">다른 사용자들과 정보를 공유하고 소통하세요.</p>
+                  <h3 className="font-semibold text-gray-900 mb-2">
+                    사용자 커뮤니티
+                  </h3>
+                  <p className="text-sm text-gray-600 mb-4">
+                    다른 사용자들과 정보를 공유하고 소통하세요.
+                  </p>
                   <Button variant="outline" className="w-full bg-transparent">
                     <Users className="w-4 h-4 mr-2" />
                     커뮤니티 가기
@@ -816,8 +956,12 @@ export default function SupportPage() {
                 {/* 다운로드 */}
                 <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
                   <Download className="w-8 h-8 text-indigo-600 mb-4" />
-                  <h3 className="font-semibold text-gray-900 mb-2">자료 다운로드</h3>
-                  <p className="text-sm text-gray-600 mb-4">브로슈어, 가이드북 등을 다운로드하세요.</p>
+                  <h3 className="font-semibold text-gray-900 mb-2">
+                    자료 다운로드
+                  </h3>
+                  <p className="text-sm text-gray-600 mb-4">
+                    브로슈어, 가이드북 등을 다운로드하세요.
+                  </p>
                   <Button variant="outline" className="w-full bg-transparent">
                     <Download className="w-4 h-4 mr-2" />
                     자료실 가기
@@ -832,8 +976,12 @@ export default function SupportPage() {
         <div className="mt-12 pt-8 border-t border-gray-200">
           <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-8 border border-blue-200">
             <div className="text-center mb-6">
-              <h3 className="text-xl font-semibold text-gray-900 mb-2">추가 도움이 필요하신가요?</h3>
-              <p className="text-gray-600">언제든지 연락주시면 친절하게 도와드리겠습니다.</p>
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                추가 도움이 필요하신가요?
+              </h3>
+              <p className="text-gray-600">
+                언제든지 연락주시면 친절하게 도와드리겠습니다.
+              </p>
             </div>
 
             <div className="grid md:grid-cols-2 gap-6">
@@ -849,7 +997,9 @@ export default function SupportPage() {
 
               <div className="text-center">
                 <Clock className="w-6 h-6 text-green-600 mx-auto mb-2" />
-                <div className="font-medium text-gray-900 mb-1">고객센터 운영시간</div>
+                <div className="font-medium text-gray-900 mb-1">
+                  고객센터 운영시간
+                </div>
                 <div className="text-sm text-gray-600">
                   평일: 09:00 - 18:00
                   <br />
@@ -861,5 +1011,5 @@ export default function SupportPage() {
         </div>
       </div>
     </div>
-  )
+  );
 }

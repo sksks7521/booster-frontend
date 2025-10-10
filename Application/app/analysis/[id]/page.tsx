@@ -162,7 +162,6 @@ export default function PropertyDetailPage() {
   if (isLoading || isRefreshing) {
     return (
       <div className="min-h-screen bg-gray-50">
-        <Header user={user} />
         <div className="container mx-auto px-4 py-8">
           <LoadingState title="불러오는 중입니다..." />
         </div>
@@ -174,7 +173,6 @@ export default function PropertyDetailPage() {
   if (error) {
     return (
       <div className="min-h-screen bg-gray-50">
-        <Header user={user} />
         <div className="container mx-auto px-4 py-8">
           <ErrorState
             onRetry={refetch}
@@ -220,8 +218,6 @@ export default function PropertyDetailPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Header user={user} />
-
       <div className="container mx-auto px-4 py-8">
         {/* 상단 네비게이션 */}
         <div className="flex items-center justify-between mb-6">

@@ -1,13 +1,22 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import Link from "next/link"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { TrendingUp, Clock, Target, BarChart3, MapPin, Users, CheckCircle, ArrowRight } from "lucide-react"
+import { useState } from "react";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import {
+  TrendingUp,
+  Clock,
+  Target,
+  BarChart3,
+  MapPin,
+  Users,
+  CheckCircle,
+  ArrowRight,
+} from "lucide-react";
 
 export default function LandingPage() {
-  const [isVideoPlaying, setIsVideoPlaying] = useState(false)
+  const [isVideoPlaying, setIsVideoPlaying] = useState(false);
 
   const features = [
     {
@@ -30,7 +39,7 @@ export default function LandingPage() {
       title: "전문가 최적화",
       description: "실무진 워크플로우 반영",
     },
-  ]
+  ];
 
   const benefits = [
     "실거래가, 경매 낙찰가 등 통합 데이터 분석",
@@ -38,45 +47,11 @@ export default function LandingPage() {
     "수익률 시뮬레이션 계산기",
     "관심 물건 관리 및 알림",
     "전문가용 상세 리포트 생성",
-  ]
+  ];
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50">
-      {/* Header */}
-      <header className="relative z-10 bg-white/80 backdrop-blur-sm border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            {/* Logo */}
-            <Link href="/" className="flex items-center">
-              <div className="text-2xl font-bold text-blue-600">부스터</div>
-              <div className="ml-2 text-sm text-gray-500">Booster</div>
-            </Link>
-
-            {/* Navigation */}
-            <nav className="hidden md:flex items-center space-x-8">
-              <Link href="/features" className="text-gray-700 hover:text-blue-600 font-medium transition-colors">
-                기능
-              </Link>
-              <Link href="/pricing" className="text-gray-700 hover:text-blue-600 font-medium transition-colors">
-                요금제
-              </Link>
-              <Link href="/support" className="text-gray-700 hover:text-blue-600 font-medium transition-colors">
-                고객지원
-              </Link>
-            </nav>
-
-            {/* Auth Buttons */}
-            <div className="flex items-center space-x-3">
-              <Button variant="ghost" asChild className="hidden sm:inline-flex">
-                <Link href="/login">로그인</Link>
-              </Button>
-              <Button asChild>
-                <Link href="/signup">회원가입</Link>
-              </Button>
-            </div>
-          </div>
-        </div>
-      </header>
+      {/* Header removed: now provided by AppShell */}
 
       {/* Hero Section */}
       <main className="relative">
@@ -85,7 +60,10 @@ export default function LandingPage() {
             {/* Left Content */}
             <div className="space-y-8">
               {/* Badge */}
-              <Badge variant="secondary" className="bg-blue-100 text-blue-700 hover:bg-blue-100">
+              <Badge
+                variant="secondary"
+                className="bg-blue-100 text-blue-700 hover:bg-blue-100"
+              >
                 <TrendingUp className="w-4 h-4 mr-2" />
                 부동산 분석의 새로운 기준
               </Badge>
@@ -102,7 +80,8 @@ export default function LandingPage() {
                   </span>
                 </h1>
                 <p className="text-xl text-gray-600 leading-relaxed max-w-lg">
-                  빌라, 상가, 창고 등 비정형 부동산의 가치를 정확하고 빠르게 분석하여 투자 의사결정에 확신을 더하세요.
+                  빌라, 상가, 창고 등 비정형 부동산의 가치를 정확하고 빠르게
+                  분석하여 투자 의사결정에 확신을 더하세요.
                 </p>
               </div>
 
@@ -115,8 +94,12 @@ export default function LandingPage() {
                   >
                     {feature.icon}
                     <div>
-                      <div className="font-semibold text-gray-900 text-sm">{feature.title}</div>
-                      <div className="text-xs text-gray-600">{feature.description}</div>
+                      <div className="font-semibold text-gray-900 text-sm">
+                        {feature.title}
+                      </div>
+                      <div className="text-xs text-gray-600">
+                        {feature.description}
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -124,13 +107,22 @@ export default function LandingPage() {
 
               {/* CTA Buttons */}
               <div className="flex flex-col sm:flex-row gap-4">
-                <Button size="lg" className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-4 text-lg" asChild>
+                <Button
+                  size="lg"
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-4 text-lg"
+                  asChild
+                >
                   <Link href="/signup">
                     무료로 체험해보기
                     <ArrowRight className="w-5 h-5 ml-2" />
                   </Link>
                 </Button>
-                <Button variant="outline" size="lg" className="px-8 py-4 text-lg bg-transparent" asChild>
+                <Button
+                  variant="outline"
+                  size="lg"
+                  className="px-8 py-4 text-lg bg-transparent"
+                  asChild
+                >
                   <Link href="/login">로그인</Link>
                 </Button>
               </div>
@@ -138,10 +130,12 @@ export default function LandingPage() {
               {/* Social Proof */}
               <div className="flex items-center space-x-6 pt-4">
                 <div className="text-sm text-gray-500">
-                  <span className="font-semibold text-gray-900">200+</span> 전문가가 사용 중
+                  <span className="font-semibold text-gray-900">200+</span>{" "}
+                  전문가가 사용 중
                 </div>
                 <div className="text-sm text-gray-500">
-                  <span className="font-semibold text-gray-900">10,000+</span> 물건 분석 완료
+                  <span className="font-semibold text-gray-900">10,000+</span>{" "}
+                  물건 분석 완료
                 </div>
               </div>
             </div>
@@ -158,7 +152,9 @@ export default function LandingPage() {
                       <div className="w-3 h-3 bg-yellow-400 rounded-full"></div>
                       <div className="w-3 h-3 bg-green-400 rounded-full"></div>
                     </div>
-                    <div className="text-sm text-gray-500">부스터 분석 대시보드</div>
+                    <div className="text-sm text-gray-500">
+                      부스터 분석 대시보드
+                    </div>
                   </div>
                 </div>
 
@@ -169,7 +165,9 @@ export default function LandingPage() {
                     <div className="absolute inset-0 flex items-center justify-center">
                       <div className="text-center">
                         <MapPin className="w-12 h-12 text-blue-600 mx-auto mb-2" />
-                        <div className="text-sm font-medium text-gray-700">지도 기반 분석</div>
+                        <div className="text-sm font-medium text-gray-700">
+                          지도 기반 분석
+                        </div>
                       </div>
                     </div>
                     {/* Mock Markers */}
@@ -190,12 +188,18 @@ export default function LandingPage() {
                       <div className="flex items-center space-x-3">
                         <div className="w-2 h-2 bg-blue-600 rounded-full"></div>
                         <div>
-                          <div className="text-sm font-medium text-gray-900">서울 강남구 역삼동 빌라</div>
-                          <div className="text-xs text-gray-500">25평 • 2010년</div>
+                          <div className="text-sm font-medium text-gray-900">
+                            서울 강남구 역삼동 빌라
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            25평 • 2010년
+                          </div>
                         </div>
                       </div>
                       <div className="text-right">
-                        <div className="text-sm font-semibold text-gray-900">4.5억</div>
+                        <div className="text-sm font-semibold text-gray-900">
+                          4.5억
+                        </div>
                         <div className="text-xs text-green-600">+12.5%</div>
                       </div>
                     </div>
@@ -203,12 +207,18 @@ export default function LandingPage() {
                       <div className="flex items-center space-x-3">
                         <div className="w-2 h-2 bg-green-600 rounded-full"></div>
                         <div>
-                          <div className="text-sm font-medium text-gray-900">서울 서초구 서초동 빌라</div>
-                          <div className="text-xs text-gray-500">22평 • 2008년</div>
+                          <div className="text-sm font-medium text-gray-900">
+                            서울 서초구 서초동 빌라
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            22평 • 2008년
+                          </div>
                         </div>
                       </div>
                       <div className="text-right">
-                        <div className="text-sm font-semibold text-gray-900">3.8억</div>
+                        <div className="text-sm font-semibold text-gray-900">
+                          3.8억
+                        </div>
                         <div className="text-xs text-green-600">+8.3%</div>
                       </div>
                     </div>
@@ -220,7 +230,9 @@ export default function LandingPage() {
               <div className="absolute -top-4 -right-4 bg-white rounded-lg shadow-lg p-4 border border-gray-200">
                 <div className="flex items-center space-x-2">
                   <CheckCircle className="w-5 h-5 text-green-600" />
-                  <div className="text-sm font-medium text-gray-900">분석 완료</div>
+                  <div className="text-sm font-medium text-gray-900">
+                    분석 완료
+                  </div>
                 </div>
                 <div className="text-xs text-gray-500 mt-1">30초 소요</div>
               </div>
@@ -249,36 +261,54 @@ export default function LandingPage() {
                 <div className="ml-2 text-sm text-gray-400">Booster</div>
               </Link>
               <p className="text-gray-400 mb-4 max-w-md">
-                부동산 분석의 새로운 기준을 제시하는 혁신적인 플랫폼으로, 전문가들의 투자 의사결정을 지원합니다.
+                부동산 분석의 새로운 기준을 제시하는 혁신적인 플랫폼으로,
+                전문가들의 투자 의사결정을 지원합니다.
               </p>
-              <div className="text-sm text-gray-500">© 2024 Booster. All rights reserved.</div>
+              <div className="text-sm text-gray-500">
+                © 2024 Booster. All rights reserved.
+              </div>
             </div>
 
             <div>
               <h3 className="font-semibold mb-4">서비스</h3>
               <ul className="space-y-2 text-sm text-gray-400">
                 <li>
-                  <Link href="/analysis" className="hover:text-white transition-colors">
+                  <Link
+                    href="/analysis"
+                    className="hover:text-white transition-colors"
+                  >
                     통합 분석
                   </Link>
                 </li>
                 <li>
-                  <Link href="/calculator" className="hover:text-white transition-colors">
+                  <Link
+                    href="/calculator"
+                    className="hover:text-white transition-colors"
+                  >
                     수익률 계산기
                   </Link>
                 </li>
                 <li>
-                  <Link href="/favorites" className="hover:text-white transition-colors">
+                  <Link
+                    href="/favorites"
+                    className="hover:text-white transition-colors"
+                  >
                     관심 물건
                   </Link>
                 </li>
                 <li>
-                  <Link href="/notices" className="hover:text-white transition-colors">
+                  <Link
+                    href="/notices"
+                    className="hover:text-white transition-colors"
+                  >
                     공지사항
                   </Link>
                 </li>
                 <li>
-                  <Link href="/pricing" className="hover:text-white transition-colors">
+                  <Link
+                    href="/pricing"
+                    className="hover:text-white transition-colors"
+                  >
                     요금제
                   </Link>
                 </li>
@@ -289,27 +319,42 @@ export default function LandingPage() {
               <h3 className="font-semibold mb-4">지원</h3>
               <ul className="space-y-2 text-sm text-gray-400">
                 <li>
-                  <Link href="/support" className="hover:text-white transition-colors">
+                  <Link
+                    href="/support"
+                    className="hover:text-white transition-colors"
+                  >
                     고객센터
                   </Link>
                 </li>
                 <li>
-                  <Link href="/notices" className="hover:text-white transition-colors">
+                  <Link
+                    href="/notices"
+                    className="hover:text-white transition-colors"
+                  >
                     공지사항
                   </Link>
                 </li>
                 <li>
-                  <Link href="/faq" className="hover:text-white transition-colors">
+                  <Link
+                    href="/faq"
+                    className="hover:text-white transition-colors"
+                  >
                     FAQ
                   </Link>
                 </li>
                 <li>
-                  <Link href="/terms" className="hover:text-white transition-colors">
+                  <Link
+                    href="/terms"
+                    className="hover:text-white transition-colors"
+                  >
                     이용약관
                   </Link>
                 </li>
                 <li>
-                  <Link href="/privacy" className="hover:text-white transition-colors">
+                  <Link
+                    href="/privacy"
+                    className="hover:text-white transition-colors"
+                  >
                     개인정보처리방침
                   </Link>
                 </li>
@@ -319,5 +364,5 @@ export default function LandingPage() {
         </div>
       </footer>
     </div>
-  )
+  );
 }

@@ -3,6 +3,7 @@ import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
 import "./globals.css";
 import { Providers } from "./providers";
+import AppShell from "@/components/layout/AppShell";
 
 export const metadata: Metadata = {
   title: "v0 App",
@@ -37,7 +38,9 @@ html {
         `}</style>
       </head>
       <body>
-        <Providers>{children}</Providers>
+        <Providers>
+          <AppShell>{children}</AppShell>
+        </Providers>
       </body>
     </html>
   );

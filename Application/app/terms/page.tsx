@@ -1,9 +1,9 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import Link from "next/link"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
+import { useState } from "react";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import {
   ArrowLeft,
   FileText,
@@ -13,21 +13,23 @@ import {
   Search,
   ChevronDown,
   ChevronUp,
-} from "lucide-react"
+} from "lucide-react";
 
 interface TermsSection {
-  id: string
-  title: string
-  content: string[]
+  id: string;
+  title: string;
+  content: string[];
   subsections?: {
-    title: string
-    content: string[]
-  }[]
+    title: string;
+    content: string[];
+  }[];
 }
 
 export default function TermsPage() {
-  const [expandedSections, setExpandedSections] = useState<string[]>(["section1"])
-  const [searchTerm, setSearchTerm] = useState("")
+  const [expandedSections, setExpandedSections] = useState<string[]>([
+    "section1",
+  ]);
+  const [searchTerm, setSearchTerm] = useState("");
 
   const termsData: TermsSection[] = [
     {
@@ -45,7 +47,9 @@ export default function TermsPage() {
       subsections: [
         {
           title: "1. '서비스'",
-          content: ["회사가 제공하는 부동산 분석, 경매 정보 제공, 수익률 계산 등의 모든 서비스를 의미합니다."],
+          content: [
+            "회사가 제공하는 부동산 분석, 경매 정보 제공, 수익률 계산 등의 모든 서비스를 의미합니다.",
+          ],
         },
         {
           title: "2. '회원'",
@@ -84,15 +88,27 @@ export default function TermsPage() {
       subsections: [
         {
           title: "1. 부동산 분석 서비스",
-          content: ["부동산 시장 데이터 분석 및 제공", "경매 물건 정보 수집 및 분석", "투자 수익률 계산 및 시뮬레이션"],
+          content: [
+            "부동산 시장 데이터 분석 및 제공",
+            "경매 물건 정보 수집 및 분석",
+            "투자 수익률 계산 및 시뮬레이션",
+          ],
         },
         {
           title: "2. 정보 제공 서비스",
-          content: ["부동산 시장 동향 정보", "경매 일정 및 결과 정보", "법령 및 제도 변경 사항"],
+          content: [
+            "부동산 시장 동향 정보",
+            "경매 일정 및 결과 정보",
+            "법령 및 제도 변경 사항",
+          ],
         },
         {
           title: "3. 기타 서비스",
-          content: ["회원 맞춤형 추천 서비스", "커뮤니티 및 상담 서비스", "교육 및 세미나 서비스"],
+          content: [
+            "회원 맞춤형 추천 서비스",
+            "커뮤니티 및 상담 서비스",
+            "교육 및 세미나 서비스",
+          ],
         },
       ],
     },
@@ -215,68 +231,42 @@ export default function TermsPage() {
         "회사와 회원간에 발생한 분쟁에 관한 관할법원은 민사소송법상의 관할법원으로 합니다.",
       ],
     },
-  ]
+  ];
 
   const toggleSection = (sectionId: string) => {
     setExpandedSections((prev) =>
-      prev.includes(sectionId) ? prev.filter((id) => id !== sectionId) : [...prev, sectionId],
-    )
-  }
+      prev.includes(sectionId)
+        ? prev.filter((id) => id !== sectionId)
+        : [...prev, sectionId]
+    );
+  };
 
   const filteredTerms = termsData.filter(
     (section) =>
       section.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      section.content.some((content) => content.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      section.content.some((content) =>
+        content.toLowerCase().includes(searchTerm.toLowerCase())
+      ) ||
       section.subsections?.some(
         (sub) =>
           sub.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          sub.content.some((content) => content.toLowerCase().includes(searchTerm.toLowerCase())),
-      ),
-  )
+          sub.content.some((content) =>
+            content.toLowerCase().includes(searchTerm.toLowerCase())
+          )
+      )
+  );
 
   const handlePrint = () => {
-    window.print()
-  }
+    window.print();
+  };
 
   const handleDownload = () => {
     // 실제 구현에서는 PDF 생성 라이브러리 사용
-    alert("PDF 다운로드 기능은 준비 중입니다.")
-  }
+    alert("PDF 다운로드 기능은 준비 중입니다.");
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* 헤더 */}
-      <div className="bg-white border-b border-gray-200 sticky top-0 z-10">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center space-x-4">
-              <Button variant="ghost" size="sm" asChild className="text-gray-600 hover:text-gray-900">
-                <Link href="/">
-                  <ArrowLeft className="w-4 h-4 mr-2" />
-                  홈으로
-                </Link>
-              </Button>
-              <div className="h-6 w-px bg-gray-300"></div>
-              <Link href="/" className="flex items-center">
-                <div className="text-xl font-bold text-blue-600">부스터</div>
-                <div className="ml-2 text-sm text-gray-500">Booster</div>
-              </Link>
-            </div>
-
-            <div className="flex items-center space-x-3">
-              <Button variant="outline" size="sm" onClick={handlePrint} className="bg-transparent">
-                <Print className="w-4 h-4 mr-2" />
-                인쇄
-              </Button>
-              <Button variant="outline" size="sm" onClick={handleDownload} className="bg-transparent">
-                <Download className="w-4 h-4 mr-2" />
-                다운로드
-              </Button>
-            </div>
-          </div>
-        </div>
-      </div>
-
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* 페이지 헤더 */}
         <div className="text-center mb-12">
@@ -284,14 +274,19 @@ export default function TermsPage() {
             <FileText className="w-12 h-12 text-blue-600" />
           </div>
           <h1 className="text-4xl font-bold text-gray-900 mb-4">이용약관</h1>
-          <p className="text-lg text-gray-600 mb-6">부스터 서비스 이용에 관한 약관입니다</p>
+          <p className="text-lg text-gray-600 mb-6">
+            부스터 서비스 이용에 관한 약관입니다
+          </p>
 
           <div className="flex items-center justify-center space-x-6 text-sm text-gray-500">
             <div className="flex items-center">
               <Calendar className="w-4 h-4 mr-2" />
               <span>시행일: 2024년 1월 1일</span>
             </div>
-            <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+            <Badge
+              variant="outline"
+              className="bg-blue-50 text-blue-700 border-blue-200"
+            >
               버전 1.0
             </Badge>
           </div>
@@ -341,7 +336,9 @@ export default function TermsPage() {
                 className="w-full px-6 py-4 text-left hover:bg-gray-50 transition-colors"
               >
                 <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold text-gray-900">{section.title}</h3>
+                  <h3 className="text-lg font-semibold text-gray-900">
+                    {section.title}
+                  </h3>
                   {expandedSections.includes(section.id) ? (
                     <ChevronUp className="w-5 h-5 text-gray-400" />
                   ) : (
@@ -362,12 +359,22 @@ export default function TermsPage() {
                     {section.subsections && (
                       <div className="space-y-4 mt-6">
                         {section.subsections.map((subsection, subIndex) => (
-                          <div key={subIndex} className="pl-4 border-l-2 border-blue-100">
-                            <h4 className="font-medium text-gray-900 mb-2">{subsection.title}</h4>
+                          <div
+                            key={subIndex}
+                            className="pl-4 border-l-2 border-blue-100"
+                          >
+                            <h4 className="font-medium text-gray-900 mb-2">
+                              {subsection.title}
+                            </h4>
                             <div className="space-y-2">
                               {subsection.content.map((paragraph, pIndex) => (
-                                <p key={pIndex} className="text-gray-600 text-sm leading-relaxed">
-                                  {paragraph.startsWith("•") ? paragraph : `• ${paragraph}`}
+                                <p
+                                  key={pIndex}
+                                  className="text-gray-600 text-sm leading-relaxed"
+                                >
+                                  {paragraph.startsWith("•")
+                                    ? paragraph
+                                    : `• ${paragraph}`}
                                 </p>
                               ))}
                             </div>
@@ -386,7 +393,9 @@ export default function TermsPage() {
         {searchTerm && filteredTerms.length === 0 && (
           <div className="text-center py-12">
             <Search className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">검색 결과가 없습니다</h3>
+            <h3 className="text-lg font-medium text-gray-900 mb-2">
+              검색 결과가 없습니다
+            </h3>
             <p className="text-gray-500">다른 검색어로 시도해보세요.</p>
           </div>
         )}
@@ -409,7 +418,8 @@ export default function TermsPage() {
             </div>
             <div className="mt-4 pt-4 border-t border-gray-200">
               <p className="text-xs text-gray-500">
-                본 약관에 대한 문의사항이 있으시면 언제든지 고객센터로 연락주시기 바랍니다.
+                본 약관에 대한 문의사항이 있으시면 언제든지 고객센터로
+                연락주시기 바랍니다.
               </p>
             </div>
           </div>
@@ -418,21 +428,33 @@ export default function TermsPage() {
         {/* 관련 링크 */}
         <div className="mt-8 text-center">
           <div className="flex flex-col sm:flex-row justify-center items-center space-y-2 sm:space-y-0 sm:space-x-6">
-            <Link href="/privacy" className="text-blue-600 hover:text-blue-700 font-medium">
+            <Link
+              href="/privacy"
+              className="text-blue-600 hover:text-blue-700 font-medium"
+            >
               개인정보처리방침
             </Link>
-            <Link href="/support" className="text-blue-600 hover:text-blue-700 font-medium">
+            <Link
+              href="/support"
+              className="text-blue-600 hover:text-blue-700 font-medium"
+            >
               고객센터
             </Link>
-            <Link href="/faq" className="text-blue-600 hover:text-blue-700 font-medium">
+            <Link
+              href="/faq"
+              className="text-blue-600 hover:text-blue-700 font-medium"
+            >
               자주 묻는 질문
             </Link>
-            <Link href="/signup" className="text-blue-600 hover:text-blue-700 font-medium">
+            <Link
+              href="/signup"
+              className="text-blue-600 hover:text-blue-700 font-medium"
+            >
               회원가입
             </Link>
           </div>
         </div>
       </div>
     </div>
-  )
+  );
 }

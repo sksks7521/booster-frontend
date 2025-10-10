@@ -92,9 +92,16 @@ export default function SaleFilter({
       | "dateRange",
     value: [number, number] | [string, string]
   ) => {
+    console.log("🔵 [SaleFilter] setRangeFilter 호출:", {
+      key,
+      value,
+      namespace,
+    });
     if (namespace && typeof setNsRangeFilter === "function") {
+      console.log("✅ [SaleFilter] setNsRangeFilter 사용 (네임스페이스 모드)");
       (setNsRangeFilter as any)(namespace, key, value);
     } else {
+      console.log("✅ [SaleFilter] setRangeFilterBase 사용 (전역 모드)");
       setRangeFilterBase(key as any, value as any);
     }
   };
@@ -421,7 +428,9 @@ export default function SaleFilter({
                     <SelectTrigger>
                       <SelectValue
                         placeholder={
-                          dongLoading ? "로딩 중..." : "읍/면/동 선택 (선택사항)"
+                          dongLoading
+                            ? "로딩 중..."
+                            : "읍/면/동 선택 (선택사항)"
                         }
                       />
                     </SelectTrigger>

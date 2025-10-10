@@ -340,8 +340,6 @@ export default function AnalysisPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Header user={user} />
-
       <div className="container mx-auto px-4 py-8">
         {/* 페이지 헤더 */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-8">

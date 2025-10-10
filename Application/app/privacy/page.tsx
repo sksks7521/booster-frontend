@@ -1,12 +1,12 @@
-"use client"
+"use client";
 
-import type React from "react"
+import type React from "react";
 
-import { useState } from "react"
-import Link from "next/link"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { Alert, AlertDescription } from "@/components/ui/alert"
+import { useState } from "react";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   ArrowLeft,
   Shield,
@@ -25,26 +25,28 @@ import {
   CheckCircle,
   Mail,
   Phone,
-} from "lucide-react"
+} from "lucide-react";
 
 interface PrivacySection {
-  id: string
-  title: string
-  icon: React.ReactNode
-  content: string[]
+  id: string;
+  title: string;
+  icon: React.ReactNode;
+  content: string[];
   subsections?: {
-    title: string
-    content: string[]
+    title: string;
+    content: string[];
     table?: {
-      headers: string[]
-      rows: string[][]
-    }
-  }[]
+      headers: string[];
+      rows: string[][];
+    };
+  }[];
 }
 
 export default function PrivacyPage() {
-  const [expandedSections, setExpandedSections] = useState<string[]>(["section1"])
-  const [searchTerm, setSearchTerm] = useState("")
+  const [expandedSections, setExpandedSections] = useState<string[]>([
+    "section1",
+  ]);
+  const [searchTerm, setSearchTerm] = useState("");
 
   const privacyData: PrivacySection[] = [
     {
@@ -106,10 +108,18 @@ export default function PrivacyPage() {
             headers: ["처리목적", "보유기간", "관련법령"],
             rows: [
               ["회원가입 및 관리", "회원탈퇴 시까지", "개인정보보호법"],
-              ["재화 또는 서비스 제공", "재화·서비스 공급완료 및 요금결제·정산 완료시까지", "전자상거래법"],
+              [
+                "재화 또는 서비스 제공",
+                "재화·서비스 공급완료 및 요금결제·정산 완료시까지",
+                "전자상거래법",
+              ],
               ["계약 또는 청약철회 등에 관한 기록", "5년", "전자상거래법"],
               ["대금결제 및 재화 등의 공급에 관한 기록", "5년", "전자상거래법"],
-              ["소비자의 불만 또는 분쟁처리에 관한 기록", "3년", "전자상거래법"],
+              [
+                "소비자의 불만 또는 분쟁처리에 관한 기록",
+                "3년",
+                "전자상거래법",
+              ],
               ["웹사이트 방문기록", "3개월", "통신비밀보호법"],
             ],
           },
@@ -131,11 +141,16 @@ export default function PrivacyPage() {
         },
         {
           title: "2. 선택항목",
-          content: ["관심분야, 직업, 회사명, 부서, 직책", "마케팅 수신 동의 여부"],
+          content: [
+            "관심분야, 직업, 회사명, 부서, 직책",
+            "마케팅 수신 동의 여부",
+          ],
         },
         {
           title: "3. 자동 수집 항목",
-          content: ["IP주소, 쿠키, MAC주소, 서비스 이용기록, 방문기록, 불량 이용기록 등"],
+          content: [
+            "IP주소, 쿠키, MAC주소, 서비스 이용기록, 방문기록, 불량 이용기록 등",
+          ],
         },
       ],
     },
@@ -153,9 +168,24 @@ export default function PrivacyPage() {
           table: {
             headers: ["제공받는 자", "제공목적", "제공항목", "보유·이용기간"],
             rows: [
-              ["결제대행업체", "결제처리", "이름, 이메일, 휴대전화번호, 결제정보", "결제완료 후 5년"],
-              ["배송업체", "상품배송", "이름, 주소, 휴대전화번호", "배송완료 후 즉시 파기"],
-              ["고객센터 운영업체", "고객상담", "이름, 이메일, 휴대전화번호, 문의내용", "상담완료 후 3년"],
+              [
+                "결제대행업체",
+                "결제처리",
+                "이름, 이메일, 휴대전화번호, 결제정보",
+                "결제완료 후 5년",
+              ],
+              [
+                "배송업체",
+                "상품배송",
+                "이름, 주소, 휴대전화번호",
+                "배송완료 후 즉시 파기",
+              ],
+              [
+                "고객센터 운영업체",
+                "고객상담",
+                "이름, 이메일, 휴대전화번호, 문의내용",
+                "상담완료 후 3년",
+              ],
             ],
           },
         },
@@ -165,7 +195,9 @@ export default function PrivacyPage() {
       id: "section6",
       title: "개인정보처리의 위탁",
       icon: <Users className="w-5 h-5" />,
-      content: ["회사는 원활한 개인정보 업무처리를 위하여 다음과 같이 개인정보 처리업무를 위탁하고 있습니다."],
+      content: [
+        "회사는 원활한 개인정보 업무처리를 위하여 다음과 같이 개인정보 처리업무를 위탁하고 있습니다.",
+      ],
       subsections: [
         {
           title: "위탁업무 내용",
@@ -173,7 +205,11 @@ export default function PrivacyPage() {
           table: {
             headers: ["위탁받는 자", "위탁업무", "개인정보 보유·이용기간"],
             rows: [
-              ["AWS(Amazon Web Services)", "클라우드 서비스 제공", "위탁계약 종료시까지"],
+              [
+                "AWS(Amazon Web Services)",
+                "클라우드 서비스 제공",
+                "위탁계약 종료시까지",
+              ],
               ["Google Analytics", "웹사이트 분석", "수집일로부터 26개월"],
               ["SendGrid", "이메일 발송", "발송완료 후 즉시 파기"],
               ["Twilio", "SMS 발송", "발송완료 후 즉시 파기"],
@@ -192,11 +228,15 @@ export default function PrivacyPage() {
       id: "section7",
       title: "정보주체의 권리·의무 및 행사방법",
       icon: <CheckCircle className="w-5 h-5" />,
-      content: ["정보주체는 회사에 대해 언제든지 다음 각 호의 개인정보 보호 관련 권리를 행사할 수 있습니다."],
+      content: [
+        "정보주체는 회사에 대해 언제든지 다음 각 호의 개인정보 보호 관련 권리를 행사할 수 있습니다.",
+      ],
       subsections: [
         {
           title: "1. 개인정보 처리현황 통지요구",
-          content: ["정보주체는 개인정보보호법 제35조에 따른 개인정보의 처리현황에 대한 통지를 요구할 수 있습니다."],
+          content: [
+            "정보주체는 개인정보보호법 제35조에 따른 개인정보의 처리현황에 대한 통지를 요구할 수 있습니다.",
+          ],
         },
         {
           title: "2. 개인정보 열람요구",
@@ -271,11 +311,15 @@ export default function PrivacyPage() {
         },
         {
           title: "2. 정기적인 자체 감사 실시",
-          content: ["개인정보 취급 관련 안정성 확보를 위해 정기적(분기 1회)으로 자체 감사를 실시하고 있습니다."],
+          content: [
+            "개인정보 취급 관련 안정성 확보를 위해 정기적(분기 1회)으로 자체 감사를 실시하고 있습니다.",
+          ],
         },
         {
           title: "3. 내부관리계획의 수립 및 시행",
-          content: ["개인정보의 안전한 처리를 위하여 내부관리계획을 수립하고 시행하고 있습니다."],
+          content: [
+            "개인정보의 안전한 처리를 위하여 내부관리계획을 수립하고 시행하고 있습니다.",
+          ],
         },
         {
           title: "4. 개인정보의 암호화",
@@ -303,7 +347,9 @@ export default function PrivacyPage() {
         },
         {
           title: "8. 문서보안을 위한 잠금장치 사용",
-          content: ["개인정보가 포함된 서류, 보조저장매체 등을 잠금장치가 있는 안전한 장소에 보관하고 있습니다."],
+          content: [
+            "개인정보가 포함된 서류, 보조저장매체 등을 잠금장치가 있는 안전한 장소에 보관하고 있습니다.",
+          ],
         },
         {
           title: "9. 비인가자에 대한 출입 통제",
@@ -333,7 +379,11 @@ export default function PrivacyPage() {
         },
         {
           title: "개인정보 보호 담당부서",
-          content: ["부서명: 개인정보보호팀", "담당자: 이담당자", "연락처: 02-1234-5679, privacy-team@booster.com"],
+          content: [
+            "부서명: 개인정보보호팀",
+            "담당자: 이담당자",
+            "연락처: 02-1234-5679, privacy-team@booster.com",
+          ],
         },
         {
           title: "권익침해 구제방법",
@@ -368,87 +418,72 @@ export default function PrivacyPage() {
       subsections: [
         {
           title: "개인정보 처리방침 버전 정보",
-          content: ["현재 버전: v1.0", "시행일자: 2024년 1월 1일", "이전 버전과의 주요 변경사항: 최초 제정"],
+          content: [
+            "현재 버전: v1.0",
+            "시행일자: 2024년 1월 1일",
+            "이전 버전과의 주요 변경사항: 최초 제정",
+          ],
         },
       ],
     },
-  ]
+  ];
 
   const toggleSection = (sectionId: string) => {
     setExpandedSections((prev) =>
-      prev.includes(sectionId) ? prev.filter((id) => id !== sectionId) : [...prev, sectionId],
-    )
-  }
+      prev.includes(sectionId)
+        ? prev.filter((id) => id !== sectionId)
+        : [...prev, sectionId]
+    );
+  };
 
   const filteredPrivacy = privacyData.filter(
     (section) =>
       section.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      section.content.some((content) => content.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      section.content.some((content) =>
+        content.toLowerCase().includes(searchTerm.toLowerCase())
+      ) ||
       section.subsections?.some(
         (sub) =>
           sub.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          sub.content.some((content) => content.toLowerCase().includes(searchTerm.toLowerCase())),
-      ),
-  )
+          sub.content.some((content) =>
+            content.toLowerCase().includes(searchTerm.toLowerCase())
+          )
+      )
+  );
 
   const handlePrint = () => {
-    window.print()
-  }
+    window.print();
+  };
 
   const handleDownload = () => {
     // 실제 구현에서는 PDF 생성 라이브러리 사용
-    alert("PDF 다운로드 기능은 준비 중입니다.")
-  }
+    alert("PDF 다운로드 기능은 준비 중입니다.");
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* 헤더 */}
-      <div className="bg-white border-b border-gray-200 sticky top-0 z-10">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center space-x-4">
-              <Button variant="ghost" size="sm" asChild className="text-gray-600 hover:text-gray-900">
-                <Link href="/">
-                  <ArrowLeft className="w-4 h-4 mr-2" />
-                  홈으로
-                </Link>
-              </Button>
-              <div className="h-6 w-px bg-gray-300"></div>
-              <Link href="/" className="flex items-center">
-                <div className="text-xl font-bold text-blue-600">부스터</div>
-                <div className="ml-2 text-sm text-gray-500">Booster</div>
-              </Link>
-            </div>
-
-            <div className="flex items-center space-x-3">
-              <Button variant="outline" size="sm" onClick={handlePrint} className="bg-transparent">
-                <Print className="w-4 h-4 mr-2" />
-                인쇄
-              </Button>
-              <Button variant="outline" size="sm" onClick={handleDownload} className="bg-transparent">
-                <Download className="w-4 h-4 mr-2" />
-                다운로드
-              </Button>
-            </div>
-          </div>
-        </div>
-      </div>
-
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* 페이지 헤더 */}
         <div className="text-center mb-12">
           <div className="flex items-center justify-center mb-4">
             <Shield className="w-12 h-12 text-blue-600" />
           </div>
-          <h1 className="text-4xl font-bold text-gray-900 mb-4">개인정보처리방침</h1>
-          <p className="text-lg text-gray-600 mb-6">부스터 서비스 이용 시 개인정보 보호에 관한 방침입니다</p>
+          <h1 className="text-4xl font-bold text-gray-900 mb-4">
+            개인정보처리방침
+          </h1>
+          <p className="text-lg text-gray-600 mb-6">
+            부스터 서비스 이용 시 개인정보 보호에 관한 방침입니다
+          </p>
 
           <div className="flex items-center justify-center space-x-6 text-sm text-gray-500">
             <div className="flex items-center">
               <Calendar className="w-4 h-4 mr-2" />
               <span>시행일: 2024년 1월 1일</span>
             </div>
-            <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+            <Badge
+              variant="outline"
+              className="bg-green-50 text-green-700 border-green-200"
+            >
               버전 1.0
             </Badge>
           </div>
@@ -458,8 +493,10 @@ export default function PrivacyPage() {
         <Alert className="mb-8 border-blue-200 bg-blue-50">
           <Shield className="h-4 w-4 text-blue-600" />
           <AlertDescription className="text-blue-800">
-            <strong>개인정보 보호 약속:</strong> 부스터는 이용자의 개인정보를 소중히 여기며, 개인정보보호법에 따라
-            안전하게 관리하고 있습니다. 개인정보 처리에 대한 문의사항이 있으시면 언제든지 연락주시기 바랍니다.
+            <strong>개인정보 보호 약속:</strong> 부스터는 이용자의 개인정보를
+            소중히 여기며, 개인정보보호법에 따라 안전하게 관리하고 있습니다.
+            개인정보 처리에 대한 문의사항이 있으시면 언제든지 연락주시기
+            바랍니다.
           </AlertDescription>
         </Alert>
 
@@ -510,7 +547,9 @@ export default function PrivacyPage() {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-3">
                     <span className="text-blue-600">{section.icon}</span>
-                    <h3 className="text-lg font-semibold text-gray-900">{section.title}</h3>
+                    <h3 className="text-lg font-semibold text-gray-900">
+                      {section.title}
+                    </h3>
                   </div>
                   {expandedSections.includes(section.id) ? (
                     <ChevronUp className="w-5 h-5 text-gray-400" />
@@ -532,44 +571,59 @@ export default function PrivacyPage() {
                     {section.subsections && (
                       <div className="space-y-6 mt-6">
                         {section.subsections.map((subsection, subIndex) => (
-                          <div key={subIndex} className="pl-4 border-l-2 border-blue-100">
-                            <h4 className="font-medium text-gray-900 mb-3">{subsection.title}</h4>
+                          <div
+                            key={subIndex}
+                            className="pl-4 border-l-2 border-blue-100"
+                          >
+                            <h4 className="font-medium text-gray-900 mb-3">
+                              {subsection.title}
+                            </h4>
 
                             {subsection.table ? (
                               <div className="overflow-x-auto mb-4">
                                 <table className="min-w-full border border-gray-200 rounded-lg">
                                   <thead className="bg-gray-50">
                                     <tr>
-                                      {subsection.table.headers.map((header, hIndex) => (
-                                        <th
-                                          key={hIndex}
-                                          className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200"
-                                        >
-                                          {header}
-                                        </th>
-                                      ))}
+                                      {subsection.table.headers.map(
+                                        (header, hIndex) => (
+                                          <th
+                                            key={hIndex}
+                                            className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200"
+                                          >
+                                            {header}
+                                          </th>
+                                        )
+                                      )}
                                     </tr>
                                   </thead>
                                   <tbody className="bg-white divide-y divide-gray-200">
-                                    {subsection.table.rows.map((row, rIndex) => (
-                                      <tr key={rIndex} className="hover:bg-gray-50">
-                                        {row.map((cell, cIndex) => (
-                                          <td
-                                            key={cIndex}
-                                            className="px-4 py-3 text-sm text-gray-700 border-b border-gray-200"
-                                          >
-                                            {cell}
-                                          </td>
-                                        ))}
-                                      </tr>
-                                    ))}
+                                    {subsection.table.rows.map(
+                                      (row, rIndex) => (
+                                        <tr
+                                          key={rIndex}
+                                          className="hover:bg-gray-50"
+                                        >
+                                          {row.map((cell, cIndex) => (
+                                            <td
+                                              key={cIndex}
+                                              className="px-4 py-3 text-sm text-gray-700 border-b border-gray-200"
+                                            >
+                                              {cell}
+                                            </td>
+                                          ))}
+                                        </tr>
+                                      )
+                                    )}
                                   </tbody>
                                 </table>
                               </div>
                             ) : (
                               <div className="space-y-2">
                                 {subsection.content.map((paragraph, pIndex) => (
-                                  <p key={pIndex} className="text-gray-600 text-sm leading-relaxed whitespace-pre-line">
+                                  <p
+                                    key={pIndex}
+                                    className="text-gray-600 text-sm leading-relaxed whitespace-pre-line"
+                                  >
                                     {paragraph}
                                   </p>
                                 ))}
@@ -590,7 +644,9 @@ export default function PrivacyPage() {
         {searchTerm && filteredPrivacy.length === 0 && (
           <div className="text-center py-12">
             <Search className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">검색 결과가 없습니다</h3>
+            <h3 className="text-lg font-medium text-gray-900 mb-2">
+              검색 결과가 없습니다
+            </h3>
             <p className="text-gray-500">다른 검색어로 시도해보세요.</p>
           </div>
         )}
@@ -604,7 +660,9 @@ export default function PrivacyPage() {
             </h3>
             <div className="grid md:grid-cols-2 gap-6">
               <div>
-                <div className="font-medium text-gray-900 mb-2">개인정보 보호책임자</div>
+                <div className="font-medium text-gray-900 mb-2">
+                  개인정보 보호책임자
+                </div>
                 <div className="text-sm text-gray-600 space-y-1">
                   <div>김개인정보 (개인정보보호팀장)</div>
                   <div className="flex items-center">
@@ -618,7 +676,9 @@ export default function PrivacyPage() {
                 </div>
               </div>
               <div>
-                <div className="font-medium text-gray-900 mb-2">개인정보 보호담당부서</div>
+                <div className="font-medium text-gray-900 mb-2">
+                  개인정보 보호담당부서
+                </div>
                 <div className="text-sm text-gray-600 space-y-1">
                   <div>개인정보보호팀</div>
                   <div className="flex items-center">
@@ -634,8 +694,9 @@ export default function PrivacyPage() {
             </div>
             <div className="mt-4 pt-4 border-t border-blue-200">
               <p className="text-xs text-gray-600">
-                개인정보 처리에 관한 문의사항이나 권리 행사를 원하시는 경우 언제든지 연락주시기 바랍니다. 평일
-                09:00-18:00 (주말 및 공휴일 휴무)
+                개인정보 처리에 관한 문의사항이나 권리 행사를 원하시는 경우
+                언제든지 연락주시기 바랍니다. 평일 09:00-18:00 (주말 및 공휴일
+                휴무)
               </p>
             </div>
           </div>
@@ -650,17 +711,23 @@ export default function PrivacyPage() {
             </h3>
             <div className="grid md:grid-cols-3 gap-4 text-sm text-gray-600">
               <div>
-                <div className="font-medium text-gray-900 mb-1">개인정보 침해신고센터</div>
+                <div className="font-medium text-gray-900 mb-1">
+                  개인정보 침해신고센터
+                </div>
                 <div>privacy.go.kr</div>
                 <div>(국번없이) 182</div>
               </div>
               <div>
-                <div className="font-medium text-gray-900 mb-1">개인정보 분쟁조정위원회</div>
+                <div className="font-medium text-gray-900 mb-1">
+                  개인정보 분쟁조정위원회
+                </div>
                 <div>www.kopico.go.kr</div>
                 <div>(국번없이) 1833-6972</div>
               </div>
               <div>
-                <div className="font-medium text-gray-900 mb-1">사이버범죄수사단</div>
+                <div className="font-medium text-gray-900 mb-1">
+                  사이버범죄수사단
+                </div>
                 <div>대검찰청</div>
                 <div>02-3480-3573</div>
               </div>
@@ -671,21 +738,33 @@ export default function PrivacyPage() {
         {/* 관련 링크 */}
         <div className="mt-8 text-center">
           <div className="flex flex-col sm:flex-row justify-center items-center space-y-2 sm:space-y-0 sm:space-x-6">
-            <Link href="/terms" className="text-blue-600 hover:text-blue-700 font-medium">
+            <Link
+              href="/terms"
+              className="text-blue-600 hover:text-blue-700 font-medium"
+            >
               이용약관
             </Link>
-            <Link href="/support" className="text-blue-600 hover:text-blue-700 font-medium">
+            <Link
+              href="/support"
+              className="text-blue-600 hover:text-blue-700 font-medium"
+            >
               고객센터
             </Link>
-            <Link href="/faq" className="text-blue-600 hover:text-blue-700 font-medium">
+            <Link
+              href="/faq"
+              className="text-blue-600 hover:text-blue-700 font-medium"
+            >
               자주 묻는 질문
             </Link>
-            <Link href="/signup" className="text-blue-600 hover:text-blue-700 font-medium">
+            <Link
+              href="/signup"
+              className="text-blue-600 hover:text-blue-700 font-medium"
+            >
               회원가입
             </Link>
           </div>
         </div>
       </div>
     </div>
-  )
+  );
 }

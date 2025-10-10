@@ -791,15 +791,31 @@ export const datasetConfigs: Record<DatasetId, DatasetConfig> = {
         }
 
         // 날짜 범위 매핑
+        console.log("🔍 [sale buildListKey] dateRange 필터 확인:", {
+          dateRange: allowedFilters.dateRange,
+          isArray: Array.isArray(allowedFilters.dateRange),
+          type: typeof allowedFilters.dateRange,
+          allowedFilters,
+        });
         if (Array.isArray(allowedFilters.dateRange)) {
           const [startDate, endDate] = allowedFilters.dateRange;
+          console.log("✅ [sale buildListKey] dateRange 매핑 시도:", {
+            startDate,
+            endDate,
+          });
           if (startDate) {
             cleanFilters.contract_date_from = startDate;
+            console.log("✅ contract_date_from 설정:", startDate);
           }
           if (endDate) {
             cleanFilters.contract_date_to = endDate;
+            console.log("✅ contract_date_to 설정:", endDate);
           }
           delete cleanFilters.dateRange;
+        } else {
+          console.log(
+            "⚠️ [sale buildListKey] dateRange가 배열이 아니거나 없음"
+          );
         }
 
         // 층확인 매핑
@@ -835,6 +851,8 @@ export const datasetConfigs: Record<DatasetId, DatasetConfig> = {
           delete cleanFilters.searchQuery;
           delete cleanFilters.searchField;
         }
+
+        console.log("🔵 [sale buildListKey] 최종 API 파라미터:", cleanFilters);
 
         return [
           "/api/v1/real-transactions/",
@@ -941,15 +959,29 @@ export const datasetConfigs: Record<DatasetId, DatasetConfig> = {
         }
 
         // 날짜 범위 매핑
+        console.log("🔍 [sale fetchList] dateRange 필터 확인:", {
+          dateRange: allowedFilters.dateRange,
+          isArray: Array.isArray(allowedFilters.dateRange),
+          type: typeof allowedFilters.dateRange,
+          allowedFilters,
+        });
         if (Array.isArray(allowedFilters.dateRange)) {
           const [startDate, endDate] = allowedFilters.dateRange;
+          console.log("✅ [sale fetchList] dateRange 매핑 시도:", {
+            startDate,
+            endDate,
+          });
           if (startDate) {
             cleanFilters.contract_date_from = startDate;
+            console.log("✅ contract_date_from 설정:", startDate);
           }
           if (endDate) {
             cleanFilters.contract_date_to = endDate;
+            console.log("✅ contract_date_to 설정:", endDate);
           }
           delete cleanFilters.dateRange;
+        } else {
+          console.log("⚠️ [sale fetchList] dateRange가 배열이 아니거나 없음");
         }
 
         // 층확인 매핑
@@ -986,11 +1018,23 @@ export const datasetConfigs: Record<DatasetId, DatasetConfig> = {
           delete cleanFilters.searchField;
         }
 
-        return realTransactionApi.getTransactions({
+        console.log("🔵 [sale fetchList] 최종 API 파라미터:", cleanFilters);
+
+        const result = await realTransactionApi.getTransactions({
           ...(cleanFilters as any),
           page,
           size,
         });
+
+        console.log("🟢 [sale fetchList] 백엔드 응답:", {
+          total: result.total,
+          itemsCount: result.items?.length,
+          hasContractDateFilter: !!(
+            cleanFilters.contract_date_from || cleanFilters.contract_date_to
+          ),
+        });
+
+        return result;
       },
     },
     adapter: {

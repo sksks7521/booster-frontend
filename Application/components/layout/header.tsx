@@ -1,22 +1,22 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import Link from "next/link"
-import { Button } from "@/components/ui/button"
-import { Menu, X, User, LogOut } from "lucide-react"
+import { useState } from "react";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import { Menu, X, User, LogOut, ChevronDown } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+  DropdownMenuLabel,
+} from "@/components/ui/dropdown-menu";
+import { useAuthUser } from "@/hooks/useAuthUser";
 
-interface HeaderProps {
-  user?: {
-    email: string
-    subscription?: {
-      plan: string
-      expiresAt: string
-    }
-  }
-}
-
-export default function Header({ user }: HeaderProps) {
-  const [isMenuOpen, setIsMenuOpen] = useState(false)
+export default function Header() {
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const { user, logout } = useAuthUser();
 
   return (
     <header className="bg-white border-b border-gray-200 sticky top-0 z-50">
@@ -28,23 +28,77 @@ export default function Header({ user }: HeaderProps) {
             <div className="ml-2 text-sm text-gray-500">Booster</div>
           </Link>
 
-          {/* Desktop Navigation */}
-          <nav className="hidden md:flex items-center space-x-8">
-            <Link href="/features" className="text-gray-700 hover:text-blue-600 font-medium">
-              기능
-            </Link>
-            <Link href="/analysis" className="text-gray-700 hover:text-blue-600 font-medium">
-              통합 분석
-            </Link>
-            <Link href="/calculator" className="text-gray-700 hover:text-blue-600 font-medium">
-              수익률 계산기
-            </Link>
-            <Link href="/favorites" className="text-gray-700 hover:text-blue-600 font-medium">
-              관심 물건
-            </Link>
-            <Link href="/notices" className="text-gray-700 hover:text-blue-600 font-medium">
-              공지사항
-            </Link>
+          {/* Desktop Navigation - 4 dropdown groups */}
+          <nav className="hidden md:flex items-center space-x-6">
+            {/* 회사소개 */}
+            <DropdownMenu>
+              <DropdownMenuTrigger className="flex items-center text-gray-700 hover:text-blue-600 font-medium">
+                회사소개 <ChevronDown className="w-4 h-4 ml-1" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
+                <DropdownMenuLabel>회사소개</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem disabled>
+                  브랜드 소개 (준비중)
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {/* 요금제 */}
+            <DropdownMenu>
+              <DropdownMenuTrigger className="flex items-center text-gray-700 hover:text-blue-600 font-medium">
+                요금제 <ChevronDown className="w-4 h-4 ml-1" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
+                <DropdownMenuItem asChild>
+                  <Link href="/pricing">요금제</Link>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {/* 서비스 */}
+            <DropdownMenu>
+              <DropdownMenuTrigger className="flex items-center text-gray-700 hover:text-blue-600 font-medium">
+                서비스 <ChevronDown className="w-4 h-4 ml-1" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
+                <DropdownMenuItem asChild>
+                  <Link href="/analysis">통합 분석</Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/calculator">수익률 계산기</Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/favorites">관심 물건</Link>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem asChild>
+                  <Link href="/features">기능 소개</Link>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {/* 고객지원 */}
+            <DropdownMenu>
+              <DropdownMenuTrigger className="flex items-center text-gray-700 hover:text-blue-600 font-medium">
+                고객지원 <ChevronDown className="w-4 h-4 ml-1" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
+                <DropdownMenuItem asChild>
+                  <Link href="/support">고객센터</Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/notices">공지사항</Link>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem asChild>
+                  <Link href="/terms">이용약관</Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/privacy">개인정보처리방침</Link>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </nav>
 
           {/* User Menu */}
@@ -53,7 +107,11 @@ export default function Header({ user }: HeaderProps) {
               <div className="flex items-center space-x-4">
                 <div className="text-sm">
                   <div className="font-medium text-gray-900">{user.email}</div>
-                  {user.subscription && <div className="text-blue-600 text-xs">{user.subscription.plan} 플랜</div>}
+                  {user.subscription && (
+                    <div className="text-blue-600 text-xs">
+                      {user.subscription.plan} 플랜
+                    </div>
+                  )}
                 </div>
                 <Button variant="ghost" size="sm" asChild>
                   <Link href="/mypage">
@@ -79,8 +137,16 @@ export default function Header({ user }: HeaderProps) {
 
           {/* Mobile menu button */}
           <div className="md:hidden">
-            <Button variant="ghost" size="sm" onClick={() => setIsMenuOpen(!isMenuOpen)}>
-              {isMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setIsMenuOpen(!isMenuOpen)}
+            >
+              {isMenuOpen ? (
+                <X className="w-5 h-5" />
+              ) : (
+                <Menu className="w-5 h-5" />
+              )}
             </Button>
           </div>
         </div>
@@ -88,32 +154,114 @@ export default function Header({ user }: HeaderProps) {
         {/* Mobile Navigation */}
         {isMenuOpen && (
           <div className="md:hidden py-4 border-t border-gray-200">
-            <div className="flex flex-col space-y-4">
-              <Link href="/features" className="text-gray-700 hover:text-blue-600 font-medium">
-                기능
-              </Link>
-              <Link href="/analysis" className="text-gray-700 hover:text-blue-600 font-medium">
-                통합 분석
-              </Link>
-              <Link href="/calculator" className="text-gray-700 hover:text-blue-600 font-medium">
-                수익률 계산기
-              </Link>
-              <Link href="/favorites" className="text-gray-700 hover:text-blue-600 font-medium">
-                관심 물건
-              </Link>
-              <Link href="/notices" className="text-gray-700 hover:text-blue-600 font-medium">
-                공지사항
-              </Link>
+            <div className="flex flex-col space-y-3">
+              <div>
+                <div className="text-xs tracking-wider text-gray-500 mb-1">
+                  회사소개
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-gray-400 text-sm">
+                    브랜드 소개 (준비중)
+                  </span>
+                </div>
+              </div>
+              <div className="pt-2 border-t border-gray-100">
+                <div className="text-xs tracking-wider text-gray-500 mb-1">
+                  요금제
+                </div>
+                <div className="flex flex-col">
+                  <Link
+                    href="/pricing"
+                    className="text-gray-700 hover:text-blue-600 text-sm"
+                  >
+                    요금제
+                  </Link>
+                </div>
+              </div>
+              <div className="pt-2 border-t border-gray-100">
+                <div className="text-xs tracking-wider text-gray-500 mb-1">
+                  서비스
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <Link
+                    href="/analysis"
+                    className="text-gray-700 hover:text-blue-600 text-sm"
+                  >
+                    통합 분석
+                  </Link>
+                  <Link
+                    href="/calculator"
+                    className="text-gray-700 hover:text-blue-600 text-sm"
+                  >
+                    수익률 계산기
+                  </Link>
+                  <Link
+                    href="/favorites"
+                    className="text-gray-700 hover:text-blue-600 text-sm"
+                  >
+                    관심 물건
+                  </Link>
+                  <Link
+                    href="/features"
+                    className="text-gray-700 hover:text-blue-600 text-sm"
+                  >
+                    기능 소개
+                  </Link>
+                </div>
+              </div>
+              <div className="pt-2 border-t border-gray-100">
+                <div className="text-xs tracking-wider text-gray-500 mb-1">
+                  고객지원
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <Link
+                    href="/support"
+                    className="text-gray-700 hover:text-blue-600 text-sm"
+                  >
+                    고객센터
+                  </Link>
+                  <Link
+                    href="/notices"
+                    className="text-gray-700 hover:text-blue-600 text-sm"
+                  >
+                    공지사항
+                  </Link>
+                  <Link
+                    href="/terms"
+                    className="text-gray-700 hover:text-blue-600 text-sm"
+                  >
+                    이용약관
+                  </Link>
+                  <Link
+                    href="/privacy"
+                    className="text-gray-700 hover:text-blue-600 text-sm"
+                  >
+                    개인정보처리방침
+                  </Link>
+                </div>
+              </div>
               {user ? (
                 <div className="pt-4 border-t border-gray-200">
-                  <div className="text-sm font-medium text-gray-900 mb-2">{user.email}</div>
+                  <div className="text-sm font-medium text-gray-900 mb-2">
+                    {user.email}
+                  </div>
                   <div className="flex flex-col space-y-2">
-                    <Button variant="ghost" size="sm" className="justify-start" asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="justify-start"
+                      asChild
+                    >
                       <Link href="/mypage">
                         <User className="w-4 h-4 mr-2" />내 정보
                       </Link>
                     </Button>
-                    <Button variant="ghost" size="sm" className="justify-start">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="justify-start"
+                      onClick={logout}
+                    >
                       <LogOut className="w-4 h-4 mr-2" />
                       로그아웃
                     </Button>
@@ -134,5 +282,5 @@ export default function Header({ user }: HeaderProps) {
         )}
       </div>
     </header>
-  )
+  );
 }

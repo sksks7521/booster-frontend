@@ -70,6 +70,13 @@ export default function SaleSearchResults({
   const mergedFilters: any =
     namespace && nsOverrides ? { ...allFilters, ...nsOverrides } : allFilters;
 
+  console.log("🔍 [SaleSearchResults] 필터 상태 확인:", {
+    dateRange: mergedFilters?.dateRange,
+    allDateRange: (allFilters as any)?.dateRange,
+    nsDateRange: nsOverrides?.dateRange,
+    mergedFilters,
+  });
+
   const setPage = useFilterStore((s) => s.setPage);
   const setSize = useFilterStore((s) => s.setSize);
   const setSortConfig = useFilterStore((s: any) => s.setSortConfig);
@@ -269,11 +276,15 @@ export default function SaleSearchResults({
   const handleSort = (column?: string, direction?: "asc" | "desc") => {
     const key = column ?? "";
     const order = direction ?? "asc";
+
+    // camelCase를 snake_case로 변환하여 백엔드 정렬 컬럼명과 비교
+    const snakeKey = key.replace(/([A-Z])/g, "_$1").toLowerCase();
+
     if (
       !key ||
       (Array.isArray(sortableColumns) &&
         sortableColumns.length > 0 &&
-        !sortableColumns.includes(key))
+        !sortableColumns.includes(snakeKey))
     ) {
       return;
     }

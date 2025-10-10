@@ -1,36 +1,53 @@
-"use client"
+"use client";
 
-import type React from "react"
+import type React from "react";
 
-import { useState } from "react"
-import Link from "next/link"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { Switch } from "@/components/ui/switch"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import Header from "@/components/layout/header"
-import { Check, X, Crown, Zap, Shield, BarChart3, Headphones, Star, ArrowRight } from "lucide-react"
+import { useState } from "react";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import Header from "@/components/layout/header";
+import {
+  Check,
+  X,
+  Crown,
+  Zap,
+  Shield,
+  BarChart3,
+  Headphones,
+  Star,
+  ArrowRight,
+} from "lucide-react";
 
 interface PricingPlan {
-  id: string
-  name: string
-  description: string
+  id: string;
+  name: string;
+  description: string;
   price: {
-    monthly: number
-    yearly: number
-  }
+    monthly: number;
+    yearly: number;
+  };
   features: {
-    name: string
-    included: boolean
-    limit?: string
-  }[]
-  popular?: boolean
-  icon: React.ReactNode
-  color: string
+    name: string;
+    included: boolean;
+    limit?: string;
+  }[];
+  popular?: boolean;
+  icon: React.ReactNode;
+  color: string;
 }
 
 export default function PricingPage() {
-  const [isYearly, setIsYearly] = useState(false)
+  const [isYearly, setIsYearly] = useState(false);
 
   // 사용자 정보 (임시)
   const user = {
@@ -39,7 +56,7 @@ export default function PricingPage() {
       plan: "Pro",
       expiresAt: "2024-12-31",
     },
-  }
+  };
 
   const plans: PricingPlan[] = [
     {
@@ -127,37 +144,49 @@ export default function PricingPage() {
       icon: <Shield className="w-6 h-6" />,
       color: "border-gold-200",
     },
-  ]
+  ];
 
   const formatPrice = (price: number) => {
-    if (price === 0) return "무료"
-    return `₩${price.toLocaleString()}`
-  }
+    if (price === 0) return "무료";
+    return `₩${price.toLocaleString()}`;
+  };
 
   const getDiscountPercentage = (monthly: number, yearly: number) => {
-    if (monthly === 0 || yearly === 0) return 0
-    return Math.round(((monthly * 12 - yearly) / (monthly * 12)) * 100)
-  }
+    if (monthly === 0 || yearly === 0) return 0;
+    return Math.round(((monthly * 12 - yearly) / (monthly * 12)) * 100);
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Header user={user} />
-
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         {/* 헤더 섹션 */}
         <div className="text-center mb-16">
           <h1 className="text-4xl font-bold text-gray-900 mb-4">
-            투자 목표에 맞는 <span className="text-blue-600">플랜을 선택하세요</span>
+            투자 목표에 맞는{" "}
+            <span className="text-blue-600">플랜을 선택하세요</span>
           </h1>
           <p className="text-xl text-gray-600 mb-8 max-w-3xl mx-auto">
-            부동산 분석의 모든 기능을 경험해보세요. 언제든지 플랜을 변경할 수 있습니다.
+            부동산 분석의 모든 기능을 경험해보세요. 언제든지 플랜을 변경할 수
+            있습니다.
           </p>
 
           {/* 요금제 토글 */}
           <div className="flex items-center justify-center space-x-4 mb-8">
-            <span className={`text-sm font-medium ${!isYearly ? "text-gray-900" : "text-gray-500"}`}>월간 결제</span>
+            <span
+              className={`text-sm font-medium ${
+                !isYearly ? "text-gray-900" : "text-gray-500"
+              }`}
+            >
+              월간 결제
+            </span>
             <Switch checked={isYearly} onCheckedChange={setIsYearly} />
-            <span className={`text-sm font-medium ${isYearly ? "text-gray-900" : "text-gray-500"}`}>연간 결제</span>
+            <span
+              className={`text-sm font-medium ${
+                isYearly ? "text-gray-900" : "text-gray-500"
+              }`}
+            >
+              연간 결제
+            </span>
             <Badge variant="secondary" className="ml-2">
               최대 17% 할인
             </Badge>
@@ -170,7 +199,9 @@ export default function PricingPage() {
             <Card
               key={plan.id}
               className={`relative ${plan.color} ${
-                plan.popular ? "ring-2 ring-purple-500 shadow-lg scale-105" : "hover:shadow-lg"
+                plan.popular
+                  ? "ring-2 ring-purple-500 shadow-lg scale-105"
+                  : "hover:shadow-lg"
               } transition-all duration-200`}
             >
               {plan.popular && (
@@ -184,26 +215,42 @@ export default function PricingPage() {
 
               <CardHeader className="text-center pb-4">
                 <div className="flex items-center justify-center mb-4">
-                  <div className={`p-3 rounded-full ${plan.popular ? "bg-purple-100" : "bg-gray-100"}`}>
+                  <div
+                    className={`p-3 rounded-full ${
+                      plan.popular ? "bg-purple-100" : "bg-gray-100"
+                    }`}
+                  >
                     {plan.icon}
                   </div>
                 </div>
                 <CardTitle className="text-xl font-bold">{plan.name}</CardTitle>
-                <CardDescription className="text-gray-600">{plan.description}</CardDescription>
+                <CardDescription className="text-gray-600">
+                  {plan.description}
+                </CardDescription>
               </CardHeader>
 
               <CardContent className="pt-0">
                 {/* 가격 */}
                 <div className="text-center mb-6">
                   <div className="text-3xl font-bold text-gray-900 mb-1">
-                    {formatPrice(isYearly ? plan.price.yearly : plan.price.monthly)}
+                    {formatPrice(
+                      isYearly ? plan.price.yearly : plan.price.monthly
+                    )}
                   </div>
                   <div className="text-sm text-gray-500">
-                    {plan.price.monthly === 0 ? "영구 무료" : isYearly ? "/ 년" : "/ 월"}
+                    {plan.price.monthly === 0
+                      ? "영구 무료"
+                      : isYearly
+                      ? "/ 년"
+                      : "/ 월"}
                   </div>
                   {isYearly && plan.price.monthly > 0 && (
                     <div className="text-sm text-green-600 font-medium mt-1">
-                      {getDiscountPercentage(plan.price.monthly, plan.price.yearly)}% 할인
+                      {getDiscountPercentage(
+                        plan.price.monthly,
+                        plan.price.yearly
+                      )}
+                      % 할인
                     </div>
                   )}
                 </div>
@@ -220,11 +267,17 @@ export default function PricingPage() {
                         )}
                       </div>
                       <div className="flex-1">
-                        <span className={`text-sm ${feature.included ? "text-gray-900" : "text-gray-400"}`}>
+                        <span
+                          className={`text-sm ${
+                            feature.included ? "text-gray-900" : "text-gray-400"
+                          }`}
+                        >
                           {feature.name}
                         </span>
                         {feature.limit && feature.included && (
-                          <span className="text-xs text-gray-500 ml-1">({feature.limit})</span>
+                          <span className="text-xs text-gray-500 ml-1">
+                            ({feature.limit})
+                          </span>
                         )}
                       </div>
                     </li>
@@ -238,12 +291,18 @@ export default function PricingPage() {
                     plan.popular
                       ? "bg-purple-600 hover:bg-purple-700"
                       : plan.id === "free"
-                        ? "bg-gray-600 hover:bg-gray-700"
-                        : "bg-blue-600 hover:bg-blue-700"
+                      ? "bg-gray-600 hover:bg-gray-700"
+                      : "bg-blue-600 hover:bg-blue-700"
                   }`}
                   asChild
                 >
-                  <Link href={plan.id === "free" ? "/signup" : `/checkout?plan=${plan.id}`}>
+                  <Link
+                    href={
+                      plan.id === "free"
+                        ? "/signup"
+                        : `/checkout?plan=${plan.id}`
+                    }
+                  >
                     {plan.id === "free" ? "무료로 시작하기" : "플랜 선택하기"}
                     <ArrowRight className="w-4 h-4 ml-2" />
                   </Link>
@@ -256,16 +315,23 @@ export default function PricingPage() {
         {/* 기능 비교표 */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden mb-16">
           <div className="px-8 py-6 border-b border-gray-200">
-            <h2 className="text-2xl font-bold text-gray-900 text-center">상세 기능 비교</h2>
+            <h2 className="text-2xl font-bold text-gray-900 text-center">
+              상세 기능 비교
+            </h2>
           </div>
 
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-4 text-left text-sm font-medium text-gray-900">기능</th>
+                  <th className="px-6 py-4 text-left text-sm font-medium text-gray-900">
+                    기능
+                  </th>
                   {plans.map((plan) => (
-                    <th key={plan.id} className="px-6 py-4 text-center text-sm font-medium text-gray-900">
+                    <th
+                      key={plan.id}
+                      className="px-6 py-4 text-center text-sm font-medium text-gray-900"
+                    >
                       {plan.name}
                     </th>
                   ))}
@@ -273,18 +339,35 @@ export default function PricingPage() {
               </thead>
               <tbody className="divide-y divide-gray-200">
                 {[
-                  { name: "월간 분석 횟수", values: ["5회", "50회", "200회", "무제한"] },
-                  { name: "관심 물건 저장", values: ["10개", "100개", "500개", "무제한"] },
-                  { name: "분석 리포트", values: ["기본", "기본", "고급", "프리미엄"] },
+                  {
+                    name: "월간 분석 횟수",
+                    values: ["5회", "50회", "200회", "무제한"],
+                  },
+                  {
+                    name: "관심 물건 저장",
+                    values: ["10개", "100개", "500개", "무제한"],
+                  },
+                  {
+                    name: "분석 리포트",
+                    values: ["기본", "기본", "고급", "프리미엄"],
+                  },
                   { name: "고급 분석 도구", values: ["✗", "✓", "✓", "✓"] },
                   { name: "API 접근", values: ["✗", "✗", "✓", "✓"] },
                   { name: "데이터 내보내기", values: ["✗", "✓", "✓", "✓"] },
-                  { name: "고객 지원", values: ["이메일", "이메일", "우선 지원", "전담 지원"] },
+                  {
+                    name: "고객 지원",
+                    values: ["이메일", "이메일", "우선 지원", "전담 지원"],
+                  },
                 ].map((row, index) => (
                   <tr key={index} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 text-sm font-medium text-gray-900">{row.name}</td>
+                    <td className="px-6 py-4 text-sm font-medium text-gray-900">
+                      {row.name}
+                    </td>
                     {row.values.map((value, valueIndex) => (
-                      <td key={valueIndex} className="px-6 py-4 text-center text-sm text-gray-600">
+                      <td
+                        key={valueIndex}
+                        className="px-6 py-4 text-center text-sm text-gray-600"
+                      >
                         {value === "✓" ? (
                           <Check className="w-5 h-5 text-green-500 mx-auto" />
                         ) : value === "✗" ? (
@@ -303,56 +386,71 @@ export default function PricingPage() {
 
         {/* FAQ 섹션 */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-8 mb-16">
-          <h2 className="text-2xl font-bold text-gray-900 text-center mb-8">자주 묻는 질문</h2>
+          <h2 className="text-2xl font-bold text-gray-900 text-center mb-8">
+            자주 묻는 질문
+          </h2>
 
           <div className="grid md:grid-cols-2 gap-8">
             <div className="space-y-6">
               <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">플랜을 언제든지 변경할 수 있나요?</h3>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                  플랜을 언제든지 변경할 수 있나요?
+                </h3>
                 <p className="text-gray-600">
-                  네, 언제든지 플랜을 업그레이드하거나 다운그레이드할 수 있습니다. 변경사항은 다음 결제 주기부터
-                  적용됩니다.
+                  네, 언제든지 플랜을 업그레이드하거나 다운그레이드할 수
+                  있습니다. 변경사항은 다음 결제 주기부터 적용됩니다.
                 </p>
               </div>
 
               <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">무료 체험 기간이 있나요?</h3>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                  무료 체험 기간이 있나요?
+                </h3>
                 <p className="text-gray-600">
-                  Free Trial 플랜을 통해 영구적으로 기본 기능을 무료로 사용할 수 있습니다. 유료 플랜은 별도의 체험 기간
-                  없이 바로 시작됩니다.
+                  Free Trial 플랜을 통해 영구적으로 기본 기능을 무료로 사용할 수
+                  있습니다. 유료 플랜은 별도의 체험 기간 없이 바로 시작됩니다.
                 </p>
               </div>
 
               <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">결제는 어떻게 이루어지나요?</h3>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                  결제는 어떻게 이루어지나요?
+                </h3>
                 <p className="text-gray-600">
-                  신용카드, 체크카드, 계좌이체를 통해 결제할 수 있습니다. 모든 결제는 안전하게 암호화되어 처리됩니다.
+                  신용카드, 체크카드, 계좌이체를 통해 결제할 수 있습니다. 모든
+                  결제는 안전하게 암호화되어 처리됩니다.
                 </p>
               </div>
             </div>
 
             <div className="space-y-6">
               <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">환불 정책은 어떻게 되나요?</h3>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                  환불 정책은 어떻게 되나요?
+                </h3>
                 <p className="text-gray-600">
-                  서비스에 만족하지 않으시면 구매 후 7일 이내에 전액 환불받을 수 있습니다. 자세한 내용은 이용약관을
-                  참고해주세요.
+                  서비스에 만족하지 않으시면 구매 후 7일 이내에 전액 환불받을 수
+                  있습니다. 자세한 내용은 이용약관을 참고해주세요.
                 </p>
               </div>
 
               <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">기업용 플랜이 따로 있나요?</h3>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                  기업용 플랜이 따로 있나요?
+                </h3>
                 <p className="text-gray-600">
-                  Enterprise 플랜이 기업용으로 설계되었습니다. 더 많은 기능이나 맞춤형 솔루션이 필요하시면 별도로
-                  문의해주세요.
+                  Enterprise 플랜이 기업용으로 설계되었습니다. 더 많은 기능이나
+                  맞춤형 솔루션이 필요하시면 별도로 문의해주세요.
                 </p>
               </div>
 
               <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">고객 지원은 어떻게 받을 수 있나요?</h3>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                  고객 지원은 어떻게 받을 수 있나요?
+                </h3>
                 <p className="text-gray-600">
-                  플랜에 따라 이메일, 우선 지원, 전담 지원을 제공합니다. 고객센터를 통해 언제든지 도움을 받을 수
-                  있습니다.
+                  플랜에 따라 이메일, 우선 지원, 전담 지원을 제공합니다.
+                  고객센터를 통해 언제든지 도움을 받을 수 있습니다.
                 </p>
               </div>
             </div>
@@ -363,10 +461,15 @@ export default function PricingPage() {
         <div className="text-center bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl p-12 text-white">
           <h2 className="text-3xl font-bold mb-4">지금 바로 시작하세요</h2>
           <p className="text-xl mb-8 opacity-90">
-            부동산 투자의 새로운 기준을 경험해보세요. 언제든지 플랜을 변경할 수 있습니다.
+            부동산 투자의 새로운 기준을 경험해보세요. 언제든지 플랜을 변경할 수
+            있습니다.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Button size="lg" className="bg-white text-blue-600 hover:bg-gray-100" asChild>
+            <Button
+              size="lg"
+              className="bg-white text-blue-600 hover:bg-gray-100"
+              asChild
+            >
               <Link href="/signup">
                 무료로 시작하기
                 <ArrowRight className="w-5 h-5 ml-2" />
@@ -396,7 +499,9 @@ export default function PricingPage() {
                 <div className="text-2xl font-bold text-blue-400">부스터</div>
                 <div className="ml-2 text-sm text-gray-400">Booster</div>
               </div>
-              <p className="text-gray-400 mb-4">부동산 투자의 새로운 기준을 제시하는 AI 기반 분석 플랫폼입니다.</p>
+              <p className="text-gray-400 mb-4">
+                부동산 투자의 새로운 기준을 제시하는 AI 기반 분석 플랫폼입니다.
+              </p>
               <div className="text-sm text-gray-500">
                 <p>© 2024 Booster. All rights reserved.</p>
               </div>
@@ -406,22 +511,34 @@ export default function PricingPage() {
               <h3 className="text-lg font-semibold mb-4">서비스</h3>
               <ul className="space-y-2 text-gray-400">
                 <li>
-                  <Link href="/analysis" className="hover:text-white transition-colors">
+                  <Link
+                    href="/analysis"
+                    className="hover:text-white transition-colors"
+                  >
                     부동산 분석
                   </Link>
                 </li>
                 <li>
-                  <Link href="/calculator" className="hover:text-white transition-colors">
+                  <Link
+                    href="/calculator"
+                    className="hover:text-white transition-colors"
+                  >
                     수익률 계산기
                   </Link>
                 </li>
                 <li>
-                  <Link href="/favorites" className="hover:text-white transition-colors">
+                  <Link
+                    href="/favorites"
+                    className="hover:text-white transition-colors"
+                  >
                     관심 물건
                   </Link>
                 </li>
                 <li>
-                  <Link href="/pricing" className="hover:text-white transition-colors">
+                  <Link
+                    href="/pricing"
+                    className="hover:text-white transition-colors"
+                  >
                     요금제
                   </Link>
                 </li>
@@ -432,22 +549,34 @@ export default function PricingPage() {
               <h3 className="text-lg font-semibold mb-4">고객지원</h3>
               <ul className="space-y-2 text-gray-400">
                 <li>
-                  <Link href="/support" className="hover:text-white transition-colors">
+                  <Link
+                    href="/support"
+                    className="hover:text-white transition-colors"
+                  >
                     고객센터
                   </Link>
                 </li>
                 <li>
-                  <Link href="/notices" className="hover:text-white transition-colors">
+                  <Link
+                    href="/notices"
+                    className="hover:text-white transition-colors"
+                  >
                     공지사항
                   </Link>
                 </li>
                 <li>
-                  <Link href="/terms" className="hover:text-white transition-colors">
+                  <Link
+                    href="/terms"
+                    className="hover:text-white transition-colors"
+                  >
                     이용약관
                   </Link>
                 </li>
                 <li>
-                  <Link href="/privacy" className="hover:text-white transition-colors">
+                  <Link
+                    href="/privacy"
+                    className="hover:text-white transition-colors"
+                  >
                     개인정보처리방침
                   </Link>
                 </li>
@@ -457,5 +586,5 @@ export default function PricingPage() {
         </div>
       </footer>
     </div>
-  )
+  );
 }
