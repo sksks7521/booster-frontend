@@ -679,8 +679,22 @@ export const realTransactionApi = {
 
 export const realRentApi = {
   getRents: (params?: Record<string, any>) => apiClient.getRealRents(params),
+  // 컬럼 메타: 실거래 전월세
+  getColumns: (): Promise<any> => apiClient.getRealRentsColumns(),
   getRentalYield: (params?: Record<string, any>) =>
     apiClient.getRentalYield(params),
+  // 주소별 전월세 조회 (실거래가 팝업과 유사한 UX)
+  getRentsByAddress: async (address: string): Promise<any> => {
+    const response = await fetch(
+      `${API_BASE_URL}/api/v1/real-rents/by-address?address=${encodeURIComponent(
+        address
+      )}&size=1000&ordering=-contract_date`
+    );
+    if (!response.ok) {
+      throw new Error("Failed to fetch rents by address");
+    }
+    return response.json();
+  },
 };
 
 export const userPrefsApi = {

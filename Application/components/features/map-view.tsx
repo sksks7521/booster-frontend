@@ -9,9 +9,10 @@ import { DEFAULT_THRESHOLDS, MAP_GUARD } from "@/lib/map/config";
 import { renderBasePopup } from "@/components/map/popup/BasePopup";
 import { auctionSchema } from "@/components/map/popup/schemas/auction";
 import { saleSchema } from "@/components/map/popup/schemas/sale";
+import { rentSchema } from "@/components/map/popup/schemas/rent";
 import { analysisSchema } from "@/components/map/popup/schemas/analysis";
 import { useFilterStore } from "@/store/filterStore";
-import { realTransactionApi } from "@/lib/api";
+import { realTransactionApi, realRentApi } from "@/lib/api";
 import {
   Sheet,
   SheetContent,
@@ -571,8 +572,8 @@ function MapView({
         return renderBasePopup({ title, subtitle, rows, actions });
       }
 
-      // 🆕 sale 전용 팝업: 비동기 데이터 로딩 + 테이블 렌더링
-      if (namespace === "sale") {
+      // 🆕 sale/rent 전용 팝업: 비동기 데이터 로딩 + 테이블 렌더링
+      if (namespace === "sale" || namespace === "rent") {
         const item = it || {};
         const address =
           item?.address ||
@@ -595,8 +596,11 @@ function MapView({
         `;
 
         // 비동기로 데이터 로딩 후 팝업 업데이트
-        realTransactionApi
-          .getTransactionsByAddress(address)
+        const loader =
+          namespace === "sale"
+            ? realTransactionApi.getTransactionsByAddress(address)
+            : realRentApi.getRentsByAddress(address);
+        loader
           .then((response) => {
             // ⭐ 경고 메시지 처리 (1000건 초과 시)
             if (response.warning) {
@@ -608,10 +612,10 @@ function MapView({
             const transactions = response.items || [];
             const buildingInfo = transactions[0] || item; // 첫 번째 거래 또는 현재 아이템을 대표로 사용
 
-            const { title, subtitle, rows, table, actions } = saleSchema(
-              buildingInfo,
-              transactions
-            );
+            const { title, subtitle, rows, table, actions } =
+              namespace === "sale"
+                ? saleSchema(buildingInfo, transactions)
+                : rentSchema(buildingInfo, transactions);
 
             const newContent = renderBasePopup({
               title,
@@ -1329,7 +1333,7 @@ function MapView({
       if (!isFinite(lat) || !isFinite(lng)) return;
       try {
         const pos = new w.kakao.maps.LatLng(lat, lng);
-        // 가격 필드: 실거래가(price/transactionAmount) vs 경매(minimum_bid_price)
+        // 기본 금액 필드(매매/경매 호환)
         const price =
           it?.price ??
           it?.transactionAmount ??
@@ -1338,10 +1342,16 @@ function MapView({
           it?.min_bid_price ??
           0;
 
+        // 렌트 전용 레전드 값(전월세전환금): extra 우선, 서버 원본 폴백, 최종적으로 price 사용
+        const rentLegendValue =
+          it?.extra?.jeonseConversionAmount ??
+          it?.jeonse_conversion_amount ??
+          price;
+
         // 라벨: namespace에 따라 분기
         let label: string;
-        if (namespace === "sale") {
-          // 실거래가: 엘리베이터 여부 표시 (Y/N)
+        if (namespace === "sale" || namespace === "rent") {
+          // 실거래가/전월세: 엘리베이터 여부 표시 (Y/N)
           const elevatorAvailable = it?.extra?.elevatorAvailable;
           if (elevatorAvailable === true) {
             label = "Y";
@@ -1351,15 +1361,17 @@ function MapView({
             label = "-"; // 정보 없음
           }
         } else {
-          // 경매: 비율 표시
+          // 경매 등: 비율 표시
           const ratioRaw = it?.bid_to_appraised_ratio ?? it?.percentage ?? null;
           label = getBucketText(ratioRaw);
         }
 
-        // 색상 결정
+        // 색상 결정: 렌트는 전환금 기준, 그 외는 price 기준
         let color =
           typeof markerColorFn === "function"
             ? (markerColorFn as any)(it)
+            : namespace === "rent"
+            ? getColorByPrice(rentLegendValue)
             : getColorByPrice(price);
         if (typeof color !== "string" || color.trim() === "") {
           color = "#111827"; // fallback to black if unmapped/invalid
@@ -1373,6 +1385,10 @@ function MapView({
             namespace === "sale"
               ? `거래금액 ${Number(
                   parseFloat(price || 0) || 0
+                ).toLocaleString()}만원`
+              : namespace === "rent"
+              ? `전월세전환금 ${Number(
+                  parseFloat(rentLegendValue || 0) || 0
                 ).toLocaleString()}만원`
               : `최저가 ${Number(
                   parseFloat(price || 0) || 0

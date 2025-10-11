@@ -15,7 +15,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useFilterStore } from "@/store/filterStore";
-import { useLocationsSimple } from "@/hooks/useLocations";
+import {
+  useRealTransactionsSido,
+  useRealTransactionsSigungu,
+  useRealTransactionsAdminDong,
+} from "@/hooks/useLocations";
 import {
   ChevronDown,
   ChevronUp,
@@ -163,6 +167,10 @@ export default function RentFilter({
 
   // 검색 상태
   const [addressSearch, setAddressSearch] = useState<string>("");
+  // 주소 검색 유형(Option A): 도로명 | 지번
+  const [addressSearchField, setAddressSearchField] = useState<
+    "address" | "jibun_address"
+  >("address");
 
   // 날짜 범위
   const [startDate, setStartDate] = useState<string>("");
@@ -173,7 +181,7 @@ export default function RentFilter({
 
   const handleAddressSearch = () => {
     const q = addressSearch.trim();
-    setFilter("searchField", q ? "address" : "all");
+    setFilter("searchField", q ? (addressSearchField as any) : "all");
     setFilter("searchQuery", q);
     setPageStore(1);
   };
@@ -190,59 +198,38 @@ export default function RentFilter({
     useState<RentFilterPreset[]>(RENT_PRESETS);
   const [showPresets, setShowPresets] = useState<boolean>(false);
 
-  // API 데이터 로드
-  const {
-    locations,
-    isLoading: locationsLoading,
-    error: locationsError,
-    usingFallback: locationsUsingFallback,
-  } = useLocationsSimple();
-
-  // 지역 선택 로직
+  // 지역 목록: 백엔드 정규 API 연동 (매매와 동일)
+  const { sidos, isLoading: sidosLoading } = useRealTransactionsSido();
+  const provinces = (sidos || []).map((s) => s.name);
+  const { sigungus, isLoading: sigunguLoading } = useRealTransactionsSigungu(
+    selectedProvince || undefined
+  );
+  const sigunguNames = (sigungus || []).map((c) => c.name);
+  const { adminDongs, isLoading: townsLoading } = useRealTransactionsAdminDong(
+    selectedProvince || undefined,
+    selectedCity || undefined
+  );
+  const adminDongNames = (adminDongs || []).map((t) => t.name);
   useEffect(() => {
-    if (locations && Array.isArray(locations) && locations.length > 0) {
-      const provinces = Array.from(
-        new Set(locations.map((loc) => loc.province))
-      );
-      if (selectedProvince && provinces.includes(selectedProvince)) {
-        const cities = Array.from(
-          new Set(
-            locations
-              .filter((loc) => loc.province === selectedProvince)
-              .map((loc) => loc.city)
-          )
-        );
-        setAvailableCities(cities);
-      } else {
-        setAvailableCities([]);
-      }
-    }
-  }, [locations, selectedProvince]);
-
+    setAvailableCities(sigunguNames);
+  }, [sigunguNames.join(",")]);
   useEffect(() => {
-    if (
-      locations &&
-      Array.isArray(locations) &&
-      locations.length > 0 &&
-      selectedProvince &&
-      selectedCity
-    ) {
-      const districts = Array.from(
-        new Set(
-          locations
-            .filter(
-              (loc) =>
-                loc.province === selectedProvince && loc.city === selectedCity
-            )
-            .map((loc) => loc.district)
-            .filter((d) => d && d.trim() !== "")
-        )
-      );
-      setAvailableDistricts(districts);
-    } else {
-      setAvailableDistricts([]);
-    }
-  }, [locations, selectedProvince, selectedCity]);
+    setAvailableDistricts(adminDongNames);
+  }, [adminDongNames.join(",")]);
+
+  // 스토어 초기값과 로컬 상태 동기화(최초 1회 및 목록 로드 이후 보정)
+  useEffect(() => {
+    const p = (filters as any)?.province;
+    const c = (filters as any)?.cityDistrict;
+    const d = (filters as any)?.town;
+    if (p && !selectedProvince) setSelectedProvince(p);
+    // 시군구 목록 로드 후 초기 선택 반영
+    if (c && !selectedCity && sigunguNames.includes(c)) setSelectedCity(c);
+    // 읍면동 목록 로드 후 초기 선택 반영
+    if (d && !selectedDistrict && adminDongNames.includes(d))
+      setSelectedDistrict(d);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sidosLoading, sigunguNames.join(","), adminDongNames.join(",")]);
 
   // 지역 변경 핸들러
   const handleProvinceChange = (value: string) => {
@@ -251,8 +238,8 @@ export default function RentFilter({
     setSelectedCity("");
     setSelectedDistrict("");
     setFilter("province", actualValue);
-    setFilter("city", "");
-    setFilter("district", "");
+    setFilter("cityDistrict", "");
+    setFilter("town", "");
     setPageStore(1);
   };
 
@@ -260,15 +247,15 @@ export default function RentFilter({
     const actualValue = value === "all" ? "" : value;
     setSelectedCity(actualValue);
     setSelectedDistrict("");
-    setFilter("city", actualValue);
-    setFilter("district", "");
+    setFilter("cityDistrict", actualValue);
+    setFilter("town", "");
     setPageStore(1);
   };
 
   const handleDistrictChange = (value: string) => {
     const actualValue = value === "all" ? "" : value;
     setSelectedDistrict(actualValue);
-    setFilter("district", actualValue);
+    setFilter("town", actualValue);
     setPageStore(1);
   };
 
@@ -296,10 +283,7 @@ export default function RentFilter({
     setPageStore(1);
   };
 
-  const provinces =
-    locations && Array.isArray(locations)
-      ? Array.from(new Set(locations.map((loc) => loc.province)))
-      : [];
+  // provinces는 위의 정규 API 결과 사용
 
   return (
     <Card className="w-full">
@@ -376,10 +360,31 @@ export default function RentFilter({
               </Label>
 
               <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <Label className="text-xs text-gray-600">주소 유형</Label>
+                  <Select
+                    value={addressSearchField}
+                    onValueChange={(v) =>
+                      setAddressSearchField(v as "address" | "jibun_address")
+                    }
+                  >
+                    <SelectTrigger className="h-8 w-40">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="address">도로명주소</SelectItem>
+                      <SelectItem value="jibun_address">지번주소</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
                 <Label className="text-xs text-gray-600">주소 검색</Label>
                 <div className="flex space-x-2">
                   <Input
-                    placeholder="도로명주소로 검색하세요"
+                    placeholder={
+                      addressSearchField === "address"
+                        ? "도로명주소로 검색하세요"
+                        : "지번주소(예: ○○동 123-45)로 검색하세요"
+                    }
                     value={addressSearch}
                     onChange={(e) => setAddressSearch(e.target.value)}
                     onKeyPress={(e) =>
@@ -434,18 +439,31 @@ export default function RentFilter({
                   <Select
                     value={selectedCity}
                     onValueChange={handleCityChange}
-                    disabled={!selectedProvince}
+                    disabled={
+                      !selectedProvince ||
+                      sigunguLoading ||
+                      availableCities.length === 0
+                    }
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="시/군/구 선택" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all">전체</SelectItem>
-                      {availableCities.map((city) => (
-                        <SelectItem key={city} value={city}>
-                          {city}
+                      {sigunguLoading && (
+                        <SelectItem value="loading" disabled>
+                          불러오는 중...
                         </SelectItem>
-                      ))}
+                      )}
+                      {!sigunguLoading && (
+                        <>
+                          <SelectItem value="all">전체</SelectItem>
+                          {availableCities.map((city) => (
+                            <SelectItem key={city} value={city}>
+                              {city}
+                            </SelectItem>
+                          ))}
+                        </>
+                      )}
                     </SelectContent>
                   </Select>
                 </div>
@@ -455,18 +473,31 @@ export default function RentFilter({
                   <Select
                     value={selectedDistrict}
                     onValueChange={handleDistrictChange}
-                    disabled={!selectedCity}
+                    disabled={
+                      !selectedCity ||
+                      townsLoading ||
+                      availableDistricts.length === 0
+                    }
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="읍/면/동 선택" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all">전체</SelectItem>
-                      {availableDistricts.map((district) => (
-                        <SelectItem key={district} value={district}>
-                          {district}
+                      {townsLoading && (
+                        <SelectItem value="loading" disabled>
+                          불러오는 중...
                         </SelectItem>
-                      ))}
+                      )}
+                      {!townsLoading && (
+                        <>
+                          <SelectItem value="all">전체</SelectItem>
+                          {availableDistricts.map((district) => (
+                            <SelectItem key={district} value={district}>
+                              {district}
+                            </SelectItem>
+                          ))}
+                        </>
+                      )}
                     </SelectContent>
                   </Select>
                 </div>

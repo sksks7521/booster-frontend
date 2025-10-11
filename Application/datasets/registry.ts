@@ -164,6 +164,26 @@ const SALE_FILTERS = [
   "sortOrder",
 ] as const;
 
+// rent 전용: 실거래가(전월세) 허용 필터
+const RENT_FILTERS = [
+  "province",
+  "cityDistrict",
+  "town",
+  "depositRange",
+  "monthlyRentRange",
+  "areaRange",
+  "buildYearRange",
+  "dateRange",
+  "rentType",
+  "contractType",
+  "floorConfirmation",
+  "elevatorAvailable",
+  "searchField",
+  "searchQuery",
+  "sortBy",
+  "sortOrder",
+] as const;
+
 export const datasetConfigs: Record<DatasetId, DatasetConfig> = {
   auction_ed: {
     id: "auction_ed",
@@ -1214,74 +1234,347 @@ export const datasetConfigs: Record<DatasetId, DatasetConfig> = {
     title: "실거래가(전월세)",
     api: {
       buildListKey: ({ filters, page, size }) => {
-        const cleanFilters = { ...filters };
-        // 좌표 기반 필터 제거 (sale/auction_ed와 동일한 문제)
-        delete cleanFilters.lat;
-        delete cleanFilters.lng;
-        delete cleanFilters.south;
-        delete cleanFilters.west;
-        delete cleanFilters.north;
-        delete cleanFilters.east;
-        delete cleanFilters.radius_km;
+        // 화이트리스트로 허용된 필터만 선택
+        const allowedFilters = pickAllowed(filters as any, RENT_FILTERS);
+        const cleanFilters = { ...allowedFilters } as Record<string, unknown>;
+
+        // 좌표 기반 필터 제거 (일부 페이지 공통 좌표 키가 들어올 수 있어 방지)
+        delete (cleanFilters as any).lat;
+        delete (cleanFilters as any).lng;
+        delete (cleanFilters as any).south;
+        delete (cleanFilters as any).west;
+        delete (cleanFilters as any).north;
+        delete (cleanFilters as any).east;
+        delete (cleanFilters as any).radius_km;
+
+        // 선택 항목만 보기(ids) 서버 필터 연동: showSelectedOnly && selectedIds 있을 때만 적용
+        try {
+          const selOnly = (filters as any)?.showSelectedOnly === true;
+          const idsArr = Array.isArray((filters as any)?.selectedIds)
+            ? ((filters as any)?.selectedIds as any[])
+            : [];
+          if (selOnly && idsArr.length > 0) {
+            const capped = idsArr
+              .slice(0, 500)
+              .map((v) => String(v))
+              .filter((s) => s && s !== "undefined" && s !== "null");
+            if (capped.length > 0) (cleanFilters as any).ids = capped.join(",");
+          }
+        } catch {}
 
         // 지역 필터를 real_rents 백엔드 필드명으로 매핑
-        if (filters?.province) {
-          cleanFilters.sido = filters.province;
-          delete cleanFilters.province;
+        if (allowedFilters.province) {
+          (cleanFilters as any).sido = allowedFilters.province;
+          delete (cleanFilters as any).province;
         }
-        if (filters?.cityDistrict) {
-          cleanFilters.sigungu = filters.cityDistrict;
-          delete cleanFilters.cityDistrict;
+        if (allowedFilters.cityDistrict) {
+          const pd = (allowedFilters as any).province as string | undefined;
+          const cd = String((allowedFilters as any).cityDistrict || "");
+          const withPrefix =
+            pd && !cd.startsWith(String(pd)) ? `${pd} ${cd}` : cd;
+          (cleanFilters as any).sigungu = withPrefix;
+          delete (cleanFilters as any).cityDistrict;
         }
-        if (filters?.town) {
-          cleanFilters.admin_dong_name = filters.town;
-          delete cleanFilters.town;
+        if (allowedFilters.town) {
+          (cleanFilters as any).admin_dong_name = allowedFilters.town;
+          delete (cleanFilters as any).town;
+        }
+
+        // 정렬 파라미터를 서버 ordering 형식으로 변환
+        if (allowedFilters.sortBy && allowedFilters.sortOrder) {
+          const serverKey = camelToSnake(allowedFilters.sortBy as string);
+          if (serverKey) {
+            const order = allowedFilters.sortOrder as string;
+            (cleanFilters as any).ordering = `${
+              order === "desc" ? "-" : ""
+            }${serverKey}`;
+            delete (cleanFilters as any).sortBy;
+            delete (cleanFilters as any).sortOrder;
+          }
+        }
+
+        // 보증금 범위 매핑
+        if (Array.isArray((allowedFilters as any).depositRange)) {
+          const [minDeposit, maxDeposit] = (allowedFilters as any)
+            .depositRange as [number, number];
+          if (typeof minDeposit === "number" && minDeposit > 0)
+            (cleanFilters as any).min_deposit_amount = minDeposit;
+          if (typeof maxDeposit === "number" && maxDeposit > 0)
+            (cleanFilters as any).max_deposit_amount = maxDeposit;
+          delete (cleanFilters as any).depositRange;
+        }
+
+        // 월세 범위 매핑
+        if (Array.isArray((allowedFilters as any).monthlyRentRange)) {
+          const [minMonthly, maxMonthly] = (allowedFilters as any)
+            .monthlyRentRange as [number, number];
+          if (typeof minMonthly === "number" && minMonthly > 0)
+            (cleanFilters as any).min_monthly_rent = minMonthly;
+          if (typeof maxMonthly === "number" && maxMonthly > 0)
+            (cleanFilters as any).max_monthly_rent = maxMonthly;
+          delete (cleanFilters as any).monthlyRentRange;
+        }
+
+        // 전용면적 범위 매핑
+        if (Array.isArray((allowedFilters as any).areaRange)) {
+          const [minArea, maxArea] = (allowedFilters as any).areaRange as [
+            number,
+            number
+          ];
+          if (typeof minArea === "number" && minArea > 0)
+            (cleanFilters as any).min_exclusive_area = minArea;
+          if (typeof maxArea === "number" && maxArea > 0)
+            (cleanFilters as any).max_exclusive_area = maxArea;
+          delete (cleanFilters as any).areaRange;
+        }
+
+        // 건축연도 범위 매핑
+        if (Array.isArray((allowedFilters as any).buildYearRange)) {
+          const [minYear, maxYear] = (allowedFilters as any).buildYearRange as [
+            number,
+            number
+          ];
+          if (typeof minYear === "number" && minYear > 1900)
+            (cleanFilters as any).min_construction_year = minYear;
+          if (typeof maxYear === "number" && maxYear > 1900)
+            (cleanFilters as any).max_construction_year = maxYear;
+          delete (cleanFilters as any).buildYearRange;
+        }
+
+        // 날짜 범위 매핑
+        if (Array.isArray((allowedFilters as any).dateRange)) {
+          const [startDate, endDate] = (allowedFilters as any).dateRange as [
+            string,
+            string
+          ];
+          if (startDate) (cleanFilters as any).contract_date_from = startDate;
+          if (endDate) (cleanFilters as any).contract_date_to = endDate;
+          delete (cleanFilters as any).dateRange;
+        }
+
+        // 전월세 구분/계약 구분
+        if ((allowedFilters as any).rentType) {
+          (cleanFilters as any).rent_type = (allowedFilters as any).rentType;
+          delete (cleanFilters as any).rentType;
+        }
+        if ((allowedFilters as any).contractType) {
+          (cleanFilters as any).contract_type = (
+            allowedFilters as any
+          ).contractType;
+          delete (cleanFilters as any).contractType;
+        }
+
+        // 층확인/엘리베이터(백엔드 지원 시)
+        if (
+          (allowedFilters as any).floorConfirmation &&
+          (allowedFilters as any).floorConfirmation !== "all"
+        ) {
+          const fc = (allowedFilters as any).floorConfirmation;
+          (cleanFilters as any).floor_confirmation = Array.isArray(fc)
+            ? fc.join(",")
+            : fc;
+          delete (cleanFilters as any).floorConfirmation;
+        }
+        if (
+          (allowedFilters as any).elevatorAvailable !== undefined &&
+          (allowedFilters as any).elevatorAvailable !== "all"
+        ) {
+          (cleanFilters as any).elevator_available = (
+            allowedFilters as any
+          ).elevatorAvailable;
+          delete (cleanFilters as any).elevatorAvailable;
+        }
+
+        // 주소 검색 매핑 (Option A/B)
+        if (
+          (allowedFilters as any).searchQuery &&
+          (allowedFilters as any).searchField
+        ) {
+          const sf = String((allowedFilters as any).searchField);
+          const q = (allowedFilters as any).searchQuery as string;
+          if (sf === "address") {
+            (cleanFilters as any).address_search = q;
+            (cleanFilters as any).address_search_type = "road";
+          } else if (sf === "jibun_address") {
+            (cleanFilters as any).address_search = q;
+            (cleanFilters as any).address_search_type = "jibun";
+          } else if (sf === "road_address") {
+            (cleanFilters as any).road_address_search = q;
+          }
+          delete (cleanFilters as any).searchQuery;
+          delete (cleanFilters as any).searchField;
         }
 
         return [
           "/api/v1/real-rents/",
           {
-            ...pickAllowed(cleanFilters as any, ALLOWED_FILTERS_WITH_SORT),
+            ...(cleanFilters as any),
             page,
             size,
           },
         ] as const;
       },
       fetchList: async ({ filters, page, size }) => {
-        const cleanFilters = { ...filters };
+        // 화이트리스트로 허용된 필터만 선택
+        const allowedFilters = pickAllowed(filters as any, RENT_FILTERS);
+        const cleanFilters = { ...allowedFilters } as Record<string, unknown>;
+
         // 좌표 기반 필터 제거
-        delete cleanFilters.lat;
-        delete cleanFilters.lng;
-        delete cleanFilters.south;
-        delete cleanFilters.west;
-        delete cleanFilters.north;
-        delete cleanFilters.east;
-        delete cleanFilters.radius_km;
+        delete (cleanFilters as any).lat;
+        delete (cleanFilters as any).lng;
+        delete (cleanFilters as any).south;
+        delete (cleanFilters as any).west;
+        delete (cleanFilters as any).north;
+        delete (cleanFilters as any).east;
+        delete (cleanFilters as any).radius_km;
 
         // 지역 필터를 real_rents 백엔드 필드명으로 매핑
-        if (filters?.province) {
-          cleanFilters.sido = filters.province;
-          delete cleanFilters.province;
+        if (allowedFilters.province) {
+          (cleanFilters as any).sido = allowedFilters.province;
+          delete (cleanFilters as any).province;
         }
-        if (filters?.cityDistrict) {
-          cleanFilters.sigungu = filters.cityDistrict;
-          delete cleanFilters.cityDistrict;
+        if (allowedFilters.cityDistrict) {
+          const pd = (allowedFilters as any).province as string | undefined;
+          const cd = String((allowedFilters as any).cityDistrict || "");
+          const withPrefix =
+            pd && !cd.startsWith(String(pd)) ? `${pd} ${cd}` : cd;
+          (cleanFilters as any).sigungu = withPrefix;
+          delete (cleanFilters as any).cityDistrict;
         }
-        if (filters?.town) {
-          cleanFilters.admin_dong_name = filters.town;
-          delete cleanFilters.town;
+        if (allowedFilters.town) {
+          (cleanFilters as any).admin_dong_name = allowedFilters.town;
+          delete (cleanFilters as any).town;
+        }
+
+        // 정렬 파라미터를 서버 ordering 형식으로 변환
+        if (allowedFilters.sortBy && allowedFilters.sortOrder) {
+          const serverKey = camelToSnake(allowedFilters.sortBy as string);
+          if (serverKey) {
+            const order = allowedFilters.sortOrder as string;
+            (cleanFilters as any).ordering = `${
+              order === "desc" ? "-" : ""
+            }${serverKey}`;
+            delete (cleanFilters as any).sortBy;
+            delete (cleanFilters as any).sortOrder;
+          }
+        }
+
+        // 보증금 범위 매핑
+        if (Array.isArray((allowedFilters as any).depositRange)) {
+          const [minDeposit, maxDeposit] = (allowedFilters as any)
+            .depositRange as [number, number];
+          if (typeof minDeposit === "number" && minDeposit > 0)
+            (cleanFilters as any).min_deposit_amount = minDeposit;
+          if (typeof maxDeposit === "number" && maxDeposit > 0)
+            (cleanFilters as any).max_deposit_amount = maxDeposit;
+          delete (cleanFilters as any).depositRange;
+        }
+
+        // 월세 범위 매핑
+        if (Array.isArray((allowedFilters as any).monthlyRentRange)) {
+          const [minMonthly, maxMonthly] = (allowedFilters as any)
+            .monthlyRentRange as [number, number];
+          if (typeof minMonthly === "number" && minMonthly > 0)
+            (cleanFilters as any).min_monthly_rent = minMonthly;
+          if (typeof maxMonthly === "number" && maxMonthly > 0)
+            (cleanFilters as any).max_monthly_rent = maxMonthly;
+          delete (cleanFilters as any).monthlyRentRange;
+        }
+
+        // 전용면적 범위 매핑
+        if (Array.isArray((allowedFilters as any).areaRange)) {
+          const [minArea, maxArea] = (allowedFilters as any).areaRange as [
+            number,
+            number
+          ];
+          if (typeof minArea === "number" && minArea > 0)
+            (cleanFilters as any).min_exclusive_area = minArea;
+          if (typeof maxArea === "number" && maxArea > 0)
+            (cleanFilters as any).max_exclusive_area = maxArea;
+          delete (cleanFilters as any).areaRange;
+        }
+
+        // 건축연도 범위 매핑
+        if (Array.isArray((allowedFilters as any).buildYearRange)) {
+          const [minYear, maxYear] = (allowedFilters as any).buildYearRange as [
+            number,
+            number
+          ];
+          if (typeof minYear === "number" && minYear > 1900)
+            (cleanFilters as any).min_construction_year = minYear;
+          if (typeof maxYear === "number" && maxYear > 1900)
+            (cleanFilters as any).max_construction_year = maxYear;
+          delete (cleanFilters as any).buildYearRange;
+        }
+
+        // 날짜 범위 매핑
+        if (Array.isArray((allowedFilters as any).dateRange)) {
+          const [startDate, endDate] = (allowedFilters as any).dateRange as [
+            string,
+            string
+          ];
+          if (startDate) (cleanFilters as any).contract_date_from = startDate;
+          if (endDate) (cleanFilters as any).contract_date_to = endDate;
+          delete (cleanFilters as any).dateRange;
+        }
+
+        // 전월세 구분/계약 구분
+        if ((allowedFilters as any).rentType) {
+          (cleanFilters as any).rent_type = (allowedFilters as any).rentType;
+          delete (cleanFilters as any).rentType;
+        }
+        if ((allowedFilters as any).contractType) {
+          (cleanFilters as any).contract_type = (
+            allowedFilters as any
+          ).contractType;
+          delete (cleanFilters as any).contractType;
+        }
+
+        // 층확인/엘리베이터(백엔드 지원 시)
+        if (
+          (allowedFilters as any).floorConfirmation &&
+          (allowedFilters as any).floorConfirmation !== "all"
+        ) {
+          const fc = (allowedFilters as any).floorConfirmation;
+          (cleanFilters as any).floor_confirmation = Array.isArray(fc)
+            ? fc.join(",")
+            : fc;
+          delete (cleanFilters as any).floorConfirmation;
+        }
+        if (
+          (allowedFilters as any).elevatorAvailable !== undefined &&
+          (allowedFilters as any).elevatorAvailable !== "all"
+        ) {
+          (cleanFilters as any).elevator_available = (
+            allowedFilters as any
+          ).elevatorAvailable;
+          delete (cleanFilters as any).elevatorAvailable;
+        }
+
+        // 주소 검색 매핑 (Option A/B)
+        if (
+          (allowedFilters as any).searchQuery &&
+          (allowedFilters as any).searchField
+        ) {
+          const sf = String((allowedFilters as any).searchField);
+          const q = (allowedFilters as any).searchQuery as string;
+          if (sf === "address") {
+            (cleanFilters as any).address_search = q;
+            (cleanFilters as any).address_search_type = "road";
+          } else if (sf === "jibun_address") {
+            (cleanFilters as any).address_search = q;
+            (cleanFilters as any).address_search_type = "jibun";
+          } else if (sf === "road_address") {
+            (cleanFilters as any).road_address_search = q;
+          }
+          delete (cleanFilters as any).searchQuery;
+          delete (cleanFilters as any).searchField;
         }
 
         return realRentApi.getRents({
-          ...pickAllowed(cleanFilters as any, ALLOWED_FILTERS),
+          ...(cleanFilters as any),
           page,
           size,
-          ...(filters?.sortBy && filters?.sortOrder
-            ? {
-                sort_by: (filters as any).sortBy,
-                sort_order: (filters as any).sortOrder,
-              }
-            : {}),
         });
       },
     },
@@ -1403,7 +1696,7 @@ export const datasetConfigs: Record<DatasetId, DatasetConfig> = {
     },
     table: {
       columns: columnsRent as any,
-      defaultSort: { key: "depositAmount", order: "desc" },
+      defaultSort: { key: "contractDate", order: "desc" },
     },
     filters: { defaults: {}, ui: [] },
   },

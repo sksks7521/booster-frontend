@@ -1,6 +1,6 @@
 import useSWR from "swr";
 import type { DatasetId } from "@/types/datasets";
-import { realTransactionApi } from "@/lib/api";
+import { realTransactionApi, realRentApi } from "@/lib/api";
 import { fetcher } from "@/lib/fetcher";
 
 export type SortableColumns = {
@@ -32,6 +32,11 @@ export function useSortableColumns(datasetId: DatasetId) {
       // sale 데이터셋은 새로운 형식 지원
       if (datasetId === "sale") {
         const response = await realTransactionApi.getColumns();
+        return response as ColumnsResponse;
+      }
+      // rent 데이터셋도 API 클라이언트 경유(신규/구형 포맷 모두 허용)
+      if (datasetId === "rent") {
+        const response = await realRentApi.getColumns();
         return response as ColumnsResponse;
       }
       // auction_ed는 기존 형식 유지
