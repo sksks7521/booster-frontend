@@ -872,6 +872,178 @@ export default function PropertyDetailV2Page() {
     // 향후 트래킹 이벤트 연결 지점
   }, [itemId]);
 
+  // 🆕 상세 → 실거래가(전월세) 지도 초기값 주입(기존)
+  // 🆕 상세 → 전월세 지도 초기값 주입(1회): 중심/반경/원표시 상태
+  useEffect(() => {
+    try {
+      if (activeDataset !== "rent") return;
+      if (typeof setNsFilter !== "function") return;
+      const already = (nsState as any)?.rent?.mapInitFromDetail === true;
+      if (already) return;
+
+      const toNum = (v: any) =>
+        typeof v === "number" ? v : v != null ? parseFloat(String(v)) : NaN;
+
+      // 우선순위: vm.location → vm → property
+      const vmLat = toNum((vm as any)?.location?.lat ?? (vm as any)?.lat);
+      const vmLng = toNum((vm as any)?.location?.lng ?? (vm as any)?.lng);
+      const pLat = toNum(
+        (property as any)?.lat ??
+          (property as any)?.latitude ??
+          (property as any)?.lat_y ??
+          (property as any)?.y
+      );
+      const pLng = toNum(
+        (property as any)?.lng ??
+          (property as any)?.longitude ??
+          (property as any)?.lon ??
+          (property as any)?.x
+      );
+
+      let lat = Number.isFinite(vmLat) ? vmLat : pLat;
+      let lng = Number.isFinite(vmLng) ? vmLng : pLng;
+
+      // 범위 기반 스왑(한국 좌표대: lat≈33~39, lng≈124~132)
+      if (
+        Number.isFinite(lat) &&
+        Number.isFinite(lng) &&
+        (lat as number) > 90 &&
+        Math.abs(lng as number) <= 90
+      ) {
+        const t = lat;
+        lat = lng;
+        lng = t;
+      }
+
+      const valid =
+        Number.isFinite(lat) &&
+        Number.isFinite(lng) &&
+        !(Number(lat) === 0 && Number(lng) === 0);
+      if (!valid) return;
+
+      setNsFilter("rent", "circleCenter" as any, { lat, lng });
+      setNsFilter("rent", "circleRadiusM" as any, 1000);
+      setNsFilter("rent", "circleEnabled" as any, false);
+      setNsFilter("rent", "applyCircleFilter" as any, false);
+      // 초기화 완료 플래그(재주입 방지)
+      setNsFilter("rent", "mapInitFromDetail" as any, true);
+    } catch {}
+  }, [activeDataset, vm, property, nsState, setNsFilter]);
+
+  // 🆕 상세 → 실거래가(매매) 지도 초기값 주입(1회): 중심/반경/원표시 상태
+  useEffect(() => {
+    try {
+      if (activeDataset !== "sale") return;
+      if (typeof setNsFilter !== "function") return;
+      const already = (nsState as any)?.sale?.mapInitFromDetail === true;
+      if (already) return;
+
+      const toNum = (v: any) =>
+        typeof v === "number" ? v : v != null ? parseFloat(String(v)) : NaN;
+
+      // 우선순위: vm.location → vm → property
+      const vmLat = toNum((vm as any)?.location?.lat ?? (vm as any)?.lat);
+      const vmLng = toNum((vm as any)?.location?.lng ?? (vm as any)?.lng);
+      const pLat = toNum(
+        (property as any)?.lat ??
+          (property as any)?.latitude ??
+          (property as any)?.lat_y ??
+          (property as any)?.y
+      );
+      const pLng = toNum(
+        (property as any)?.lng ??
+          (property as any)?.longitude ??
+          (property as any)?.lon ??
+          (property as any)?.x
+      );
+
+      let lat = Number.isFinite(vmLat) ? vmLat : pLat;
+      let lng = Number.isFinite(vmLng) ? vmLng : pLng;
+
+      // 범위 기반 스왑(한국 좌표대: lat≈33~39, lng≈124~132)
+      if (
+        Number.isFinite(lat) &&
+        Number.isFinite(lng) &&
+        (lat as number) > 90 &&
+        Math.abs(lng as number) <= 90
+      ) {
+        const t = lat;
+        lat = lng;
+        lng = t;
+      }
+
+      const valid =
+        Number.isFinite(lat) &&
+        Number.isFinite(lng) &&
+        !(Number(lat) === 0 && Number(lng) === 0);
+      if (!valid) return;
+
+      setNsFilter("sale", "circleCenter" as any, { lat, lng });
+      setNsFilter("sale", "circleRadiusM" as any, 1000);
+      setNsFilter("sale", "circleEnabled" as any, false);
+      setNsFilter("sale", "applyCircleFilter" as any, false);
+      // 초기화 완료 플래그(재주입 방지)
+      setNsFilter("sale", "mapInitFromDetail" as any, true);
+    } catch {}
+  }, [activeDataset, vm, property, nsState, setNsFilter]);
+
+  // 🆕 상세 → 과거경매결과 지도 초기값 주입(1회): 중심/반경/원표시 상태
+  useEffect(() => {
+    try {
+      if (activeDataset !== "auction_ed") return;
+      if (typeof setNsFilter !== "function") return;
+      const already = (nsState as any)?.auction_ed?.mapInitFromDetail === true;
+      if (already) return;
+
+      const toNum = (v: any) =>
+        typeof v === "number" ? v : v != null ? parseFloat(String(v)) : NaN;
+
+      // 우선순위: vm.location → vm → property
+      const vmLat = toNum((vm as any)?.location?.lat ?? (vm as any)?.lat);
+      const vmLng = toNum((vm as any)?.location?.lng ?? (vm as any)?.lng);
+      const pLat = toNum(
+        (property as any)?.lat ??
+          (property as any)?.latitude ??
+          (property as any)?.lat_y ??
+          (property as any)?.y
+      );
+      const pLng = toNum(
+        (property as any)?.lng ??
+          (property as any)?.longitude ??
+          (property as any)?.lon ??
+          (property as any)?.x
+      );
+
+      let lat = Number.isFinite(vmLat) ? vmLat : pLat;
+      let lng = Number.isFinite(vmLng) ? vmLng : pLng;
+
+      // 범위 기반 스왑(한국 좌표대: lat≈33~39, lng≈124~132)
+      if (
+        Number.isFinite(lat) &&
+        Number.isFinite(lng) &&
+        (lat as number) > 90 &&
+        Math.abs(lng as number) <= 90
+      ) {
+        const t = lat;
+        lat = lng;
+        lng = t;
+      }
+
+      const valid =
+        Number.isFinite(lat) &&
+        Number.isFinite(lng) &&
+        !(Number(lat) === 0 && Number(lng) === 0);
+      if (!valid) return;
+
+      setNsFilter("auction_ed", "circleCenter" as any, { lat, lng });
+      setNsFilter("auction_ed", "circleRadiusM" as any, 1000);
+      setNsFilter("auction_ed", "circleEnabled" as any, false);
+      setNsFilter("auction_ed", "applyCircleFilter" as any, false);
+      // 초기화 완료 플래그(재주입 방지)
+      setNsFilter("auction_ed", "mapInitFromDetail" as any, true);
+    } catch {}
+  }, [activeDataset, vm, property, nsState, setNsFilter]);
+
   if (isLoading || isRefreshing) {
     return (
       <div className="min-h-screen bg-gray-50">

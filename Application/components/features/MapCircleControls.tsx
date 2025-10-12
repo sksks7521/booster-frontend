@@ -12,7 +12,7 @@ interface MapCircleControlsProps {
   refLocked?: boolean;
   onToggleRefLock?: () => void;
   onMoveToRefMarker?: () => void;
-  // 🆕 버튼 텍스트 커스터마이징
+  // 버튼 텍스트 커스터마이징
   moveToButtonText?: string; // 기본값: "물건 위치로 이동"
 }
 
@@ -25,7 +25,7 @@ export default function MapCircleControls({
   refLocked,
   onToggleRefLock,
   onMoveToRefMarker,
-  moveToButtonText = "물건 위치로 이동", // 🆕 기본값
+  moveToButtonText = "물건 위치로 이동",
 }: MapCircleControlsProps) {
   if (!enabled) return null;
 
