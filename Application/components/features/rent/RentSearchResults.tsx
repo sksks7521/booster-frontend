@@ -116,8 +116,20 @@ export default function RentSearchResults({
   const refetch = pageHook.mutate;
   const rawItems = pageHook.items;
   const serverTotal = pageHook.total;
-  const items = rawItems || [];
-  const totalCount = serverTotal;
+  // 선택 항목만 보기(클라이언트 필터) 적용: 백엔드 ids 미지원 대비
+  const showSelectedOnly = useFilterStore((s: any) => s.showSelectedOnly);
+  const selectedIdsForFilter = useFilterStore(
+    (s: any) => s.selectedIds || []
+  ) as string[];
+  const itemsBase = rawItems || [];
+  const items = showSelectedOnly
+    ? Array.isArray(selectedIdsForFilter) && selectedIdsForFilter.length > 0
+      ? itemsBase.filter((it: any) =>
+          (selectedIdsForFilter as string[]).includes(String(it?.id))
+        )
+      : []
+    : itemsBase;
+  const totalCount = showSelectedOnly ? items.length : serverTotal;
 
   // 📊 전체 데이터 개수 조회 (필터 없이)
   const { total: totalAllData } = useDataset("rent", {}, 1, 1, true);
@@ -287,14 +299,19 @@ export default function RentSearchResults({
 
   // 정렬 핸들러: 서버 허용 키만
   const handleSort = (column?: string, direction?: "asc" | "desc") => {
-    const key = column ?? "";
+    // 정렬 해제: column이 비어 들어오면 해제로 처리
+    if (!column) {
+      setSortConfig(undefined as any, undefined as any);
+      return;
+    }
+    // 정렬 설정: 허용 컬럼만 통과
+    const key = column;
     const order = direction ?? "asc";
     const snakeKey = key.replace(/([A-Z])/g, "_$1").toLowerCase();
     if (
-      !key ||
-      (Array.isArray(sortableColumns) &&
-        sortableColumns.length > 0 &&
-        !sortableColumns.includes(snakeKey))
+      Array.isArray(sortableColumns) &&
+      sortableColumns.length > 0 &&
+      !sortableColumns.includes(snakeKey)
     ) {
       return;
     }

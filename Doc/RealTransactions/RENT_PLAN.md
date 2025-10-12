@@ -35,6 +35,9 @@
 - 데이터셋/정렬
   - `datasetConfigs.rent.table.defaultSort = { key: "contractDate", order: "desc" }` 적용
   - `fetchList`에서 `sigungu` 자동 정규화(예: `경기도` + `고양시 덕양구` → `경기도 고양시 덕양구`)
+  - 테이블 정렬 토글 사이클 구현: 오름(asc) → 내림(desc) → 해제(none)
+    - `ItemTable` 3번째 클릭 시 `onSort(undefined, undefined)` 전송
+    - `RentSearchResults.tsx`/`SaleSearchResults.tsx`의 `handleSort`가 빈 컬럼 입력 시 `setSortConfig(undefined, undefined)` 호출하도록 수정
 - 컬럼/스키마
   - `columnsRent` 확정: "대지권면적(㎡)" 제외, "보증금갱신차이(만원) → 보증금갱신차이(%)" 순서 반영
   - 팝업 스키마 `components/map/popup/schemas/rent.ts` 추가, `pickFirst`로 snake/camel 혼합 키 안정화
@@ -49,6 +52,17 @@
   - 색상 기준: 전월세 전환금(5%) 분기 사용
 - 백엔드 커뮤니케이션
   - `/real-rents/by-address` 라우팅 충돌(422) 및 지역 AND 필터 정규화 요청 문서화·발송
+  - 실거래가(전월세) 목록 API 정렬(ordering) 미적용 확인 → 적용 요청서 발송
+    - 문서: `Communication/Backend/send/Request/251011_Frontend_to_Backend_real-rents_ordering_지원요청.md`
+  - 확장 필터/UI/서버 매핑
+    - 전환금/연수익률/평당보증금/평당월세 4종 컨트롤 추가 및 서버 `min/max_*` 매핑 활성화
+    - 계약일자 빠른 선택(최근 1/3/6개월/올해) 버튼 추가
+    - 층확인 칩 보정 및 서버 토큰 정규화(영→한), 빈/"all"/공백 미전송
+    - 상단 버튼(선택 항목만 보기/설정 초기화) 도입, 하단 중복 초기화 버튼 제거
+  - 선택 항목만 보기(ids)
+    - 프론트: `ids` CSV(≤500) 전송 로직 추가(폴백: 클라이언트 필터)
+    - 백엔드: 지원 완료(AND 결합, 정렬/페이징 호환) 답신 수신
+    - 문서: `Communication/Backend/send/Request/251011_Frontend_to_Backend_real-rents_ids_지원요청.md`, `Communication/Backend/send/Completed/251011_Backend_to_Frontend_real-rents_ids_지원_답신.md`
 
 ### 2. 차이(전월세 전용) 포인트
 
@@ -136,6 +150,7 @@
 - 허용 컬럼: `/columns`의 허용 목록만 활성
 - 기본 정렬: `contractDate desc`(제안)
 - 토글 사이클: asc → desc → none, isSorting 동안 재클릭 억제
+  - 구현 상태: 렌트/매매 모두 `handleSort` 정렬 해제 분기 반영(2025-10-11)
 - 구현 메모:
   - 훅: `useSortableColumns("rent")` 사용
   - 응답 포맷이 legacy(`sortable_columns`)일 경우 그대로 사용, new(`columns[].sortable`)면 true만 추출

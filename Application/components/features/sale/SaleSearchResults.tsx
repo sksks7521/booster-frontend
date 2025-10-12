@@ -313,17 +313,21 @@ export default function SaleSearchResults({
 
   // 정렬 핸들러(분석 페이지와 동일 시그니처)
   const handleSort = (column?: string, direction?: "asc" | "desc") => {
-    const key = column ?? "";
-    const order = direction ?? "asc";
+    // 정렬 해제: column이 비어 들어오면 해제로 처리
+    if (!column) {
+      setSortConfig(undefined as any, undefined as any);
+      return;
+    }
 
-    // camelCase를 snake_case로 변환하여 백엔드 정렬 컬럼명과 비교
+    // 정렬 설정: 허용 컬럼만 통과 (camelCase → snake_case 비교)
+    const key = column;
+    const order = direction ?? "asc";
     const snakeKey = key.replace(/([A-Z])/g, "_$1").toLowerCase();
 
     if (
-      !key ||
-      (Array.isArray(sortableColumns) &&
-        sortableColumns.length > 0 &&
-        !sortableColumns.includes(snakeKey))
+      Array.isArray(sortableColumns) &&
+      sortableColumns.length > 0 &&
+      !sortableColumns.includes(snakeKey)
     ) {
       return;
     }
