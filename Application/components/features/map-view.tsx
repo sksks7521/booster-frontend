@@ -84,6 +84,8 @@ interface MapViewProps {
   // true (기본값): circleCenter → refMarker → 지도중심 (경매 방식)
   // false: circleCenter만 사용, 폴백 없음 (실거래 방식)
   useRefMarkerFallback?: boolean;
+  // 표시 상한(사용자 UI에서 선택한 cap). 지정 시 내부 Top-K에 반영
+  markerLimit?: number;
 }
 
 function MapView({
@@ -219,6 +221,9 @@ function MapView({
   // Kakao만 사용
   const kakaoKey = process.env.NEXT_PUBLIC_KAKAO_APP_KEY;
   const provider: "kakao" = "kakao";
+  const propsMarkerLimit = (arguments as any)[0]?.markerLimit as
+    | number
+    | undefined;
 
   // 지역 키가 바뀌었을 때 내부 마커/클러스터 정리 및 초기 fitBounds 1회 재허용
   useEffect(() => {
@@ -1316,14 +1321,61 @@ function MapView({
     } catch {}
 
     // 최대 N개만 표시(성능 보호) - 면적 상한과 분리된 표시 상한 사용
-    const MAX = MAP_GUARD.maxMarkers;
-    // 좌표 결측 제외 + 상한 적용
+    const MAX =
+      Number.isFinite(Number(propsMarkerLimit)) && Number(propsMarkerLimit) > 0
+        ? Math.floor(Number(propsMarkerLimit))
+        : MAP_GUARD.maxMarkers;
+    // 좌표 결측 제외 + 상한 적용 (렌트는 기준점 가까운 순 Top-K 지원)
     const filtered = items.filter(
       (it: any) =>
         (it?.latitude ?? it?.lat ?? it?.lat_y ?? it?.y) != null &&
         (it?.longitude ?? it?.lng ?? it?.lon ?? it?.x) != null
     );
-    const slice = filtered.slice(0, MAX);
+    // 기준점 산출: circleCenter → refMarker → 지도중심
+    const refCenter = (function () {
+      if (namespace === "rent") {
+        const c =
+          (circleCenter as any) || (refMarkerCenter as any) || centerCoord;
+        if (
+          c &&
+          Number.isFinite((c as any).lat) &&
+          Number.isFinite((c as any).lng) &&
+          !(Number((c as any).lat) === 0 && Number((c as any).lng) === 0)
+        )
+          return { lat: Number((c as any).lat), lng: Number((c as any).lng) };
+      }
+      return null;
+    })();
+
+    let slice: any[];
+    if (namespace === "rent" && refCenter) {
+      // 거리 근사로 Top-K: (Δlat^2 + Δlng^2) 기준
+      const dx = (lat: number, lng: number) => {
+        const dlat = lat - refCenter.lat;
+        const dlng = lng - refCenter.lng;
+        return dlat * dlat + dlng * dlng;
+      };
+      // K가 작으면 정렬, 크면 힙/퀵셀렉트 고려 가능. 우선 간단 정렬 적용
+      slice = filtered
+        .map((it: any) => {
+          const latRaw = it?.latitude ?? it?.lat ?? it?.lat_y ?? it?.y;
+          const lngRaw = it?.longitude ?? it?.lng ?? it?.lon ?? it?.x;
+          const lat =
+            typeof latRaw === "number" ? latRaw : parseFloat(String(latRaw));
+          const lng =
+            typeof lngRaw === "number" ? lngRaw : parseFloat(String(lngRaw));
+          const score =
+            Number.isFinite(lat) && Number.isFinite(lng)
+              ? dx(lat, lng)
+              : Number.POSITIVE_INFINITY;
+          return { it, score };
+        })
+        .sort((a, b) => a.score - b.score)
+        .slice(0, MAX)
+        .map((e) => e.it);
+    } else {
+      slice = filtered.slice(0, MAX);
+    }
     const toAdd: any[] = [];
     let missingCoords = items.length - filtered.length;
     slice.forEach((it: any, idx: number) => {

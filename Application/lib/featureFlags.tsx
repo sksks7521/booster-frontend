@@ -11,6 +11,10 @@ export type FeatureFlags = {
   };
   // 서버 영역필터 사용 여부(auction_ed). 기본 OFF. NEXT_PUBLIC_AUCTION_ED_SERVER_AREA=1 시 ON.
   auctionEdServerAreaEnabled?: boolean;
+  // 전월세 지도 표시상한 선별 방식: server(서버 KNN) | client(클라이언트 Top-K)
+  // 기본값: client. NEXT_PUBLIC_MAP_NEAREST_LIMIT_RENT=server 면 서버 사용
+  nearestLimitRentMode?: "server" | "client";
+  nearestLimitRentIsServer?: boolean;
 };
 
 const FeatureFlagContext = React.createContext<FeatureFlags>({
@@ -31,6 +35,14 @@ export function FeatureFlagProvider({
   // 환경변수 기반 서버 영역필터 플래그(기본 OFF). NEXT_PUBLIC_AUCTION_ED_SERVER_AREA=1 이면 ON.
   const auctionEdServerAreaEnabled =
     (process.env.NEXT_PUBLIC_AUCTION_ED_SERVER_AREA ?? "0") === "1";
+  // 전월세 가까운순 표시상한 모드: 기본 client, server 지정 시 서버 KNN 사용
+  // 기본값을 'server' 로 바꿔 ENV 없이도 서버 KNN 경로가 동작하도록 함
+  const nearestLimitRentModeEnv = String(
+    process.env.NEXT_PUBLIC_MAP_NEAREST_LIMIT_RENT ?? "server"
+  ).toLowerCase();
+  const nearestLimitRentMode: "server" | "client" =
+    nearestLimitRentModeEnv === "server" ? "server" : "client";
+  const nearestLimitRentIsServer = nearestLimitRentMode === "server";
 
   const value: FeatureFlags = {
     virtualTable: vt === "1",
@@ -44,6 +56,8 @@ export function FeatureFlagProvider({
       digits: Number.isFinite(digits) ? digits : 1,
     },
     auctionEdServerAreaEnabled,
+    nearestLimitRentMode,
+    nearestLimitRentIsServer,
   };
   return (
     <FeatureFlagContext.Provider value={value}>

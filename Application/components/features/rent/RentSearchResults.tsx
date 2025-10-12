@@ -14,6 +14,7 @@ const ItemTableVirtual = dynamic(
   { ssr: false }
 );
 import MapView from "@/components/features/map-view";
+import { realRentApi } from "@/lib/api";
 
 import { useFilterStore } from "@/store/filterStore";
 import { useSortableColumns } from "@/hooks/useSortableColumns";
@@ -103,9 +104,20 @@ export default function RentSearchResults({
     Number.isFinite(circleCenter.lat) &&
     Number.isFinite(circleCenter.lng) &&
     !(Number(circleCenter.lat) === 0 && Number(circleCenter.lng) === 0);
-  const centerForFilter = centerValid
-    ? { lat: Number(circleCenter.lat), lng: Number(circleCenter.lng) }
-    : null;
+  // 서버 KNN 기준점: circleCenter 우선, 없으면 refMarkerCenter 폴백
+  const centerForFilter = (function () {
+    if (centerValid)
+      return { lat: Number(circleCenter!.lat), lng: Number(circleCenter!.lng) };
+    const ref = (nsState?.rent?.refMarkerCenter as any) || null;
+    if (
+      ref &&
+      Number.isFinite(ref.lat) &&
+      Number.isFinite(ref.lng) &&
+      !(Number(ref.lat) === 0 && Number(ref.lng) === 0)
+    )
+      return { lat: Number(ref.lat), lng: Number(ref.lng) };
+    return null;
+  })();
 
   // 🆕 페이지별 데이터 (서버 정렬+페이지네이션)
   const pageHook = useDataset("rent", mergedFilters, page, size, regionReady);
@@ -198,6 +210,12 @@ export default function RentSearchResults({
   );
   const mapRawItems = mapPageHook.items;
 
+  // 플래그/최근접 서버 모드 상태
+  const { areaDisplay, nearestLimitRentIsServer } = useFeatureFlags();
+  const [nearestItems, setNearestItems] = useState<any[] | null>(null);
+  const [nearestError, setNearestError] = useState<string | null>(null);
+  const [nearestWarning, setNearestWarning] = useState<string | null>(null);
+
   // 원 영역 필터 파이프라인
   const {
     processedItemsSorted,
@@ -211,7 +229,8 @@ export default function RentSearchResults({
     page,
     size,
     items,
-    globalSource: mapRawItems,
+    globalSource:
+      nearestLimitRentIsServer && nearestItems ? nearestItems : mapRawItems,
     maxMarkersCap,
     getRowSortTs: (r: any) =>
       r?.contract_date ? Date.parse(r.contract_date) : 0,
@@ -227,7 +246,6 @@ export default function RentSearchResults({
   const { sortableColumns } = useSortableColumns("rent");
   const sortBy = useFilterStore((s: any) => s.sortBy);
   const sortOrder = useFilterStore((s: any) => s.sortOrder);
-  const { areaDisplay } = useFeatureFlags();
   const useVirtual = false;
 
   // 체크박스 선택 → 지도 연동
@@ -333,6 +351,113 @@ export default function RentSearchResults({
     .map((v) => parseInt(v.trim()))
     .filter((n) => Number.isFinite(n));
 
+  // 서버 KNN 모드: 지도용 데이터 최근접 상위 K만 요청
+  useEffect(() => {
+    const shouldUseServer = Boolean(nearestLimitRentIsServer);
+    const wantMapData = activeView !== "table" || applyCircleFilter;
+    if (!regionReady || !shouldUseServer || !wantMapData) {
+      setNearestItems(null);
+      setNearestError(null);
+      return;
+    }
+    if (!centerForFilter) {
+      setNearestItems(null);
+      setNearestError(null);
+      return;
+    }
+    let aborted = false;
+    (async () => {
+      try {
+        setNearestError(null);
+        const params = {
+          ref_lat: centerForFilter.lat,
+          ref_lng: centerForFilter.lng,
+          limit: Number(maxMarkersCap),
+          bounds: bounds || undefined,
+          filters: mergedFilters,
+          timeoutMs: 10000,
+        } as const;
+        try {
+          console.info("[rent] nearest(server) request", {
+            ref_lat: params.ref_lat,
+            ref_lng: params.ref_lng,
+            limit: params.limit,
+            hasBounds: Boolean(params.bounds),
+          });
+        } catch {}
+        const resp = await realRentApi.getNearestRentMap(params as any);
+        if (aborted) return;
+        const arr = Array.isArray(resp?.items) ? resp.items : [];
+        if (resp?.warning) {
+          const limitUsed = Number(
+            (resp as any)?.echo?.limit ?? Number(maxMarkersCap)
+          );
+          const txt = `물건 위치로부터 가까운 상위 ${
+            Number.isFinite(limitUsed) && limitUsed > 0
+              ? limitUsed.toLocaleString()
+              : String(maxMarkersCap)
+          }건만 반환했습니다.`;
+          setNearestWarning(txt);
+          try {
+            console.warn("[rent] nearest warning:", resp.warning, txt);
+          } catch {}
+        } else {
+          setNearestWarning(null);
+        }
+        setNearestItems(arr as any[]);
+        try {
+          (window as any).__nearestRent = {
+            ts: Date.now(),
+            params: {
+              ref_lat: params.ref_lat,
+              ref_lng: params.ref_lng,
+              limit: params.limit,
+              bounds: params.bounds,
+            },
+            echo: resp?.echo,
+            warning: resp?.warning ?? null,
+            itemsLength: arr.length,
+          };
+          console.info("[rent] nearest(server) response", {
+            itemsLength: arr.length,
+            echo: resp?.echo,
+            warning: resp?.warning ?? null,
+          });
+        } catch {}
+      } catch (e: any) {
+        if (aborted) return;
+        setNearestItems(null);
+        const msg = String(e?.message || "nearest fetch failed");
+        setNearestError(msg);
+        try {
+          console.info("[rent] fallback to client Top-K:", msg);
+        } catch {}
+        try {
+          (window as any).__nearestRentError = {
+            ts: Date.now(),
+            message: msg,
+          };
+        } catch {}
+      }
+    })();
+    return () => {
+      aborted = true;
+    };
+  }, [
+    nearestLimitRentIsServer,
+    regionReady,
+    activeView,
+    applyCircleFilter,
+    centerForFilter?.lat,
+    centerForFilter?.lng,
+    maxMarkersCap,
+    bounds?.south,
+    bounds?.west,
+    bounds?.north,
+    bounds?.east,
+    mergedFilters,
+  ]);
+
   return (
     <div className="space-y-4 lg:space-y-6">
       {/* 검색 결과 헤더 및 액션 버튼 */}
@@ -431,6 +556,36 @@ export default function RentSearchResults({
               </TabsTrigger>
             </TabsList>
           </Tabs>
+
+          {/* 서버 경고/폴백 안내 (지도/통합 뷰에서만) */}
+          {activeView !== "table" && (
+            <div className="mt-2 flex flex-col gap-2">
+              {nearestWarning && (
+                <div className="flex items-center justify-between rounded border border-yellow-200 bg-yellow-50 px-3 py-1.5 text-[12px] text-yellow-800">
+                  <span className="truncate">{nearestWarning}</span>
+                  <button
+                    className="ml-2 text-yellow-700 hover:underline"
+                    onClick={() => setNearestWarning(null)}
+                  >
+                    닫기
+                  </button>
+                </div>
+              )}
+              {nearestError && (
+                <div className="flex items-center justify-between rounded border border-blue-200 bg-blue-50 px-3 py-1.5 text-[12px] text-blue-800">
+                  <span className="truncate">
+                    서버 정렬 실패로 클라이언트 기준으로 표시 중입니다.
+                  </span>
+                  <button
+                    className="ml-2 text-blue-700 hover:underline"
+                    onClick={() => setNearestError(null)}
+                  >
+                    닫기
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* 표시 상한 + 영역 안만 보기 (map, both에서 노출) */}
           {activeView !== "table" && (
@@ -803,6 +958,7 @@ export default function RentSearchResults({
                   <MapView
                     items={finalMapItems}
                     namespace="rent"
+                    markerLimit={maxMarkersCap}
                     clusterToggleEnabled={true}
                     useClustering={true}
                     legendTitle="전월세전환금 범례(단위: 만원)"
@@ -834,6 +990,7 @@ export default function RentSearchResults({
                       <MapView
                         items={finalMapItems}
                         namespace="rent"
+                        markerLimit={maxMarkersCap}
                         clusterToggleEnabled={true}
                         useClustering={true}
                         legendTitle="전월세전환금 범례(단위: 만원)"

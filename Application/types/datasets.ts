@@ -15,6 +15,39 @@ export interface ItemLike {
   extra?: Record<string, unknown>;
 }
 
+// 지도 공통 좌표 키(서버 스키마 다양성 대응)
+export interface MapCoords {
+  lat?: number;
+  lng?: number;
+  latitude?: number;
+  longitude?: number;
+  lat_y?: number;
+  y?: number;
+  lon?: number;
+  x?: number;
+}
+
+// 전월세 지도 아이템(최소 스키마)
+export interface RentMapItem extends MapCoords {
+  id: string | number;
+  address?: string;
+  roadAddress?: string;
+  price?: number;
+  extra?: {
+    jeonseConversionAmount?: number;
+    elevatorAvailable?: boolean;
+    [k: string]: unknown;
+  } & Record<string, unknown>;
+  [k: string]: unknown;
+}
+
+export interface RentNearestResponse {
+  items: RentMapItem[];
+  total?: number;
+  warning?: string | null;
+  echo?: { dataset: "rent"; ref_lat: number; ref_lng: number; limit: number };
+}
+
 export interface DatasetConfig {
   id: DatasetId;
   title: string;
