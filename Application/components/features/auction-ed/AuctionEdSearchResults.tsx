@@ -480,6 +480,18 @@ export default function AuctionEdSearchResults({
       const textLabels = Array.isArray(f.specialConditions)
         ? (f.specialConditions as string[])
         : [];
+      // 라벨 → 키 역매핑
+      const labelToKey: Record<string, string> = Object.fromEntries(
+        Object.entries(SPECIAL_RIGHTS_LABELS).map(([k, v]) => [String(v), k])
+      );
+      const labelArr = Array.isArray(f.specialRights)
+        ? ((f.specialRights as string[])
+            .map((s) => String(s).trim())
+            .filter(Boolean) as string[])
+        : [];
+      const keysFromLabels = labelArr
+        .map((label) => labelToKey[label])
+        .filter((s): s is string => typeof s === "string" && s.trim() !== "");
       // 키 토큰(영문) + 라벨(한글) + 텍스트 키워드를 모두 병합
       const merged = Array.from(
         new Set(
@@ -487,6 +499,7 @@ export default function AuctionEdSearchResults({
             ...flagsArr.map((k: string) => String(k).trim()),
             ...flagLabels,
             ...textLabels,
+            ...labelArr,
           ]
             .map((s) => String(s))
             .map((s) => s.trim())
@@ -496,9 +509,12 @@ export default function AuctionEdSearchResults({
       if (merged.length > 0) out.special_rights = merged.join(",");
 
       // 권장: 불리언 컬럼 매칭용 canonical 키를 별도 전달
-      const canonicalKeys = flagsArr
-        .map((k) => String(k).trim())
-        .filter(Boolean);
+      const canonicalKeys = Array.from(
+        new Set([
+          ...flagsArr.map((k) => String(k).trim()),
+          ...keysFromLabels.map((k) => String(k).trim()),
+        ])
+      ).filter(Boolean);
       if (canonicalKeys.length > 0)
         out.special_conditions = canonicalKeys.join(",");
     } catch {}
