@@ -598,6 +598,7 @@ export const datasetConfigs: Record<DatasetId, DatasetConfig> = {
     },
     adapter: {
       toItemLike: (r: any) => {
+        // 주소 우선순위: road_address > address > full_address > jibun_address
         const address =
           (pickFirst(
             r?.road_address,
@@ -606,11 +607,11 @@ export const datasetConfigs: Record<DatasetId, DatasetConfig> = {
             r?.jibun_address
           ) as string) || "";
 
-        // 좌표 처리 - latitude/longitude 필드 우선 사용
+        // 좌표: 서버 표준(latitude/longitude) 및 simple(lat/lng) 우선 사용
         const lat = toNumber(pickFirst(r?.latitude, r?.lat, r?.lat_y, r?.y));
         const lng = toNumber(pickFirst(r?.longitude, r?.lng, r?.lon, r?.x));
 
-        // 면적 - building_area_pyeong을 m2로 변환 (1평 = 3.306m2)
+        // 면적: building_area_pyeong → m2 변환(1평=3.306), simple area 폴백
         const area = (() => {
           const pyeong = toNumber(r?.building_area_pyeong);
           if (pyeong !== undefined) return pyeong * 3.306;
@@ -619,20 +620,51 @@ export const datasetConfigs: Record<DatasetId, DatasetConfig> = {
           );
         })();
 
+        // 연도: construction_year 또는 simple build_year
         const buildYear = toNumber(
           pickFirst(
             r?.construction_year,
             r?.buildYear,
             r?.build_year,
-            r?.year_built
+            r?.year_built,
+            r?.build_year
           )
         );
 
+        // 가격: final_sale_price 우선, simple price 폴백
         const price = toNumber(
           pickFirst(r?.final_sale_price, r?.price, r?.finalPrice)
         );
 
         const id = pickFirst(r?.id, r?.doc_id, r?.uuid, r?.case_number);
+
+        // 보조 변환기: 엘리베이터 O/X/Y/N → boolean
+        const toBool = (v: any): boolean | undefined => {
+          const s = String(v ?? "")
+            .trim()
+            .toUpperCase();
+          if (["Y", "O", "TRUE", "1"].includes(s)) return true;
+          if (["N", "X", "FALSE", "0"].includes(s)) return false;
+          return undefined;
+        };
+
+        // 원시 숫자 보정
+        const appraisedValue = toNumber(r?.appraised_value);
+        const minimumBidPrice = toNumber(r?.minimum_bid_price);
+        const finalSalePrice = toNumber(
+          pickFirst(r?.final_sale_price, r?.price)
+        );
+        let saleToAppraisedRatio = toNumber(r?.sale_to_appraised_ratio);
+        if (
+          saleToAppraisedRatio === undefined &&
+          finalSalePrice !== undefined &&
+          appraisedValue !== undefined &&
+          appraisedValue > 0
+        ) {
+          const rati = (finalSalePrice / appraisedValue) * 100;
+          if (Number.isFinite(rati))
+            saleToAppraisedRatio = Number(rati.toFixed(1));
+        }
 
         return {
           id: String(id ?? ""),
@@ -650,7 +682,7 @@ export const datasetConfigs: Record<DatasetId, DatasetConfig> = {
             saleDate: r?.sale_date,
 
             // 주소/위치 정보
-            roadAddress: r?.road_address,
+            roadAddress: r?.road_address ?? address,
             addressArea: r?.address_area,
             addressCity: r?.address_city,
             locationDetail: r?.location_detail,
@@ -660,11 +692,11 @@ export const datasetConfigs: Record<DatasetId, DatasetConfig> = {
             eupMyeonDong: r?.eup_myeon_dong,
 
             // 경매 가격 정보
-            appraisedValue: toNumber(r?.appraised_value),
-            minimumBidPrice: toNumber(r?.minimum_bid_price),
+            appraisedValue,
+            minimumBidPrice,
             bidToAppraisedRatio: toNumber(r?.bid_to_appraised_ratio),
-            finalSalePrice: toNumber(r?.final_sale_price),
-            saleToAppraisedRatio: toNumber(r?.sale_to_appraised_ratio),
+            finalSalePrice,
+            saleToAppraisedRatio,
             bidderCount: toNumber(r?.bidder_count),
 
             // 면적 정보
@@ -689,7 +721,7 @@ export const datasetConfigs: Record<DatasetId, DatasetConfig> = {
             // 층수/편의시설
             floorInfo: r?.floor_info,
             floorConfirmation: r?.floor_confirmation,
-            elevatorAvailable: r?.elevator_available,
+            elevatorAvailable: toBool(r?.elevator_available),
             elevatorCount: toNumber(r?.elevator_count),
             householdCount: toNumber(r?.household_count),
 
@@ -700,7 +732,7 @@ export const datasetConfigs: Record<DatasetId, DatasetConfig> = {
             postalCode: r?.postal_code,
             pnu: r?.pnu,
 
-            // 좌표 정보 (이미 lat, lng로 처리되고 있으므로 추가)
+            // 좌표 정보 (추가 노출)
             latitude: toNumber(r?.latitude),
             longitude: toNumber(r?.longitude),
 

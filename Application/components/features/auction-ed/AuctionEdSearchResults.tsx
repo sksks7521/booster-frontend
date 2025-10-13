@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -306,12 +306,266 @@ export default function AuctionEdSearchResults({
     ? Math.min(BACKEND_MAX_PAGE_SIZE, MAP_GUARD.maxMarkers)
     : requestSize;
   const mapPage = 1;
+
+  // 🆕 서버 KNN(최근접 상한) 상태 (지도 대용량 중복 요청 차단에 사용)
+  const [nearestItems, setNearestItems] = useState<any[] | null>(null);
+  const [nearestTotal, setNearestTotal] = useState<number>(0);
+  const [nearestError, setNearestError] = useState<string | null>(null);
+  const [nearestWarning, setNearestWarning] = useState<string | null>(null);
+  const enableMapFetch = !useServerArea && !nearestItems;
+
+  // 🆕 서버 전달용 필터 화이트리스트 + 안정 키
+  const serverFilterPayload = useMemo(() => {
+    const f: any = mergedFilters || {};
+    const out: Record<string, any> = {};
+
+    // 지역
+    if (f.province) out.sido = f.province;
+    if (f.cityDistrict) out.sigungu = f.cityDistrict;
+    if (f.town) out.admin_dong_name = f.town;
+
+    // 기간(매각일) - 표준+호환 키 병행 전송
+    const dr = Array.isArray(f.saleDateRange)
+      ? f.saleDateRange
+      : Array.isArray(f.dateRange)
+      ? f.dateRange
+      : undefined;
+    if (Array.isArray(dr)) {
+      const [from, to] = dr;
+      if (from) {
+        out.date_from = String(from);
+        out.sale_date_from = String(from);
+      }
+      if (to) {
+        out.date_to = String(to);
+        out.sale_date_to = String(to);
+      }
+    }
+    // 개별 필드로 들어오는 매각기일(from/to)도 보강
+    if (f.auctionDateFrom) {
+      out.date_from = String(f.auctionDateFrom);
+      out.sale_date_from = String(f.auctionDateFrom);
+    }
+    if (f.auctionDateTo) {
+      out.date_to = String(f.auctionDateTo);
+      out.sale_date_to = String(f.auctionDateTo);
+    }
+
+    // 금액(만원): priceRange 또는 salePriceRange 지원
+    // 백엔드 요청: 기본값(0~500000)은 '미설정'으로 간주하여 아예 전송하지 않음
+    {
+      const DEFAULT_MIN = 0;
+      const DEFAULT_MAX = 500000;
+      const pr = Array.isArray(f.priceRange)
+        ? f.priceRange
+        : Array.isArray(f.salePriceRange)
+        ? f.salePriceRange
+        : undefined;
+      if (Array.isArray(pr)) {
+        const [minP, maxP] = pr as [number, number];
+        if (Number.isFinite(minP) && Number(minP) > DEFAULT_MIN)
+          out.min_final_sale_price = Number(minP);
+        if (
+          Number.isFinite(maxP) &&
+          Number(maxP) > 0 &&
+          Number(maxP) < DEFAULT_MAX
+        )
+          out.max_final_sale_price = Number(maxP);
+      }
+    }
+
+    // 건물평형(평) - buildingAreaRange 우선, 없으면 exclusiveAreaRange
+    const ba = Array.isArray(f.buildingAreaRange)
+      ? f.buildingAreaRange
+      : Array.isArray(f.exclusiveAreaRange)
+      ? f.exclusiveAreaRange
+      : undefined;
+    if (Array.isArray(ba)) {
+      const [minA, maxA] = ba;
+      if (Number.isFinite(minA)) out.area_min = Number(minA);
+      if (Number.isFinite(maxA)) out.area_max = Number(maxA);
+    }
+
+    // 토지평형(평)
+    if (Array.isArray(f.landAreaRange)) {
+      const [minL, maxL] = f.landAreaRange;
+      if (Number.isFinite(minL)) out.min_land_area = Number(minL);
+      if (Number.isFinite(maxL)) out.max_land_area = Number(maxL);
+    }
+
+    // 건축년도
+    if (Array.isArray(f.buildYear)) {
+      const [minY, maxY] = f.buildYear;
+      if (Number.isFinite(minY)) out.build_year_min = Number(minY);
+      if (Number.isFinite(maxY)) out.build_year_max = Number(maxY);
+    }
+
+    // 층확인 CSV(정규화: 영문/로컬 라벨 → 서버 허용 라벨)
+    if (f.floorConfirmation && f.floorConfirmation !== "all") {
+      const normalizeFloor = (label: string) => {
+        const v = String(label).trim().toLowerCase();
+        if (["normal_floor", "저층", "고층", "일반층", "normal"].includes(v))
+          return "일반층";
+        if (["first_floor", "1층", "first"].includes(v)) return "1층";
+        if (["top_floor", "옥탑", "탑층", "top"].includes(v)) return "탑층";
+        if (["basement", "banjiha", "반지하(직입력)", "반지하"].includes(v))
+          return "반지하";
+        if (["unknown", "확인불가", "unknown_floor"].includes(v))
+          return "확인불가";
+        // 이미 허용 한글 라벨로 들어온 경우 유지
+        return String(label).trim();
+      };
+      const arr = Array.isArray(f.floorConfirmation)
+        ? (f.floorConfirmation as any[])
+        : [f.floorConfirmation];
+      out.floor_confirmation = arr
+        .map((s: any) => normalizeFloor(String(s)))
+        .filter(Boolean)
+        .join(",");
+    }
+
+    // 엘리베이터 Y/N 매핑(있음/없음/true/false 포함) + hasElevator 지원
+    {
+      const evSrc =
+        f.elevatorAvailable !== undefined && f.elevatorAvailable !== "all"
+          ? f.elevatorAvailable
+          : f.hasElevator !== undefined && f.hasElevator !== "all"
+          ? f.hasElevator
+          : undefined;
+      if (evSrc !== undefined) {
+        if (typeof evSrc === "boolean") {
+          out.elevator_available = evSrc ? "Y" : "N";
+        } else {
+          const raw = String(evSrc).trim().toUpperCase();
+          const ySet = new Set(["Y", "TRUE", "있음"]);
+          const nSet = new Set(["N", "FALSE", "없음"]);
+          if (ySet.has(raw)) out.elevator_available = "Y";
+          else if (nSet.has(raw)) out.elevator_available = "N";
+        }
+      }
+    }
+
+    // 현재상태 CSV
+    if (f.currentStatus && f.currentStatus !== "all") {
+      const arr = Array.isArray(f.currentStatus)
+        ? (f.currentStatus as any[])
+        : [f.currentStatus];
+      out.current_status = arr
+        .map((s: any) => String(s).trim())
+        .filter(Boolean)
+        .join(",");
+    }
+
+    // 특수조건: 텍스트 + 불리언 토글을 라벨로 변환하여 병합 CSV
+    try {
+      const SPECIAL_RIGHTS_LABELS: Record<string, string> = {
+        tenant_with_opposing_power: "선순위임차인",
+        hug_acquisition_condition_change: "보증기관취득조건변경",
+        senior_lease_right: "임차권설정",
+        resale: "재매각",
+        partial_sale: "지분매각",
+        joint_collateral: "공동담보",
+        separate_registration: "분리등기",
+        lien: "압류",
+        illegal_building: "불법건축물",
+        lease_right_sale: "임차권양도",
+        land_right_unregistered: "토지권미등기",
+      };
+      const flagsArr = Array.isArray(f.specialBooleanFlags)
+        ? (f.specialBooleanFlags as string[])
+        : [];
+      const flagLabels = flagsArr
+        .map((k) => SPECIAL_RIGHTS_LABELS[k])
+        .filter((v) => typeof v === "string" && v.trim() !== "");
+      const textLabels = Array.isArray(f.specialConditions)
+        ? (f.specialConditions as string[])
+        : [];
+      // 키 토큰(영문) + 라벨(한글) + 텍스트 키워드를 모두 병합
+      const merged = Array.from(
+        new Set(
+          [
+            ...flagsArr.map((k: string) => String(k).trim()),
+            ...flagLabels,
+            ...textLabels,
+          ]
+            .map((s) => String(s))
+            .map((s) => s.trim())
+            .filter(Boolean)
+        )
+      );
+      if (merged.length > 0) out.special_rights = merged.join(",");
+    } catch {}
+
+    // 매각년도(빠른 선택) 보강: YYYY → date_from/to
+    if (f.saleYear && Number.isFinite(Number(f.saleYear))) {
+      const y = String(f.saleYear).trim();
+      out.date_from = `${y}-01-01`;
+      out.sale_date_from = `${y}-01-01`;
+      out.date_to = `${y}-12-31`;
+      out.sale_date_to = `${y}-12-31`;
+    }
+
+    // 정렬(옵션) - 없으면 서버 기본 distance_asc 사용
+    if (f.sortBy && f.sortOrder) {
+      const order = String(f.sortOrder) === "desc" ? "-" : "";
+      out.ordering = `${order}${String(f.sortBy)}`;
+    }
+
+    // 검색 매핑(주소/사건번호)
+    if (f.searchQuery && f.searchField) {
+      const sq = String(f.searchQuery).trim();
+      const sf = String(f.searchField).trim();
+      if (sq) {
+        if (sf === "road_address") out.road_address_search = sq;
+        else if (sf === "case_number") out.case_number_search = sq;
+        else if (sf === "address") out.address_search = sq;
+      }
+    }
+
+    return out;
+  }, [
+    mergedFilters?.province,
+    mergedFilters?.cityDistrict,
+    mergedFilters?.town,
+    (mergedFilters as any)?.saleDateRange?.[0],
+    (mergedFilters as any)?.saleDateRange?.[1],
+    (mergedFilters as any)?.dateRange?.[0],
+    (mergedFilters as any)?.dateRange?.[1],
+    (mergedFilters as any)?.auctionDateFrom,
+    (mergedFilters as any)?.auctionDateTo,
+    (mergedFilters as any)?.priceRange?.[0],
+    (mergedFilters as any)?.priceRange?.[1],
+    (mergedFilters as any)?.buildingAreaRange?.[0],
+    (mergedFilters as any)?.buildingAreaRange?.[1],
+    (mergedFilters as any)?.exclusiveAreaRange?.[0],
+    (mergedFilters as any)?.exclusiveAreaRange?.[1],
+    (mergedFilters as any)?.landAreaRange?.[0],
+    (mergedFilters as any)?.landAreaRange?.[1],
+    (mergedFilters as any)?.buildYear?.[0],
+    (mergedFilters as any)?.buildYear?.[1],
+    (mergedFilters as any)?.saleYear,
+    (mergedFilters as any)?.floorConfirmation,
+    (mergedFilters as any)?.elevatorAvailable,
+    (mergedFilters as any)?.hasElevator,
+    (mergedFilters as any)?.currentStatus,
+    (mergedFilters as any)?.specialConditions,
+    (mergedFilters as any)?.specialBooleanFlags,
+    (mergedFilters as any)?.specialRights,
+    (mergedFilters as any)?.sortBy,
+    (mergedFilters as any)?.sortOrder,
+    (mergedFilters as any)?.searchQuery,
+    (mergedFilters as any)?.searchField,
+  ]);
+  const serverFilterKey = useMemo(
+    () => JSON.stringify(serverFilterPayload),
+    [serverFilterPayload]
+  );
   const mapPageHook = useDataset(
     "auction_ed",
     mergedFilters,
     mapPage,
     mapRequestSize,
-    !useServerArea
+    enableMapFetch
   );
   const mapGlobalHook = useGlobalDataset(
     "auction_ed",
@@ -321,7 +575,7 @@ export default function AuctionEdSearchResults({
     sortByGlobal,
     sortOrderGlobal,
     5000,
-    !useServerArea
+    enableMapFetch
   );
   const mapRawItems = useGlobal ? mapGlobalHook.items : mapPageHook.items;
   const mapLoading = useGlobal
@@ -348,6 +602,122 @@ export default function AuctionEdSearchResults({
     isLoading: boolean;
     error?: any;
   }>({ items: [], isLoading: false });
+
+  // 🆕 서버 KNN 호출 (맵/통합 뷰 또는 영역 적용 시)
+  useEffect(() => {
+    const wantMapData = activeView !== "table" || applyCircle;
+    if (!wantMapData || !regionReady || !centerForFilter) {
+      setNearestItems(null);
+      setNearestTotal(0);
+      setNearestError(null);
+      return;
+    }
+    let aborted = false;
+    // 디바운스: 잦은 중심/줌 이동 시 과호출 방지
+    const tid = setTimeout(() => {
+      (async () => {
+        try {
+          // 호출 전 상태 초기화
+          setNearestError(null);
+          setNearestItems(null);
+          setNearestTotal(0);
+
+          const params = {
+            ref_lat: centerForFilter.lat,
+            ref_lng: centerForFilter.lng,
+            limit: Number(maxMarkersCap),
+            bounds: bounds || undefined,
+            filters: serverFilterPayload,
+            timeoutMs: 10000,
+          } as const;
+          try {
+            console.info("[auction_ed] nearest(server) request", {
+              ref_lat: params.ref_lat,
+              ref_lng: params.ref_lng,
+              limit: params.limit,
+              hasBounds: Boolean(params.bounds),
+            });
+          } catch {}
+          const resp = await auctionApi.getNearestAuctionMap(params as any);
+          if (aborted) return;
+          const arr = Array.isArray(resp?.items) ? resp.items : [];
+          if (resp?.warning) {
+            const limitUsed = Number(
+              (resp as any)?.echo?.limit ?? Number(maxMarkersCap)
+            );
+            const txt = `물건 위치로부터 가까운 상위 ${
+              Number.isFinite(limitUsed) && limitUsed > 0
+                ? limitUsed.toLocaleString()
+                : String(maxMarkersCap)
+            }건만 반환했습니다.`;
+            setNearestWarning(txt);
+            try {
+              console.warn("[auction_ed] nearest warning:", resp.warning, txt);
+            } catch {}
+          } else {
+            setNearestWarning(null);
+          }
+          setNearestItems(arr as any[]);
+          try {
+            const t = Number((resp as any)?.total ?? arr.length ?? 0);
+            if (Number.isFinite(t)) setNearestTotal(t);
+          } catch {
+            setNearestTotal(Array.isArray(arr) ? arr.length : 0);
+          }
+          try {
+            (window as any).__nearestAuction = {
+              ts: Date.now(),
+              params: {
+                ref_lat: params.ref_lat,
+                ref_lng: params.ref_lng,
+                limit: params.limit,
+                bounds: params.bounds,
+              },
+              echo: resp?.echo,
+              warning: resp?.warning ?? null,
+              itemsLength: arr.length,
+            };
+            console.info("[auction_ed] nearest(server) response", {
+              itemsLength: arr.length,
+              echo: resp?.echo,
+              warning: resp?.warning ?? null,
+            });
+          } catch {}
+        } catch (e: any) {
+          if (aborted) return;
+          setNearestItems(null);
+          setNearestTotal(0);
+          const msg = String(e?.message || "nearest fetch failed");
+          setNearestError(msg);
+          try {
+            console.info("[auction_ed] fallback to client Top-K:", msg);
+          } catch {}
+          try {
+            (window as any).__nearestAuctionError = {
+              ts: Date.now(),
+              message: msg,
+            };
+          } catch {}
+        }
+      })();
+    }, 250);
+    return () => {
+      aborted = true;
+      clearTimeout(tid);
+    };
+  }, [
+    activeView !== "table",
+    applyCircle,
+    regionReady,
+    centerForFilter?.lat,
+    centerForFilter?.lng,
+    maxMarkersCap,
+    bounds?.south,
+    bounds?.west,
+    bounds?.north,
+    bounds?.east,
+    serverFilterKey,
+  ]);
 
   useEffect(() => {
     let ignore = false;
@@ -398,7 +768,7 @@ export default function AuctionEdSearchResults({
     centerForFilter?.lat,
     centerForFilter?.lng,
     radiusMForFilter,
-    JSON.stringify(filters),
+    serverFilterKey,
     page,
     size,
   ]);
@@ -457,7 +827,7 @@ export default function AuctionEdSearchResults({
     centerForFilter?.lat,
     centerForFilter?.lng,
     radiusMForFilter,
-    JSON.stringify(filters),
+    serverFilterKey,
     sortByGlobal,
     sortOrderGlobal,
     maxMarkersCap,
@@ -470,7 +840,7 @@ export default function AuctionEdSearchResults({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     wantAllForMap,
-    JSON.stringify(mergedFilters),
+    serverFilterKey,
     requestSize,
     // effectiveTotal는 아래에서 계산되므로 의존 제거
     items?.length,
@@ -478,6 +848,11 @@ export default function AuctionEdSearchResults({
   ]);
 
   // 공통 파이프라인 훅으로 치환
+  // 지도 전용 서버 소스: 서버 영역 모드면 area 응답, 그 외엔 /map(최근접) 응답
+  const serverMapItems = useServerArea
+    ? (serverAreaMapState.items as any[]) || []
+    : (nearestItems as any[]) || [];
+
   const { processedItemsSorted, pagedItems, mapItems, circleCount } =
     useCircleFilterPipeline({
       ns: "auction_ed",
@@ -485,30 +860,20 @@ export default function AuctionEdSearchResults({
       page,
       size,
       items,
-      // 서버 영역필터 사용 중에는 클라 반경 파이프라인을 사용하지 않음
-      globalSource: useServerArea
-        ? undefined
-        : globalReady
-        ? (mapRawItems as any[])
-        : undefined,
+      // 지도 전역 소스는 서버 응답으로 단일화
+      globalSource: serverMapItems,
       maxMarkersCap,
       getRowSortTs: (r: any) => (r?.sale_date ? Date.parse(r.sale_date) : 0),
     });
 
-  const effectiveTotal = useServerArea
-    ? serverAreaState.total
-    : applyCircle
-    ? processedItemsSorted.length
-    : serverTotal || 0;
+  const effectiveTotal = useServerArea ? serverAreaState.total : nearestTotal;
   const tableItemsAll = useServerArea
     ? serverAreaState.items
     : processedItemsSorted; // 목록은 상한 없이 전체
 
   // 🆕 처리된 데이터를 상위로 전달 (useMemo로 참조 안정성 확보하여 무한루프 방지)
   const processedDataMemo = useMemo(() => {
-    const mapItemsForUI = useServerArea
-      ? (serverAreaMapState.items as any[])
-      : (mapItems as any[]);
+    const mapItemsForUI = serverMapItems as any[];
     console.log("🔍 [AuctionEdSearchResults] 데이터 전달:", {
       tableItemsLength: tableItemsAll?.length,
       mapItemsLength: mapItemsForUI?.length,
@@ -734,56 +1099,98 @@ export default function AuctionEdSearchResults({
                   </Tooltip>
                 </TooltipProvider>
               </div>
-              {/* 우측: 영역 안만 보기 토글 */}
-              <label className="flex items-center gap-2 text-xs text-gray-700 border rounded px-2 py-1 bg-white">
-                <input
-                  type="checkbox"
-                  className="h-4 w-4"
-                  checked={Boolean(
-                    (useFilterStore.getState()?.ns?.auction_ed
-                      ?.applyCircleFilter as any) ?? false
-                  )}
-                  onChange={(e) => {
-                    try {
-                      const st = (useFilterStore as any).getState?.();
-                      const setNs = st?.setNsFilter;
-                      const ns = st?.ns?.auction_ed || {};
-                      const checked = Boolean(e.target.checked);
-                      if (typeof setNs === "function") {
-                        if (checked) {
-                          const center =
-                            ns?.circleCenter &&
-                            Number.isFinite(ns.circleCenter.lat) &&
-                            Number.isFinite(ns.circleCenter.lng)
-                              ? ns.circleCenter
-                              : ns?.refMarkerCenter &&
-                                Number.isFinite(ns.refMarkerCenter.lat) &&
-                                Number.isFinite(ns.refMarkerCenter.lng) &&
-                                !(
-                                  Number(ns.refMarkerCenter.lat) === 0 &&
-                                  Number(ns.refMarkerCenter.lng) === 0
-                                )
-                              ? ns.refMarkerCenter
-                              : null;
-                          if (center) {
-                            setNs("auction_ed", "circleCenter" as any, center);
+              {/* 우측: 표시 요약 + 영역 안만 보기 토글 */}
+              <div className="flex items-center gap-3">
+                <span className="inline-flex items-center rounded border border-gray-200 bg-white px-2 py-1 text-[11px] text-gray-700">
+                  표시{" "}
+                  {Math.min(
+                    serverMapItems?.length || 0,
+                    Number(maxMarkersCap)
+                  ).toLocaleString()}{" "}
+                  / 총 {(effectiveTotal || 0).toLocaleString()}
+                </span>
+                {/* 영역 안만 보기 */}
+                <label className="flex items-center gap-2 text-xs text-gray-700 border rounded px-2 py-1 bg-white">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4"
+                    checked={Boolean(
+                      (useFilterStore.getState()?.ns?.auction_ed
+                        ?.applyCircleFilter as any) ?? false
+                    )}
+                    onChange={(e) => {
+                      try {
+                        const st = (useFilterStore as any).getState?.();
+                        const setNs = st?.setNsFilter;
+                        const ns = st?.ns?.auction_ed || {};
+                        const checked = Boolean(e.target.checked);
+                        if (typeof setNs === "function") {
+                          if (checked) {
+                            const center =
+                              ns?.circleCenter &&
+                              Number.isFinite(ns.circleCenter.lat) &&
+                              Number.isFinite(ns.circleCenter.lng)
+                                ? ns.circleCenter
+                                : ns?.refMarkerCenter &&
+                                  Number.isFinite(ns.refMarkerCenter.lat) &&
+                                  Number.isFinite(ns.refMarkerCenter.lng) &&
+                                  !(
+                                    Number(ns.refMarkerCenter.lat) === 0 &&
+                                    Number(ns.refMarkerCenter.lng) === 0
+                                  )
+                                ? ns.refMarkerCenter
+                                : null;
+                            if (center) {
+                              setNs(
+                                "auction_ed",
+                                "circleCenter" as any,
+                                center
+                              );
+                            }
+                            const r = Number(ns?.circleRadiusM ?? 0);
+                            if (!Number.isFinite(r) || r <= 0) {
+                              setNs("auction_ed", "circleRadiusM" as any, 1000);
+                            }
                           }
-                          const r = Number(ns?.circleRadiusM ?? 0);
-                          if (!Number.isFinite(r) || r <= 0) {
-                            setNs("auction_ed", "circleRadiusM" as any, 1000);
-                          }
+                          setNs(
+                            "auction_ed",
+                            "applyCircleFilter" as any,
+                            checked
+                          );
                         }
-                        setNs(
-                          "auction_ed",
-                          "applyCircleFilter" as any,
-                          checked
-                        );
-                      }
-                    } catch {}
-                  }}
-                />
-                <span>영역 안만 보기</span>
-              </label>
+                      } catch {}
+                    }}
+                  />
+                  <span>영역 안만 보기</span>
+                </label>
+              </div>
+              {/* 🆕 서버 KNN 경고/폴백 배지 */}
+              <div className="flex flex-col gap-2 ml-4 min-w-[240px]">
+                {nearestWarning && (
+                  <div className="flex items-center justify-between rounded border border-yellow-200 bg-yellow-50 px-3 py-1.5 text-[12px] text-yellow-800">
+                    <span className="truncate">{nearestWarning}</span>
+                    <button
+                      className="ml-2 text-yellow-700 hover:underline"
+                      onClick={() => setNearestWarning(null)}
+                    >
+                      닫기
+                    </button>
+                  </div>
+                )}
+                {nearestError && (
+                  <div className="flex items-center justify-between rounded border border-blue-200 bg-blue-50 px-3 py-1.5 text-[12px] text-blue-800">
+                    <span className="truncate">
+                      서버 정렬 실패로 클라이언트 기준으로 표시 중입니다.
+                    </span>
+                    <button
+                      className="ml-2 text-blue-700 hover:underline"
+                      onClick={() => setNearestError(null)}
+                    >
+                      닫기
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </div>

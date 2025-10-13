@@ -57,10 +57,14 @@ export function buildAreaQueryParams(opts: BuildAreaQueryParamsOptions) {
   if ((filters as any)?.town) q.eup_myeon_dong = (filters as any).town;
 
   // price (만원)
+  // 백엔드 요청: 기본값(0~500000)은 '미설정' 처리 → 파라미터 자체를 전송하지 않음
   if (Array.isArray((filters as any)?.priceRange)) {
     const [minP, maxP] = (filters as any).priceRange as [number, number];
-    if (Number.isFinite(minP) && minP > 0) q.price_min = Math.max(0, minP);
-    if (Number.isFinite(maxP) && maxP > 0) {
+    const DEFAULT_MIN = 0;
+    const DEFAULT_MAX = 500000;
+    if (Number.isFinite(minP) && minP > DEFAULT_MIN)
+      q.price_min = Math.max(0, minP);
+    if (Number.isFinite(maxP) && maxP > 0 && maxP < DEFAULT_MAX) {
       const MAX_PRICE_CAP = 100000; // 미만(<) 규칙 상한 보정
       q.price_max = Math.min(MAX_PRICE_CAP, maxP);
     }

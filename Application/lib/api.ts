@@ -645,6 +645,75 @@ export const auctionApi = {
     apiClient.getAuctionCompletedDetail(itemId),
   getMarketAnalysis: (params?: Record<string, any>) =>
     apiClient.getAuctionMarketAnalysis(params),
+  // 🆕 경매결과 지도용 가까운 순 LIMIT API (서버 KNN)
+  getNearestAuctionMap: async (params: {
+    ref_lat: number;
+    ref_lng: number;
+    limit?: number;
+    bounds?: { south: number; west: number; north: number; east: number };
+    filters?: Record<string, any>;
+    timeoutMs?: number;
+  }): Promise<RentNearestResponse> => {
+    const q: Record<string, any> = {
+      // 경매는 별도 엔드포인트를 사용하므로 dataset 키는 불필요. 단, 서버가 요구 시 추가 협의
+      sort: "distance_asc",
+      // 서버 호환: center_lat/center_lng 표준 + ref_lat/ref_lng 병행 전송
+      center_lat: params.ref_lat,
+      center_lng: params.ref_lng,
+      ref_lat: params.ref_lat,
+      ref_lng: params.ref_lng,
+    };
+    if (typeof params.limit === "number") q.limit = params.limit;
+    if (params.bounds) {
+      q.south = params.bounds.south;
+      q.west = params.bounds.west;
+      q.north = params.bounds.north;
+      q.east = params.bounds.east;
+    }
+    if (params.filters && typeof params.filters === "object") {
+      Object.entries(params.filters).forEach(([k, v]) => {
+        if (v !== undefined && v !== null && v !== "") q[k] = v as any;
+      });
+    }
+    const query = new URLSearchParams(q).toString();
+    const endpoint = `/api/v1/auction-completed/map?${query}`;
+    const controller = new AbortController();
+    const to = setTimeout(
+      () => controller.abort(),
+      Math.max(5000, Number(params.timeoutMs ?? 10000))
+    );
+    try {
+      const res = await fetch(`${API_BASE_URL}${endpoint}`, {
+        method: "GET",
+        headers: { "Content-Type": "application/json" },
+        signal: controller.signal,
+      });
+      clearTimeout(to);
+      if (!res.ok) {
+        let details: any = undefined;
+        try {
+          details = await res.json();
+        } catch {
+          try {
+            details = await res.text();
+          } catch {}
+        }
+        throw createApiError({
+          message:
+            (details && (details.detail || details.message)) ||
+            `HTTP error ${res.status}`,
+          status: res.status,
+          url: `${API_BASE_URL}${endpoint}`,
+          method: "GET",
+          details,
+        });
+      }
+      return (await res.json()) as RentNearestResponse;
+    } catch (e) {
+      clearTimeout(to);
+      throw e;
+    }
+  },
 };
 
 export const realTransactionApi = {
