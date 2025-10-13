@@ -494,6 +494,13 @@ export default function AuctionEdSearchResults({
         )
       );
       if (merged.length > 0) out.special_rights = merged.join(",");
+
+      // 권장: 불리언 컬럼 매칭용 canonical 키를 별도 전달
+      const canonicalKeys = flagsArr
+        .map((k) => String(k).trim())
+        .filter(Boolean);
+      if (canonicalKeys.length > 0)
+        out.special_conditions = canonicalKeys.join(",");
     } catch {}
 
     // 매각년도(빠른 선택) 보강: YYYY → date_from/to

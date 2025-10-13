@@ -121,6 +121,14 @@ export function buildAreaQueryParams(opts: BuildAreaQueryParamsOptions) {
   const sr = toCsv((filters as any)?.specialRights);
   if (sr) q.special_rights = sr;
 
+  // 특수권리 불리언 컬럼용 canonical 키 CSV 전달 (권장)
+  if (Array.isArray((filters as any)?.specialBooleanFlags)) {
+    const keys = ((filters as any).specialBooleanFlags as any[])
+      .map((s) => String(s).trim())
+      .filter((s) => s !== "");
+    if (keys.length > 0) q.special_conditions = keys.join(",");
+  }
+
   // search mapping
   if ((filters as any)?.searchQuery && (filters as any)?.searchField) {
     const sq = String((filters as any).searchQuery);
