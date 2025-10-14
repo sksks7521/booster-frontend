@@ -87,7 +87,6 @@ export default function RentFilter({
       | "buildYearRange"
       | "dateRange"
       | "jeonseConversionAmountRange"
-      | "rentalYieldAnnualRange"
       | "depositPerPyeongRange"
       | "monthlyRentPerPyeongRange",
     value: [number, number] | [string, string]
@@ -895,36 +894,7 @@ export default function RentFilter({
                 )}
               </div>
 
-              {/* 연 임대수익률 (%) */}
-              <div className="space-y-3">
-                <Label
-                  className={`text-sm font-medium ${
-                    isYieldActive ? "text-blue-700 font-semibold" : ""
-                  }`}
-                >
-                  연 임대수익률 (%)
-                </Label>
-                <Slider
-                  value={filters.rentalYieldAnnualRange || [0, 20]}
-                  onValueChange={(value) => {
-                    setRangeFilter(
-                      "rentalYieldAnnualRange",
-                      value as [number, number]
-                    );
-                    setPageStore(1);
-                  }}
-                  max={30}
-                  step={0.5}
-                />
-                <div className="flex justify-between text-xs text-gray-500">
-                  <span>
-                    {(filters.rentalYieldAnnualRange?.[0] ?? 0).toFixed(1)}%
-                  </span>
-                  <span>
-                    {(filters.rentalYieldAnnualRange?.[1] ?? 20).toFixed(1)}%
-                  </span>
-                </div>
-              </div>
+              {/* 연 임대수익률 (%) - 제거됨 */}
 
               {/* 평당 보증금 (만원/평) */}
               <div className="space-y-3">

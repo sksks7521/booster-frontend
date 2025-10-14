@@ -143,7 +143,7 @@ const initialState: FilterState = {
   // 기존 필터들
   buildingType: "all", // 단일 또는 배열
   priceRange: [0, 500000],
-  areaRange: [0, 200], // 하위호환용 (deprecated)
+  areaRange: [0, 300], // 하위호환용 (deprecated) - 전월세 기본값 통일
   buildingAreaRange: [0, 100], // 건축면적 범위 (평) - 일반적인 빌라 크기
   landAreaRange: [0, 200], // 토지면적 범위 (평) - 일반적인 토지 크기
   // 표준 키 기본값
@@ -195,8 +195,9 @@ export const useFilterStore = create<FilterState & FilterActions>((set) => ({
   setFilter: (key, value) =>
     set((state: any) => {
       const next: any = { [key]: value };
+      const k = String(key);
       // 🧩 브리지: hasElevator → elevatorAvailable(Y/N/all)
-      if (key === "hasElevator") {
+      if (k === "hasElevator") {
         const raw = String(value).trim().toUpperCase();
         const ySet = new Set(["Y", "TRUE", "O", "있음"]);
         const nSet = new Set(["N", "FALSE", "X", "없음"]);
@@ -204,6 +205,78 @@ export const useFilterStore = create<FilterState & FilterActions>((set) => ({
         else if (nSet.has(raw)) next.elevatorAvailable = "N";
         else next.elevatorAvailable = "all";
       }
+      // 🧩 브리지: elevatorAvailable(boolean/Y/N) 정규화
+      if (k === "elevatorAvailable") {
+        const raw = value;
+        const s = String(raw ?? "")
+          .trim()
+          .toUpperCase();
+        if (
+          raw === true ||
+          s === "Y" ||
+          s === "TRUE" ||
+          s === "O" ||
+          s === "있음"
+        )
+          next.elevatorAvailable = "Y";
+        else if (
+          raw === false ||
+          s === "N" ||
+          s === "FALSE" ||
+          s === "X" ||
+          s === "없음"
+        )
+          next.elevatorAvailable = "N";
+        else if (!s || s === "ALL") next.elevatorAvailable = "all";
+      }
+      // 🧩 브리지: floor/floorType → floorConfirmation (CSV/배열 모두 허용)
+      if (k === "floor" || k === "floorType") {
+        const toArray = (v: any): string[] =>
+          Array.isArray(v)
+            ? v
+            : String(v || "")
+                .split(",")
+                .map((s) => s.trim())
+                .filter(Boolean);
+        const tokens = toArray(value);
+        next.floorConfirmation = tokens.length > 0 ? tokens : "all";
+      }
+      // 🧩 브리지: address/jibun_address/road_address → searchQuery + searchField
+      if (k === "address" || k === "jibun_address" || k === "road_address") {
+        const q = String(value || "").trim();
+        next.searchQuery = q;
+        if (k === "address" || k === "road_address")
+          next.searchField = q ? "address" : "all";
+        if (k === "jibun_address")
+          next.searchField = q ? "jibun_address" : "all";
+      }
+      // 🧩 브리지: min/max → Range (deposit/monthly/area/buildYear)
+      const coerceNum = (v: any) => {
+        const n = typeof v === "number" ? v : parseFloat(String(v));
+        return Number.isFinite(n) ? n : undefined;
+      };
+      const updRange = (rangeKey: string, bound: "min" | "max", v: any) => {
+        const prev = state?.[rangeKey] as [number, number] | undefined;
+        const curMin = Array.isArray(prev) ? prev[0] : undefined;
+        const curMax = Array.isArray(prev) ? prev[1] : undefined;
+        const n = coerceNum(v);
+        if (n === undefined) return;
+        const nextMin = bound === "min" ? n : curMin ?? n;
+        const nextMax = bound === "max" ? n : curMax ?? n;
+        next[rangeKey] = [nextMin, nextMax];
+      };
+      if (k === "min_deposit" || k === "min_deposit_amount")
+        updRange("depositRange", "min", value);
+      if (k === "max_deposit" || k === "max_deposit_amount")
+        updRange("depositRange", "max", value);
+      if (k === "min_monthly_rent") updRange("monthlyRentRange", "min", value);
+      if (k === "max_monthly_rent") updRange("monthlyRentRange", "max", value);
+      if (k === "min_exclusive_area") updRange("areaRange", "min", value);
+      if (k === "max_exclusive_area") updRange("areaRange", "max", value);
+      if (k === "min_construction_year")
+        updRange("buildYearRange", "min", value);
+      if (k === "max_construction_year")
+        updRange("buildYearRange", "max", value);
       return next;
     }),
 
@@ -218,6 +291,10 @@ export const useFilterStore = create<FilterState & FilterActions>((set) => ({
       // 🧩 브리지: landAreaRange → landRightsAreaRange
       if (key === "landAreaRange") {
         next.landRightsAreaRange = value;
+      }
+      // 🧩 브리지: buildYear → buildYearRange
+      if (key === "buildYear") {
+        next.buildYearRange = value;
       }
       return next;
     }),
@@ -281,14 +358,108 @@ export const useFilterStore = create<FilterState & FilterActions>((set) => ({
   // 🆕 네임스페이스 액션 구현: 오버라이드 병합 저장
   setNsFilter: (namespace, key, value) =>
     set((state: any) => {
+      const patch: any = { [key]: value };
+      const k = String(key);
+      // 동일 브리지 로직을 네임스페이스에도 적용
+      if (k === "hasElevator") {
+        const raw = String(value).trim().toUpperCase();
+        const ySet = new Set(["Y", "TRUE", "O", "있음"]);
+        const nSet = new Set(["N", "FALSE", "X", "없음"]);
+        patch.elevatorAvailable = ySet.has(raw)
+          ? "Y"
+          : nSet.has(raw)
+          ? "N"
+          : "all";
+      }
+      if (k === "elevatorAvailable") {
+        const raw = value;
+        const s = String(raw ?? "")
+          .trim()
+          .toUpperCase();
+        if (
+          raw === true ||
+          s === "Y" ||
+          s === "TRUE" ||
+          s === "O" ||
+          s === "있음"
+        )
+          patch.elevatorAvailable = "Y";
+        else if (
+          raw === false ||
+          s === "N" ||
+          s === "FALSE" ||
+          s === "X" ||
+          s === "없음"
+        )
+          patch.elevatorAvailable = "N";
+        else if (!s || s === "ALL") patch.elevatorAvailable = "all";
+      }
+      if (k === "floor" || k === "floorType") {
+        const toArray = (v: any): string[] =>
+          Array.isArray(v)
+            ? v
+            : String(v || "")
+                .split(",")
+                .map((s) => s.trim())
+                .filter(Boolean);
+        const tokens = toArray(value);
+        patch.floorConfirmation = tokens.length > 0 ? tokens : "all";
+      }
+      if (k === "address" || k === "jibun_address" || k === "road_address") {
+        const q = String(value || "").trim();
+        patch.searchQuery = q;
+        if (k === "address" || k === "road_address")
+          patch.searchField = q ? "address" : "all";
+        if (k === "jibun_address")
+          patch.searchField = q ? "jibun_address" : "all";
+      }
+      const coerceNum = (v: any) => {
+        const n = typeof v === "number" ? v : parseFloat(String(v));
+        return Number.isFinite(n) ? n : undefined;
+      };
+      const updRange = (rangeKey: string, bound: "min" | "max", v: any) => {
+        const prev = (state?.ns?.[namespace] as any)?.[rangeKey] as
+          | [number, number]
+          | undefined;
+        const curMin = Array.isArray(prev) ? prev[0] : undefined;
+        const curMax = Array.isArray(prev) ? prev[1] : undefined;
+        const n = coerceNum(v);
+        if (n === undefined) return;
+        const nextMin = bound === "min" ? n : curMin ?? n;
+        const nextMax = bound === "max" ? n : curMax ?? n;
+        patch[rangeKey] = [nextMin, nextMax];
+      };
+      if (k === "min_deposit" || k === "min_deposit_amount")
+        updRange("depositRange", "min", value);
+      if (k === "max_deposit" || k === "max_deposit_amount")
+        updRange("depositRange", "max", value);
+      if (k === "min_monthly_rent") updRange("monthlyRentRange", "min", value);
+      if (k === "max_monthly_rent") updRange("monthlyRentRange", "max", value);
+      if (k === "min_exclusive_area") updRange("areaRange", "min", value);
+      if (k === "max_exclusive_area") updRange("areaRange", "max", value);
+      if (k === "min_construction_year")
+        updRange("buildYearRange", "min", value);
+      if (k === "max_construction_year")
+        updRange("buildYearRange", "max", value);
+
       const nextNs = { ...(state.ns || {}) };
-      nextNs[namespace] = { ...(nextNs[namespace] || {}), [key]: value };
+      nextNs[namespace] = { ...(nextNs[namespace] || {}), ...patch };
       return { ns: nextNs };
     }),
   setNsRangeFilter: (namespace, key, value) =>
     set((state: any) => {
+      const patch: any = { [key]: value };
+      if (key === "areaRange" || key === "buildingAreaRange") {
+        patch.exclusiveAreaRange = value;
+      }
+      if (key === "landAreaRange") {
+        patch.landRightsAreaRange = value;
+      }
+      if (key === "buildYear") {
+        patch.buildYearRange = value;
+      }
       const nextNs = { ...(state.ns || {}) };
-      nextNs[namespace] = { ...(nextNs[namespace] || {}), [key]: value };
+      nextNs[namespace] = { ...(nextNs[namespace] || {}), ...patch };
       return { ns: nextNs };
     }),
   resetNsFilters: (namespace) =>

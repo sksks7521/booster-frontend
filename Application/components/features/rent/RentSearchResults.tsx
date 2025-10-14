@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import type { Key } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -15,6 +15,8 @@ const ItemTableVirtual = dynamic(
 );
 import MapView from "@/components/features/map-view";
 import { realRentApi } from "@/lib/api";
+import { buildRentMapFilters } from "@/components/features/rent/mapPayload";
+import { haversineDistanceM } from "@/lib/geo/distance";
 
 import { useFilterStore } from "@/store/filterStore";
 import { useSortableColumns } from "@/hooks/useSortableColumns";
@@ -351,7 +353,53 @@ export default function RentSearchResults({
     .map((v) => parseInt(v.trim()))
     .filter((n) => Number.isFinite(n));
 
-  // 서버 KNN 모드: 지도용 데이터 최근접 상위 K만 요청
+  // 서버 전달용 필터 페이로드(빌더 적용)
+  const serverFilterPayload = (() => {
+    try {
+      return buildRentMapFilters({
+        filters: mergedFilters,
+        center: centerForFilter,
+        limit: Number(maxMarkersCap),
+        bounds,
+        sortBy: sortBy as any,
+        sortOrder: (sortOrder as any) || undefined,
+      });
+    } catch {
+      return mergedFilters;
+    }
+  })();
+
+  // 요청 키(필터/센터/경계/limit) 디바운스 → 입력 중간값 과호출 방지
+  const requestKey = JSON.stringify({
+    f: serverFilterPayload,
+    lat: centerForFilter?.lat ?? null,
+    lng: centerForFilter?.lng ?? null,
+    b: bounds
+      ? {
+          s: bounds.south ?? null,
+          w: bounds.west ?? null,
+          n: bounds.north ?? null,
+          e: bounds.east ?? null,
+        }
+      : null,
+    limit: Number(maxMarkersCap),
+  });
+  const [debouncedRequestKey, setDebouncedRequestKey] = useState<string | null>(
+    null
+  );
+  useEffect(() => {
+    const tid = setTimeout(() => setDebouncedRequestKey(requestKey), 200);
+    return () => clearTimeout(tid);
+  }, [requestKey]);
+
+  const [mapTotal, setMapTotal] = useState<number | null>(null);
+
+  // 서버 KNN 모드: 지도용 데이터 최근접 상위 K만 요청 (디바운스+트레일링)
+  const inFlightRef = useRef(false);
+  const pendingKeyRef = useRef<string | null>(null);
+  const lastSentKeyRef = useRef<string | null>(null);
+  const [rerunTick, setRerunTick] = useState(0);
+
   useEffect(() => {
     const shouldUseServer = Boolean(nearestLimitRentIsServer);
     const wantMapData = activeView !== "table" || applyCircleFilter;
@@ -365,6 +413,10 @@ export default function RentSearchResults({
       setNearestError(null);
       return;
     }
+    if (!debouncedRequestKey) return;
+    pendingKeyRef.current = debouncedRequestKey;
+    if (inFlightRef.current) return;
+    inFlightRef.current = true;
     let aborted = false;
     (async () => {
       try {
@@ -374,20 +426,32 @@ export default function RentSearchResults({
           ref_lng: centerForFilter.lng,
           limit: Number(maxMarkersCap),
           bounds: bounds || undefined,
-          filters: mergedFilters,
+          filters: serverFilterPayload,
           timeoutMs: 10000,
         } as const;
         try {
-          console.info("[rent] nearest(server) request", {
-            ref_lat: params.ref_lat,
-            ref_lng: params.ref_lng,
-            limit: params.limit,
-            hasBounds: Boolean(params.bounds),
-          });
+          console.groupCollapsed(
+            "%c[rent] nearest(server) request",
+            "color:#0aa; font-weight:bold;",
+            {
+              ref_lat: params.ref_lat,
+              ref_lng: params.ref_lng,
+              limit: params.limit,
+              hasBounds: Boolean(params.bounds),
+              requestKey: pendingKeyRef.current,
+            }
+          );
+          console.time("[rent] nearest(server) fetch");
         } catch {}
         const resp = await realRentApi.getNearestRentMap(params as any);
         if (aborted) return;
+        try {
+          console.timeEnd("[rent] nearest(server) fetch");
+        } catch {}
         const arr = Array.isArray(resp?.items) ? resp.items : [];
+        setMapTotal(
+          Number.isFinite(resp?.total) ? Number(resp?.total) : arr.length
+        );
         if (resp?.warning) {
           const limitUsed = Number(
             (resp as any)?.echo?.limit ?? Number(maxMarkersCap)
@@ -405,6 +469,31 @@ export default function RentSearchResults({
           setNearestWarning(null);
         }
         setNearestItems(arr as any[]);
+        // KNN 간단 검증: 상위 5개 거리 비감소
+        try {
+          const ref = { lat: params.ref_lat, lng: params.ref_lng } as const;
+          const sample = (arr as any[]).slice(0, 5).map((it) => {
+            const lat = Number(it?.lat ?? it?.latitude ?? it?.y);
+            const lng = Number(it?.lng ?? it?.longitude ?? it?.x);
+            const d =
+              Number.isFinite(lat) && Number.isFinite(lng)
+                ? Math.round(haversineDistanceM(ref, { lat, lng }))
+                : null;
+            return { id: it?.id, lat, lng, d };
+          });
+          const distances = sample
+            .map((s) => s.d)
+            .filter((d) => d != null) as number[];
+          const isNonDecreasing = distances.every((d, i, a) =>
+            i === 0 ? true : d >= (a[i - 1] ?? d)
+          );
+          console.info("[rent] KNN check", {
+            top5: sample,
+            isNonDecreasing,
+            minD: Math.min(...(distances.length ? distances : [NaN])),
+            maxD: Math.max(...(distances.length ? distances : [NaN])),
+          });
+        } catch {}
         try {
           (window as any).__nearestRent = {
             ts: Date.now(),
@@ -421,8 +510,10 @@ export default function RentSearchResults({
           console.info("[rent] nearest(server) response", {
             itemsLength: arr.length,
             echo: resp?.echo,
+            total: resp?.total,
             warning: resp?.warning ?? null,
           });
+          console.groupEnd();
         } catch {}
       } catch (e: any) {
         if (aborted) return;
@@ -438,6 +529,17 @@ export default function RentSearchResults({
             message: msg,
           };
         } catch {}
+      } finally {
+        lastSentKeyRef.current =
+          pendingKeyRef.current || debouncedRequestKey || null;
+        inFlightRef.current = false;
+        if (
+          pendingKeyRef.current &&
+          lastSentKeyRef.current &&
+          pendingKeyRef.current !== lastSentKeyRef.current
+        ) {
+          setRerunTick((t) => t + 1);
+        }
       }
     })();
     return () => {
@@ -446,16 +548,10 @@ export default function RentSearchResults({
   }, [
     nearestLimitRentIsServer,
     regionReady,
-    activeView,
+    activeView !== "table",
     applyCircleFilter,
-    centerForFilter?.lat,
-    centerForFilter?.lng,
-    maxMarkersCap,
-    bounds?.south,
-    bounds?.west,
-    bounds?.north,
-    bounds?.east,
-    mergedFilters,
+    debouncedRequestKey,
+    rerunTick,
   ]);
 
   return (
@@ -557,32 +653,17 @@ export default function RentSearchResults({
             </TabsList>
           </Tabs>
 
-          {/* 서버 경고/폴백 안내 (지도/통합 뷰에서만) */}
-          {activeView !== "table" && (
-            <div className="mt-2 flex flex-col gap-2">
+          {/* 지도 요약: total 및 경고 (매매와 동일 위치/스타일) */}
+          {activeView === "map" && (
+            <div className="flex items-center justify-between py-2 text-sm text-muted-foreground">
+              <div>
+                지도 total:{" "}
+                {Number.isFinite(mapTotal as any)
+                  ? Number(mapTotal).toLocaleString()
+                  : "-"}
+              </div>
               {nearestWarning && (
-                <div className="flex items-center justify-between rounded border border-yellow-200 bg-yellow-50 px-3 py-1.5 text-[12px] text-yellow-800">
-                  <span className="truncate">{nearestWarning}</span>
-                  <button
-                    className="ml-2 text-yellow-700 hover:underline"
-                    onClick={() => setNearestWarning(null)}
-                  >
-                    닫기
-                  </button>
-                </div>
-              )}
-              {nearestError && (
-                <div className="flex items-center justify-between rounded border border-blue-200 bg-blue-50 px-3 py-1.5 text-[12px] text-blue-800">
-                  <span className="truncate">
-                    서버 정렬 실패로 클라이언트 기준으로 표시 중입니다.
-                  </span>
-                  <button
-                    className="ml-2 text-blue-700 hover:underline"
-                    onClick={() => setNearestError(null)}
-                  >
-                    닫기
-                  </button>
-                </div>
+                <div className="text-amber-600">{nearestWarning}</div>
               )}
             </div>
           )}

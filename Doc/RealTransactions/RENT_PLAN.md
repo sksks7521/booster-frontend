@@ -319,6 +319,39 @@
 - 네임스페이스 충돌 방지: 키에 `:rent` 접미어 유지
 - 서버 저장 전환 시 기존 localStorage와 마이그레이션 전략 필요
 
+### 진행 로그(2025-10-14)
+
+- 공통 빌더/정합성
+  - `buildRentFilterParams` 도입, `registry.ts`(rent 목록)·지도 경로에서 공용 사용
+  - 기본값 가드(stripDefaults) 활성, 표준+별칭 동시 전송, ids 게이트/상한(≤500)
+  - 목록 호환 별칭 추가: 보증금(`min_deposit_amount/max_deposit_amount`), 전환금(`min/max_jeonse_conversion_amount`)
+- 지도(KNN)/로깅/UX
+  - `RentSearchResults.tsx`에 디바운스+트레일링, `mapTotal`/경고 표시
+  - 콘솔 태그: `[rent] nearest(server) request/response`, `[rent] KNN check`
+  - 지도 요약 UI를 매매와 동일 위치/스타일(“지도 total: T”)로 통일
+- 어댑터/좌표/엘리베이터
+  - `toBool`로 `elevator_available` 정규화(Y/N)
+  - `extractLatLng` 보강: lon/x/lat_y 등 혼용 + 한국 범위 기반 스왑 가드
+- 층확인 토큰 모드
+  - `floorTokenMode`: 목록=list(KR 토큰), 지도=map(ENG 토큰) 적용
+- 기본값/필터 정리
+  - 전용면적 기본값을 스토어에서 `[0,300]`으로 통일(초기 활성/총계 불일치 해결)
+  - 연 임대수익률 필터 제거(요청 반영)
+- 백엔드 요청(지도 정합성)
+  - `/map?dataset=rent`에 `rent_type`, `contract_date_from/to`, 전환금 표준/별칭/호환키 반영 요청, echo.filters 노출 요청
+
+### 콘솔 디버그 태그(개발)
+
+- `[rent] nearest(server) request/response/warning`, `window.__nearestRent`
+- `[rent] KNN check` → `isNonDecreasing` true면 최근접 정렬 정상
+
+### 빠른 검증 체크리스트(요약)
+
+- 전용면적 초기/초기화 후 비활성(파란색 아님), 지역/상세 총계 일치
+- 전세/월세, 계약일자, 전환금: 목록/지도 함께 감소(지도는 서버 반영 필요 항목은 요청서 참조)
+- 층확인: 반지하/일반층 선택 시 목록 0건 아님(토큰 모드 KR 변환 적용)
+- ids: 선택만 보기 ON 시 ids(≤500) 전송, OFF 시 제거
+
 ### 13. SALE → RENT 매핑 요약(차이점 정리)
 
 - 엔드포인트: `/api/v1/real-transactions/`(매매) ↔ `/api/v1/real-rents/`(전월세)
