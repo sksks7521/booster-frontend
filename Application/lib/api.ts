@@ -823,6 +823,60 @@ export const realRentApi = {
   getColumns: (): Promise<any> => apiClient.getRealRentsColumns(),
   getRentalYield: (params?: Record<string, any>) =>
     apiClient.getRentalYield(params),
+  // 🆕 전월세 영역(반경) API: /api/v1/real-transactions/area
+  // buildRentAreaParams 로 생성한 파라미터를 그대로 전달합니다.
+  getRentsArea: async (
+    params?: Record<string, any>
+  ): Promise<{
+    items?: any[];
+    results?: any[];
+    total?: number;
+    total_items?: number;
+    page?: number;
+    size?: number;
+    ordering?: string;
+  }> => {
+    const finalParams: Record<string, any> = { ...(params ?? {}) };
+    const query = new URLSearchParams(
+      Object.entries(finalParams)
+        .filter(([, v]) => v !== undefined && v !== null && v !== "")
+        .map(([k, v]) => [k, String(v)])
+    ).toString();
+    const endpoint = `/api/v1/real-transactions/area?${query}`;
+    const controller = new AbortController();
+    const to = setTimeout(() => controller.abort(), 10000);
+    try {
+      const res = await fetch(`${API_BASE_URL}${endpoint}`, {
+        method: "GET",
+        headers: { "Content-Type": "application/json" },
+        signal: controller.signal,
+      });
+      clearTimeout(to);
+      if (!res.ok) {
+        let details: any = undefined;
+        try {
+          details = await res.json();
+        } catch {
+          try {
+            details = await res.text();
+          } catch {}
+        }
+        throw createApiError({
+          message:
+            (details && (details.detail || details.message)) ||
+            `HTTP error ${res.status}`,
+          status: res.status,
+          url: `${API_BASE_URL}${endpoint}`,
+          method: "GET",
+          details,
+        });
+      }
+      return (await res.json()) as any;
+    } catch (e) {
+      clearTimeout(to);
+      throw e;
+    }
+  },
   // 🆕 전월세 지도용 가까운 순 LIMIT API (서버 KNN)
   getNearestRentMap: async (params: {
     ref_lat: number;

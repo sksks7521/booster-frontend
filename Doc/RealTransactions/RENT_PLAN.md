@@ -352,6 +352,24 @@
 - 층확인: 반지하/일반층 선택 시 목록 0건 아님(토큰 모드 KR 변환 적용)
 - ids: 선택만 보기 ON 시 ids(≤500) 전송, OFF 시 제거
 
+### 진행 로그(2025-10-16)
+
+- 파이프라인/표시
+  - applyCircle ON 시 소스 단일화: `/area` 우선, 실패 시 `/map` KNN 폴백
+  - fetch limit 분리: 요청키에서 cap 제거, 영역 ON 시 서버 limit=1000 고정(표시상한은 렌더에서만 적용)
+  - 지도/통합 탭 요약을 “표시 N / 총 T”로 통일(T=영역 총합 우선)
+  - `/map` 응답을 `datasetConfigs['rent'].adapter.toItemLike`로 표준화 후 전역 소스 주입
+  - /area(list/server) 요청·응답 그룹로그, time, echo, KNN 검증(top5) 로깅 추가(디버그 게이트)
+  - /area 리스트/지도 요청은 `ordering=distance` 고정(목록 정렬은 클라이언트에서 처리) — 422 회피
+- 필터/빌더/스토어
+  - `buildRentFilterParams`: floorTokenMode(en/eng/kr) 허용, 주소검색 필드 확장, `date_from/to` 별칭 병행, `rent_type=all` 미전송, `floor_type` 별칭 병행
+  - 엘리베이터 UI를 표준키(Y/N/all)로 정합(버튼 활성/선택된 필터 바 표기 수정)
+  - 초기 화면 기본 정렬 제거(사용자 클릭 전에는 정렬 없음)
+- 백엔드 협업 문서
+  - `251016_Frontend_to_Backend_real-transactions-area-422-REQUEST.md` — /area 422 재현과 파라미터 수용/echo 명시
+  - `251016_Frontend_to_Backend_real-rents-area-map-consistency-REQUEST.md` — /map·/area 필터/정렬/총계 일관성
+  - `251016_Frontend_to_Backend_real-rents-area-schema-REQUEST.md` — dataset=rent 수용 또는 `/real-rents/area` 도입, 전월세 스키마 표준화
+
 ### 13. SALE → RENT 매핑 요약(차이점 정리)
 
 - 엔드포인트: `/api/v1/real-transactions/`(매매) ↔ `/api/v1/real-rents/`(전월세)

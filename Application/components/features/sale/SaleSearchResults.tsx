@@ -97,12 +97,12 @@ export default function SaleSearchResults({
   const hasCity = !!(allFilters as any)?.cityDistrict;
   const regionReady = hasProvince && hasCity;
 
-  // 기본 정렬 초기화 (최초 1회만)
-  useEffect(() => {
-    if (regionReady && !(allFilters as any)?.sortBy) {
-      setSortConfig("contractDate", "desc");
-    }
-  }, [regionReady, setSortConfig]);
+  // 기본 정렬 초기화 제거: 초기 화면에서는 정렬 미설정(사용자 선택 시에만 설정)
+  // useEffect(() => {
+  //   if (regionReady && !(allFilters as any)?.sortBy) {
+  //     setSortConfig("contractDate", "desc");
+  //   }
+  // }, [regionReady, setSortConfig]);
 
   // 🆕 원 필터 상태 먼저 가져오기 (분기 조건 판단용)
   const nsState = useFilterStore((s: any) => s.ns);
@@ -214,6 +214,11 @@ export default function SaleSearchResults({
   // 매매 전용 서버 최근접 모드 플래그(기본 ON)
   const nearestLimitSaleIsServer = ((flags as any)?.nearestLimitSaleIsServer ??
     true) as boolean;
+  // α배수 팩터(기본 1, 최대 3): 서버 KNN 시 넉넉히 수집 후 절단
+  const nearestSaleAlphaFactor = Math.max(
+    1,
+    Math.min(3, Number((flags as any)?.nearestSaleAlphaFactor ?? 1))
+  );
   const mapPageHook = useDataset(
     "sale",
     mergedFilters,
@@ -227,6 +232,8 @@ export default function SaleSearchResults({
 
   // 플래그/최근접 서버 모드 상태 및 임시 상태
   const [nearestItems, setNearestItems] = useState<any[] | null>(null);
+  // 전역 소스(표시상한 미적용) - 원 안 개수(circleCount)는 이 소스로 계산되어 표시상한과 독립
+  const [nearestAllItems, setNearestAllItems] = useState<any[] | null>(null);
   const [nearestError, setNearestError] = useState<string | null>(null);
   const [nearestWarning, setNearestWarning] = useState<string | null>(null);
   const [mapTotal, setMapTotal] = useState<number | null>(null);
@@ -295,7 +302,6 @@ export default function SaleSearchResults({
             e: bounds.east ?? null,
           }
         : null,
-      limit: Number(maxMarkersCap),
     });
   }, [
     serverFilterKey,
@@ -305,7 +311,6 @@ export default function SaleSearchResults({
     bounds?.west,
     bounds?.north,
     bounds?.east,
-    maxMarkersCap,
   ]);
   const [debouncedRequestKey, setDebouncedRequestKey] = useState<string | null>(
     null
@@ -321,11 +326,13 @@ export default function SaleSearchResults({
     const wantMapData = activeView !== "table" || applyCircleFilter;
     if (!regionReady || !shouldUseServer || !wantMapData) {
       setNearestItems(null);
+      setNearestAllItems(null);
       setNearestError(null);
       return;
     }
     if (!centerForFilter) {
       setNearestItems(null);
+      setNearestAllItems(null);
       setNearestError(null);
       return;
     }
@@ -339,57 +346,91 @@ export default function SaleSearchResults({
       try {
         setNearestError(null);
         const sentKey = pendingKeyRef.current || debouncedRequestKey;
+        // 서버 KNN limit 계산: 서버 사용 시 cap×α(최대 3000), 아니면 cap 그대로
+        const effectiveLimit = applyCircleFilter
+          ? 1000 // 영역 모드: 전역 소스 확보를 위해 고정 큰 값 수집
+          : Number(maxMarkersCap);
+
         const params = {
           ref_lat: centerForFilter.lat,
           ref_lng: centerForFilter.lng,
-          limit: Number(maxMarkersCap),
+          limit: Number(effectiveLimit),
           bounds: bounds || undefined,
           filters: serverFilterPayload,
           timeoutMs: 10000,
         } as const;
         try {
-          console.groupCollapsed(
-            "%c[sale] nearest(server) request",
-            "color:#0aa; font-weight:bold;",
-            {
-              ref_lat: params.ref_lat,
-              ref_lng: params.ref_lng,
-              limit: params.limit,
-              hasBounds: Boolean(params.bounds),
-              // 검색 파라미터 확인용(표준/별칭 모두 포함됨)
-              search_debug: {
-                address_search: (serverFilterPayload as any)?.address_search,
-                address_search_type: (serverFilterPayload as any)
-                  ?.address_search_type,
-                road_address_search: (serverFilterPayload as any)
-                  ?.road_address_search,
-                jibun_address_search: (serverFilterPayload as any)
-                  ?.jibun_address_search,
-              },
-              // 편의 파라미터 확인용
-              convenience_debug: {
-                floor_confirmation: (serverFilterPayload as any)
-                  ?.floor_confirmation,
-                elevator_available: (serverFilterPayload as any)
-                  ?.elevator_available,
-              },
-              requestKey: sentKey,
-            }
-          );
-          console.time("[sale] nearest(server) fetch");
+          const dbg =
+            Boolean((flags as any)?.diagnostics) ||
+            String(process.env.NEXT_PUBLIC_DETAIL_DEBUG || "") === "1";
+          if (dbg) {
+            console.groupCollapsed(
+              "%c[sale] nearest(server) request",
+              "color:#0aa; font-weight:bold;",
+              {
+                ref_lat: params.ref_lat,
+                ref_lng: params.ref_lng,
+                limit: params.limit,
+                hasBounds: Boolean(params.bounds),
+                search_debug: {
+                  address_search: (serverFilterPayload as any)?.address_search,
+                  address_search_type: (serverFilterPayload as any)
+                    ?.address_search_type,
+                  road_address_search: (serverFilterPayload as any)
+                    ?.road_address_search,
+                  jibun_address_search: (serverFilterPayload as any)
+                    ?.jibun_address_search,
+                },
+                convenience_debug: {
+                  floor_confirmation: (serverFilterPayload as any)
+                    ?.floor_confirmation,
+                  elevator_available: (serverFilterPayload as any)
+                    ?.elevator_available,
+                },
+                requestKey: sentKey,
+              }
+            );
+            console.time("[sale] nearest(server) fetch");
+          }
         } catch {}
         const resp = await realTransactionApi.getNearestSaleMap(params as any);
         if (aborted) return;
         try {
-          console.timeEnd("[sale] nearest(server) fetch");
+          const dbg =
+            Boolean((flags as any)?.diagnostics) ||
+            String(process.env.NEXT_PUBLIC_DETAIL_DEBUG || "") === "1";
+          if (dbg) console.timeEnd("[sale] nearest(server) fetch");
         } catch {}
-        const arr = Array.isArray(resp?.items) ? resp.items : [];
-        setMapTotal(
-          Number.isFinite(resp?.total) ? Number(resp?.total) : arr.length
-        );
-        if (resp?.warning) {
+        const arr = Array.isArray(resp?.items) ? (resp.items as any[]) : [];
+        const totalFromResp = Number.isFinite(resp?.total as any)
+          ? Number(resp?.total as any)
+          : arr.length;
+        setMapTotal(totalFromResp);
+
+        // 서버 KNN 지원 여부 추정: echo.ordering 또는 ordering에 distance 포함
+        const orderingStr = String(
+          ((resp as any)?.echo?.ordering ??
+            (resp as any)?.ordering ??
+            "") as any
+        ).toLowerCase();
+        const serverKnnOk = orderingStr.includes("distance");
+
+        // 경고 우선순위: (1) 총계>표시상한 → 상위K 경고 (2) 서버KNN 미지원 → 클라정렬 경고 (3) 서버 제공 warning
+        if (
+          Number.isFinite(totalFromResp) &&
+          totalFromResp > Number(maxMarkersCap)
+        ) {
+          const txt = `필터 결과가 ${totalFromResp.toLocaleString()}건입니다. 가까운 순 상위 ${Number(
+            maxMarkersCap
+          ).toLocaleString()}건만 표시합니다.`;
+          setNearestWarning(txt);
+        } else if (!serverKnnOk) {
+          setNearestWarning(
+            "서버 KNN 미지원으로 클라이언트 정렬을 적용했습니다."
+          );
+        } else if ((resp as any)?.warning) {
           const limitUsed = Number(
-            (resp as any)?.echo?.limit ?? Number(maxMarkersCap)
+            (resp as any)?.echo?.limit ?? effectiveLimit
           );
           const txt = `물건 위치로부터 가까운 상위 ${
             Number.isFinite(limitUsed) && limitUsed > 0
@@ -397,37 +438,73 @@ export default function SaleSearchResults({
               : String(maxMarkersCap)
           }건만 반환했습니다.`;
           setNearestWarning(txt);
-          try {
-            console.warn("[sale] nearest warning:", resp.warning, txt);
-          } catch {}
         } else {
           setNearestWarning(null);
         }
-        setNearestItems(arr as any[]);
-        // 간단 KNN 검증: 상위 5개 거리 증가 여부 및 최소/최대 거리 출력
-        try {
-          const ref = { lat: params.ref_lat, lng: params.ref_lng } as const;
-          const sample = (arr as any[]).slice(0, 5).map((it) => {
-            const lat = Number(it?.lat ?? it?.latitude ?? it?.y);
-            const lng = Number(it?.lng ?? it?.longitude ?? it?.x);
-            const d =
-              Number.isFinite(lat) && Number.isFinite(lng)
-                ? Math.round(haversineDistanceM(ref, { lat, lng }))
-                : null;
-            return { id: it?.id, lat, lng, d };
-          });
-          const distances = sample
-            .map((s) => s.d)
-            .filter((d) => d != null) as number[];
-          const isNonDecreasing = distances.every((d, i, a) =>
-            i === 0 ? true : d >= (a[i - 1] ?? d)
+
+        // 결과 집합 표준화: /map 응답을 표 컬럼 스키마에 맞게 어댑트한 뒤 사용
+        const adapt = (rows: any[]) =>
+          (rows || []).map((r) =>
+            (datasetConfigs as any)?.["sale"]?.adapter?.toItemLike
+              ? (datasetConfigs as any)["sale"].adapter.toItemLike(r)
+              : r
           );
-          console.info("[sale] KNN check", {
-            top5: sample,
-            isNonDecreasing,
-            minD: Math.min(...(distances.length ? distances : [NaN])),
-            maxD: Math.max(...(distances.length ? distances : [NaN])),
-          });
+
+        let finalItems: any[] = [];
+        if (!serverKnnOk) {
+          // 클라 KNN 정렬: 표준화 후 거리 정렬 → 상한 절단
+          const adapted = adapt(arr);
+          const ref = { lat: params.ref_lat, lng: params.ref_lng } as const;
+          const ranked = adapted
+            .map((it: any) => {
+              const lat = Number(it?.lat);
+              const lng = Number(it?.lng);
+              const d =
+                Number.isFinite(lat) && Number.isFinite(lng)
+                  ? haversineDistanceM(ref, { lat, lng })
+                  : Number.POSITIVE_INFINITY;
+              return { it, d };
+            })
+            .sort((a, b) => a.d - b.d)
+            .map((x) => x.it);
+          setNearestAllItems(ranked);
+          finalItems = ranked.slice(0, Number(maxMarkersCap));
+        } else {
+          // 서버 거리 정렬: 표준화 후 상한 절단
+          const adapted = adapt(arr);
+          setNearestAllItems(adapted);
+          finalItems = adapted.slice(0, Number(maxMarkersCap));
+        }
+        setNearestItems(finalItems);
+        // 간단 KNN 검증: 상위 5개 거리 증가 여부 및 최소/최대 거리 출력 (디버그 모드만)
+        try {
+          const dbg =
+            Boolean((flags as any)?.diagnostics) ||
+            String(process.env.NEXT_PUBLIC_DETAIL_DEBUG || "") === "1";
+          if (dbg) {
+            const ref = { lat: params.ref_lat, lng: params.ref_lng } as const;
+            const sample = (finalItems as any[]).slice(0, 5).map((it) => {
+              const lat = Number(it?.lat ?? it?.latitude ?? it?.y);
+              const lng = Number(it?.lng ?? it?.longitude ?? it?.x);
+              const d =
+                Number.isFinite(lat) && Number.isFinite(lng)
+                  ? Math.round(haversineDistanceM(ref, { lat, lng }))
+                  : null;
+              return { id: it?.id, lat, lng, d };
+            });
+            const distances = sample
+              .map((s) => s.d)
+              .filter((d) => d != null) as number[];
+            const isNonDecreasing = distances.every((d, i, a) =>
+              i === 0 ? true : d >= (a[i - 1] ?? d)
+            );
+            console.info("[sale] KNN check", {
+              top5: sample,
+              isNonDecreasing,
+              minD: Math.min(...(distances.length ? distances : [NaN])),
+              maxD: Math.max(...(distances.length ? distances : [NaN])),
+            });
+          }
         } catch {}
         try {
           (window as any).__nearestSale = {
@@ -438,22 +515,28 @@ export default function SaleSearchResults({
               limit: params.limit,
               bounds: params.bounds,
             },
-            echo: resp?.echo,
-            total: resp?.total,
+            echo: (resp as any)?.echo,
+            total: (resp as any)?.total,
             warning: resp?.warning ?? null,
-            itemsLength: arr.length,
+            itemsLength: (finalItems as any[])?.length ?? 0,
           };
-          console.info("[sale] nearest(server) response", {
-            itemsLength: arr.length,
-            echo: resp?.echo,
-            total: resp?.total,
-            warning: resp?.warning ?? null,
-          });
-          console.groupEnd();
+          const dbg =
+            Boolean((flags as any)?.diagnostics) ||
+            String(process.env.NEXT_PUBLIC_DETAIL_DEBUG || "") === "1";
+          if (dbg) {
+            console.info("[sale] nearest(server) response", {
+              itemsLength: (finalItems as any[])?.length ?? 0,
+              echo: (resp as any)?.echo,
+              total: (resp as any)?.total,
+              warning: resp?.warning ?? null,
+            });
+            console.groupEnd();
+          }
         } catch {}
       } catch (e: any) {
         if (aborted) return;
         setNearestItems(null);
+        setNearestAllItems(null);
         const msg = String(e?.message || "nearest fetch failed");
         setNearestError(msg);
         try {
@@ -502,7 +585,9 @@ export default function SaleSearchResults({
     size,
     items, // ✅ 테이블용 데이터 (현재 페이지)
     globalSource:
-      nearestLimitSaleIsServer && nearestItems ? nearestItems : mapRawItems,
+      nearestLimitSaleIsServer && nearestAllItems
+        ? nearestAllItems
+        : mapRawItems,
     maxMarkersCap,
     getRowSortTs: (r: any) =>
       r?.contract_date ? Date.parse(r.contract_date) : 0,
@@ -516,9 +601,14 @@ export default function SaleSearchResults({
     ? processedItemsSorted.length
     : totalCount;
 
-  // 지도 total 우선 표시 값(서버 KNN 사용 시 mapTotal, 아니면 목록 total)
-  const displayMapTotal =
-    nearestLimitSaleIsServer && mapTotal != null ? mapTotal : totalCount;
+  // 지도/요약 총계 표시 값
+  // - applyCircle ON: 원 안 총합(파이프라인 전역 정렬 결과 길이)
+  // - OFF: 서버 KNN total 있으면 사용, 없으면 목록 total
+  const displayTotal = applyCircle
+    ? processedItemsSorted.length
+    : nearestLimitSaleIsServer && mapTotal != null
+    ? mapTotal
+    : totalCount;
 
   // 테이블 기능을 위한 추가 상태들
   const { sortableColumns } = useSortableColumns("sale");
@@ -1315,16 +1405,23 @@ export default function SaleSearchResults({
 
               {activeView === "map" && (
                 <div className="h-[calc(100vh-240px)]">
-                  {/* 지도 요약: total 및 경고 */}
+                  {/* 지도 요약: 표시 N / 총 T + 경고 */}
                   <div className="flex items-center justify-between py-2 text-sm text-muted-foreground">
-                    <div>
-                      지도 total:{" "}
-                      {Number.isFinite(displayMapTotal as any)
-                        ? Number(displayMapTotal).toLocaleString()
+                    <span className="inline-flex items-center rounded border border-gray-200 bg-white px-2 py-1 text-[11px] text-gray-700">
+                      표시{" "}
+                      {Math.min(
+                        finalMapItems?.length || 0,
+                        Number(maxMarkersCap)
+                      ).toLocaleString()}{" "}
+                      / 총{" "}
+                      {Number.isFinite(displayTotal as any)
+                        ? Number(displayTotal).toLocaleString()
                         : "-"}
-                    </div>
+                    </span>
                     {nearestWarning && (
-                      <div className="text-amber-600">{nearestWarning}</div>
+                      <span className="inline-flex items-center rounded border border-yellow-200 bg-yellow-50 px-2 py-1 text-[11px] text-yellow-800">
+                        ⚠️ {nearestWarning}
+                      </span>
                     )}
                   </div>
                   <MapView
@@ -1361,6 +1458,25 @@ export default function SaleSearchResults({
                   {/* 지도 섹션 */}
                   <div className="space-y-4">
                     <h3 className="text-lg font-semibold">지도 보기</h3>
+                    {/* 지도 요약(통합 뷰): 표시 N / 총 T + 경고 배지 */}
+                    <div className="flex items-center justify-between text-xs text-gray-600">
+                      <span className="inline-flex items-center rounded border border-gray-200 bg-white px-2 py-1 text-[11px] text-gray-700">
+                        표시{" "}
+                        {Math.min(
+                          finalMapItems?.length || 0,
+                          Number(maxMarkersCap)
+                        ).toLocaleString()}{" "}
+                        / 총{" "}
+                        {Number.isFinite(displayTotal as any)
+                          ? Number(displayTotal).toLocaleString()
+                          : "-"}
+                      </span>
+                      {nearestWarning && (
+                        <span className="inline-flex items-center rounded border border-yellow-200 bg-yellow-50 px-2 py-1 text-[11px] text-yellow-800">
+                          ⚠️ {nearestWarning}
+                        </span>
+                      )}
+                    </div>
                     <div className="h-[calc(100vh-360px)]">
                       <MapView
                         items={finalMapItems}

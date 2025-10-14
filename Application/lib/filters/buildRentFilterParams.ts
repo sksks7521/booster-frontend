@@ -10,7 +10,8 @@ type BuildOptions = {
   maxIds?: number;
   sortBy?: string | undefined;
   sortOrder?: "asc" | "desc" | undefined;
-  floorTokenMode?: "eng" | "kr"; // 지도(map)는 eng, 목록(list)은 kr
+  // 지도(map)=영문, 목록(list)=한글. 'en' | 'eng' | 'kr' 모두 허용
+  floorTokenMode?: "en" | "eng" | "kr";
 };
 
 const YES_SET = new Set(["Y", "TRUE", "1", "O", "YES", "있음"]);
@@ -95,7 +96,8 @@ export function buildRentFilterParams(
 
   const f = filters || {};
   const q: Record<string, any> = {};
-  const floorMode = (opts?.floorTokenMode || "eng") as "eng" | "kr";
+  const floorRaw = String(opts?.floorTokenMode || "eng").toLowerCase();
+  const floorMode: "eng" | "kr" = floorRaw === "kr" ? "kr" : "eng";
 
   // 지역
   const sido = f.province;
@@ -208,11 +210,17 @@ export function buildRentFilterParams(
     const to = String(f.dateRange[1] || "").trim();
     if (from) q.contract_date_from = from;
     if (to) q.contract_date_to = to;
+    // 별칭(레거시)도 병행 제공
+    if (includeAliases) {
+      if (from) (q as any).date_from = from;
+      if (to) (q as any).date_to = to;
+    }
   }
 
   // 구분/편의
   if (f.rentType && String(f.rentType).trim()) {
-    q.rent_type = String(f.rentType).trim();
+    const rt = String(f.rentType).trim();
+    if (rt.toLowerCase() !== "all") q.rent_type = rt;
   }
 
   // 층확인: 배열 또는 CSV → CSV
@@ -240,6 +248,7 @@ export function buildRentFilterParams(
       };
       const tokens = floorMode === "kr" ? src.map(mapFloorTokenKr) : src;
       q.floor_confirmation = tokens.join(",");
+      if (includeAliases) (q as any).floor_type = q.floor_confirmation;
     }
   }
 
@@ -252,13 +261,17 @@ export function buildRentFilterParams(
 
   // 검색 정규화
   if (f.searchQuery && String(f.searchQuery).trim()) {
-    const rawField = String(f.searchField || "all").toLowerCase();
+    const rawField = String(f.searchField || "both").toLowerCase();
     const query = String(f.searchQuery).trim();
-    if (rawField === "address") {
+    if (
+      rawField === "address" ||
+      rawField === "road" ||
+      rawField === "road_address"
+    ) {
       q.address_search = query;
       q.address_search_type = "road";
       if (includeAliases) q.road_address_search = query;
-    } else if (rawField === "jibun_address") {
+    } else if (rawField === "jibun" || rawField === "jibun_address") {
       q.address_search = query;
       q.address_search_type = "jibun";
       if (includeAliases) q.jibun_address_search = query;

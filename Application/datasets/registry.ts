@@ -846,7 +846,7 @@ export const datasetConfigs: Record<DatasetId, DatasetConfig> = {
         const buildYear = extractBuildYear(r);
         const price = toNumber(pickFirst(r?.price, r?.transaction_amount));
         const id = pickFirst(r?.id, r?.doc_id, r?.uuid);
-        return {
+        const ret = {
           id: String(id ?? ""),
           address,
           price,
@@ -935,7 +935,45 @@ export const datasetConfigs: Record<DatasetId, DatasetConfig> = {
             transactionDate: r?.transactionDate ?? r?.contract_date,
             price_per_area: r?.price_per_area, // 만원/㎡ (서버 환산/반올림 적용)
           },
-        };
+        } as any;
+
+        // 비파괴 폴백: 표 컬럼이 기대하는 일반 키를 채움(값이 없을 때만)
+        const ex = ret.extra || (ret.extra = {});
+        // 주소/건물명
+        if (!ex.roadAddress)
+          ex.roadAddress =
+            ex.roadAddressReal ||
+            r?.road_address_real ||
+            r?.road_address ||
+            ret.address;
+        if (!ex.buildingName)
+          ex.buildingName =
+            ex.buildingNameReal || r?.building_name_real || r?.building_name;
+        // 연도/층
+        if (ex.constructionYear == null)
+          ex.constructionYear =
+            ex.constructionYearReal ?? toNumber(r?.construction_year);
+        if (!ex.floorInfo) ex.floorInfo = ex.floorInfoReal ?? r?.floor_info;
+        if (ret.buildYear == null)
+          ret.buildYear = toNumber(
+            ex.constructionYear ?? r?.build_year ?? r?.construction_year_real
+          );
+        // 가격/면적/평단가
+        if (ret.price == null)
+          ret.price = toNumber(r?.transaction_amount ?? r?.price);
+        if (ret.area == null)
+          ret.area = toNumber(r?.exclusive_area_sqm ?? r?.area_sqm ?? r?.area);
+        if (ex.pricePerPyeong == null && r?.price_per_pyeong != null)
+          ex.pricePerPyeong = toNumber(r?.price_per_pyeong);
+        // 지역/행정 보강
+        if (!ex.sigungu && r?.address_city) ex.sigungu = r?.address_city;
+        if (
+          !ex.dongName &&
+          (r?.admin_dong_name || r?.dong_name || r?.admin_dong)
+        )
+          ex.dongName = r?.admin_dong_name ?? r?.dong_name ?? r?.admin_dong;
+
+        return ret;
       },
     },
     table: {

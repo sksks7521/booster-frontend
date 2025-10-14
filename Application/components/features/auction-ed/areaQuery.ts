@@ -148,3 +148,37 @@ export function buildAreaQueryParams(opts: BuildAreaQueryParamsOptions) {
 
   return q;
 }
+
+/**
+ * buildAuctionAreaParams
+ * 공통 영역 파라미터 빌더(확장 진입점).
+ * 현재는 기존 buildAreaQueryParams를 위임 호출하여 기능 회귀를 방지합니다.
+ * 이후 표준/별칭/가드 추가 정합화가 필요할 경우 이 진입점을 확장합니다.
+ */
+export function buildAuctionAreaParams(
+  opts: BuildAreaQueryParamsOptions
+): Record<string, any> {
+  const { filters, center, radiusM, page, size, sortBy, sortOrder } = opts;
+  // 공통 빌더로 필터 정규화
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const {
+    buildAuctionFilterParams,
+  } = require("@/lib/filters/buildAuctionFilterParams");
+  const normalized = buildAuctionFilterParams(filters, {
+    includeAliases: true,
+    stripDefaults: true,
+    floorTokenMode: "kr",
+  });
+  // 영역 파라미터 병합
+  const q: Record<string, any> = {
+    ...normalized,
+    center_lat: center?.lat,
+    center_lng: center?.lng,
+    radius_m: clampRadius(radiusM),
+    page,
+    size: Math.min(1000, Number.isFinite(size as any) ? (size as any) : 20),
+  };
+  const key = camelToSnake(sortBy);
+  if (key && sortOrder) q.ordering = `${sortOrder === "desc" ? "-" : ""}${key}`;
+  return q;
+}

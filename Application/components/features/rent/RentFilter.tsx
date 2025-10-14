@@ -241,8 +241,8 @@ export default function RentFilter({
     ? (filters as any).floorConfirmation.length > 0
     : false;
   const isElevatorActive =
-    (filters as any).elevatorAvailable === true ||
-    (filters as any).elevatorAvailable === false;
+    (filters as any).elevatorAvailable === "Y" ||
+    (filters as any).elevatorAvailable === "N";
   const isAddressSearchActive = Boolean(
     (filters as any).searchQuery && String((filters as any).searchQuery).trim()
   );
@@ -1323,11 +1323,11 @@ export default function RentFilter({
                 <div className="flex flex-wrap gap-2">
                   <button
                     onClick={() => {
-                      setFilter("elevatorAvailable", undefined);
+                      setFilter("elevatorAvailable", "all");
                       setPageStore(1);
                     }}
                     className={`px-3 py-1.5 text-xs rounded-md border transition-colors ${
-                      (filters as any).elevatorAvailable === undefined
+                      (filters as any).elevatorAvailable === "all"
                         ? "bg-blue-500 text-white border-blue-500"
                         : "bg-white text-gray-700 border-gray-300 hover:border-blue-300 hover:bg-blue-50"
                     }`}
@@ -1335,8 +1335,8 @@ export default function RentFilter({
                     전체
                   </button>
                   {[
-                    { v: true, l: "있음" },
-                    { v: false, l: "없음" },
+                    { v: "Y", l: "있음" },
+                    { v: "N", l: "없음" },
                   ].map((opt) => {
                     const isActive =
                       (filters as any).elevatorAvailable === opt.v;

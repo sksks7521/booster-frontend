@@ -168,11 +168,22 @@ export default function SelectedFilterBar({
       });
     }
 
-    // ✅ hasElevator를 string 방식으로 수정
+    // ✅ 엘리베이터 표준 키(elevatorAvailable: 'Y'|'N'|'all') 우선 표시
     if (
+      (filters as any).elevatorAvailable &&
+      (filters as any).elevatorAvailable !== "all"
+    ) {
+      const v = String((filters as any).elevatorAvailable).toUpperCase();
+      selected.push({
+        key: "elevatorAvailable",
+        label: `엘리베이터: ${v === "Y" ? "있음" : v === "N" ? "없음" : v}`,
+        value: v,
+      });
+    } else if (
       (filters as any).hasElevator &&
       (filters as any).hasElevator !== "all"
     ) {
+      // 하위호환: hasElevator도 지원
       selected.push({
         key: "hasElevator",
         label: `엘리베이터: ${(filters as any).hasElevator}`,
