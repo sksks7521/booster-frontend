@@ -15,6 +15,10 @@ export type FeatureFlags = {
   // 기본값: client. NEXT_PUBLIC_MAP_NEAREST_LIMIT_RENT=server 면 서버 사용
   nearestLimitRentMode?: "server" | "client";
   nearestLimitRentIsServer?: boolean;
+  // 매매 지도 표시상한 선별 방식: server(서버 KNN) | client(클라이언트 Top-K)
+  // 기본값: server. NEXT_PUBLIC_MAP_NEAREST_LIMIT_SALE=client 면 클라이언트 사용
+  nearestLimitSaleMode?: "server" | "client";
+  nearestLimitSaleIsServer?: boolean;
 };
 
 const FeatureFlagContext = React.createContext<FeatureFlags>({
@@ -43,6 +47,13 @@ export function FeatureFlagProvider({
   const nearestLimitRentMode: "server" | "client" =
     nearestLimitRentModeEnv === "server" ? "server" : "client";
   const nearestLimitRentIsServer = nearestLimitRentMode === "server";
+  // 매매 가까운순 모드: 기본 server (지도 정합성 확보 목적)
+  const nearestLimitSaleModeEnv = String(
+    process.env.NEXT_PUBLIC_MAP_NEAREST_LIMIT_SALE ?? "server"
+  ).toLowerCase();
+  const nearestLimitSaleMode: "server" | "client" =
+    nearestLimitSaleModeEnv === "server" ? "server" : "client";
+  const nearestLimitSaleIsServer = nearestLimitSaleMode === "server";
 
   const value: FeatureFlags = {
     virtualTable: vt === "1",
@@ -58,6 +69,8 @@ export function FeatureFlagProvider({
     auctionEdServerAreaEnabled,
     nearestLimitRentMode,
     nearestLimitRentIsServer,
+    nearestLimitSaleMode,
+    nearestLimitSaleIsServer,
   };
   return (
     <FeatureFlagContext.Provider value={value}>

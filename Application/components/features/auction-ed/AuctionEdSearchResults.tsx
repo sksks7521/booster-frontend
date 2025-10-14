@@ -1082,57 +1082,88 @@ export default function AuctionEdSearchResults({
             </TabsList>
           </Tabs>
           {activeView !== "table" && (
-            <div className="mt-3 flex items-center justify-between text-xs text-gray-600">
-              <div className="flex items-center gap-3">
-                <div className="flex items-center gap-2">
-                  <span className="text-gray-700">표시 상한</span>
-                  <select
-                    className="h-7 rounded border px-2 bg-white"
-                    value={String(maxMarkersCap)}
-                    onChange={(e) => setMaxMarkersCap(parseInt(e.target.value))}
-                  >
-                    {[100, 300, 500, 1000, 2000, 3000].map((v) => (
-                      <option key={v} value={v}>
-                        {v.toLocaleString()}개
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <TooltipProvider delayDuration={0}>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <span
-                        className="inline-flex h-5 w-5 items-center justify-center rounded-full border text-gray-600 cursor-help select-none"
-                        aria-label="도움말"
-                      >
-                        ?
-                      </span>
-                    </TooltipTrigger>
-                    <TooltipContent
-                      side="bottom"
-                      align="start"
-                      className="bg-white text-gray-800 border border-gray-200 shadow-md max-w-[280px]"
+            <>
+              {/* 경고/안내 배너를 최상단에 노출 */}
+              <div className="mt-2 flex flex-col gap-2">
+                {nearestWarning && (
+                  <div className="flex items-center justify-between rounded border border-yellow-200 bg-yellow-50 px-3 py-1.5 text-[12px] text-yellow-800">
+                    <span className="truncate">{nearestWarning}</span>
+                    <button
+                      className="ml-2 text-yellow-700 hover:underline"
+                      onClick={() => setNearestWarning(null)}
                     >
-                      최대 마커 개수를 설정합니다.
-                      <br />
-                      너무 크게 선택하면 브라우저가 느려질 수 있어요.
-                      <br />
-                      최신 매각기일부터 우선 표시합니다.
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
+                      닫기
+                    </button>
+                  </div>
+                )}
+                {nearestError && (
+                  <div className="flex items-center justify-between rounded border border-blue-200 bg-blue-50 px-3 py-1.5 text-[12px] text-blue-800">
+                    <span className="truncate">
+                      서버 정렬 실패로 클라이언트 기준으로 표시 중입니다.
+                    </span>
+                    <button
+                      className="ml-2 text-blue-700 hover:underline"
+                      onClick={() => setNearestError(null)}
+                    >
+                      닫기
+                    </button>
+                  </div>
+                )}
               </div>
-              {/* 우측: 표시 요약 + 영역 안만 보기 토글 */}
-              <div className="flex items-center gap-3">
-                <span className="inline-flex items-center rounded border border-gray-200 bg-white px-2 py-1 text-[11px] text-gray-700">
-                  표시{" "}
-                  {Math.min(
-                    serverMapItems?.length || 0,
-                    Number(maxMarkersCap)
-                  ).toLocaleString()}{" "}
-                  / 총 {(effectiveTotal || 0).toLocaleString()}
-                </span>
-                {/* 영역 안만 보기 */}
+
+              {/* 설정 바: 좌측 표시상한 + 요약, 우측 영역안만 보기 */}
+              <div className="mt-3 flex items-center justify-between text-xs text-gray-600">
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2">
+                    <span className="text-gray-700">표시 상한</span>
+                    <select
+                      className="h-7 rounded border px-2 bg-white"
+                      value={String(maxMarkersCap)}
+                      onChange={(e) =>
+                        setMaxMarkersCap(parseInt(e.target.value))
+                      }
+                    >
+                      {[100, 300, 500, 1000, 2000, 3000].map((v) => (
+                        <option key={v} value={v}>
+                          {v.toLocaleString()}개
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <TooltipProvider delayDuration={0}>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span
+                          className="inline-flex h-5 w-5 items-center justify-center rounded-full border text-gray-600 cursor-help select-none"
+                          aria-label="도움말"
+                        >
+                          ?
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent
+                        side="bottom"
+                        align="start"
+                        className="bg-white text-gray-800 border border-gray-200 shadow-md max-w-[280px]"
+                      >
+                        최대 마커 개수를 설정합니다.
+                        <br />
+                        너무 크게 선택하면 브라우저가 느려질 수 있어요.
+                        <br />
+                        최신 매각기일부터 우선 표시합니다.
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                  {/* 표시 요약을 표시상한 오른쪽에 배치 */}
+                  <span className="inline-flex items-center rounded border border-gray-200 bg-white px-2 py-1 text-[11px] text-gray-700">
+                    표시{" "}
+                    {Math.min(
+                      serverMapItems?.length || 0,
+                      Number(maxMarkersCap)
+                    ).toLocaleString()}{" "}
+                    / 총 {(effectiveTotal || 0).toLocaleString()}
+                  </span>
+                </div>
+                {/* 우측: 영역 안만 보기 */}
                 <label className="flex items-center gap-2 text-xs text-gray-700 border rounded px-2 py-1 bg-white">
                   <input
                     type="checkbox"
@@ -1187,34 +1218,7 @@ export default function AuctionEdSearchResults({
                   <span>영역 안만 보기</span>
                 </label>
               </div>
-              {/* 🆕 서버 KNN 경고/폴백 배지 */}
-              <div className="flex flex-col gap-2 ml-4 min-w-[240px]">
-                {nearestWarning && (
-                  <div className="flex items-center justify-between rounded border border-yellow-200 bg-yellow-50 px-3 py-1.5 text-[12px] text-yellow-800">
-                    <span className="truncate">{nearestWarning}</span>
-                    <button
-                      className="ml-2 text-yellow-700 hover:underline"
-                      onClick={() => setNearestWarning(null)}
-                    >
-                      닫기
-                    </button>
-                  </div>
-                )}
-                {nearestError && (
-                  <div className="flex items-center justify-between rounded border border-blue-200 bg-blue-50 px-3 py-1.5 text-[12px] text-blue-800">
-                    <span className="truncate">
-                      서버 정렬 실패로 클라이언트 기준으로 표시 중입니다.
-                    </span>
-                    <button
-                      className="ml-2 text-blue-700 hover:underline"
-                      onClick={() => setNearestError(null)}
-                    >
-                      닫기
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
+            </>
           )}
         </div>
 

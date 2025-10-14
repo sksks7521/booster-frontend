@@ -39,15 +39,7 @@ export default function SelectedFilterBar({
       (setFilterBase as any)(key, value);
     }
   };
-  const setRangeFilter = (
-    key:
-      | "priceRange"
-      | "areaRange"
-      | "buildingAreaRange"
-      | "landAreaRange"
-      | "buildYear",
-    value: [number, number]
-  ) => {
+  const setRangeFilter = (key: any, value: [number, number]) => {
     if (namespace && typeof setNsRangeFilter === "function") {
       (setNsRangeFilter as any)(namespace, key, value);
     } else {

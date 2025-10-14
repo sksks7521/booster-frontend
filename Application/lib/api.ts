@@ -716,6 +716,9 @@ export const auctionApi = {
   },
 };
 
+// 실거래가(매매) 전용 API
+// 기존 realTransactionApi 객체가 아래에 정의되어 있어, 확장을 그 객체 안에 추가합니다.
+
 export const realTransactionApi = {
   getTransactions: (params?: Record<string, any>) =>
     apiClient.getRealTransactions(params),

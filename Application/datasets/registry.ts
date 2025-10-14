@@ -6,6 +6,7 @@ import {
   columnsListings,
 } from "@/datasets/contracts";
 import { auctionApi, realTransactionApi, realRentApi } from "@/lib/api";
+import { buildSaleFilterParams } from "@/lib/filters/buildSaleFilterParams";
 
 // 공통 정규화 유틸
 const toNumber = (value: unknown): number | undefined => {
@@ -776,368 +777,36 @@ export const datasetConfigs: Record<DatasetId, DatasetConfig> = {
     title: "실거래가(매매)",
     api: {
       buildListKey: ({ filters, page, size }) => {
-        // 화이트리스트로 허용된 필터만 선택
         const allowedFilters = pickAllowed(filters as any, SALE_FILTERS);
-        const cleanFilters = { ...allowedFilters } as Record<string, unknown>;
-
-        // 선택 항목만 보기(ids) 서버 필터 연동: showSelectedOnly && selectedIds 있을 때만 적용
-        try {
-          const selOnly = (filters as any)?.showSelectedOnly === true;
-          const idsArr = Array.isArray((filters as any)?.selectedIds)
-            ? ((filters as any)?.selectedIds as any[])
-            : [];
-          if (selOnly && idsArr.length > 0) {
-            const capped = idsArr
-              .slice(0, 500)
-              .map((v) => String(v))
-              .filter((s) => s && s !== "undefined" && s !== "null");
-            if (capped.length > 0) (cleanFilters as any).ids = capped.join(",");
-          }
-        } catch {}
-
-        // 지역 필터를 real_transactions 백엔드 필드명으로 매핑
-        if (allowedFilters.province) {
-          cleanFilters.sido = allowedFilters.province;
-          delete cleanFilters.province;
-        }
-        if (allowedFilters.cityDistrict) {
-          cleanFilters.sigungu = allowedFilters.cityDistrict;
-          delete cleanFilters.cityDistrict;
-        }
-        if (allowedFilters.town) {
-          cleanFilters.admin_dong_name = allowedFilters.town;
-          delete cleanFilters.town;
-        }
-
-        // 정렬 파라미터를 서버 ordering 형식으로 변환 (auction_ed 패턴)
-        if (allowedFilters.sortBy && allowedFilters.sortOrder) {
-          const serverKey = camelToSnake(allowedFilters.sortBy as string);
-          if (serverKey) {
-            const order = allowedFilters.sortOrder as string;
-            const ordering = `${order === "desc" ? "-" : ""}${serverKey}`;
-            cleanFilters.ordering = ordering;
-            delete cleanFilters.sortBy;
-            delete cleanFilters.sortOrder;
-          }
-        }
-
-        // 거래금액 범위 매핑
-        if (Array.isArray(allowedFilters.transactionAmountRange)) {
-          const [minAmount, maxAmount] = allowedFilters.transactionAmountRange;
-          if (typeof minAmount === "number" && minAmount > 0) {
-            cleanFilters.min_transaction_amount = minAmount;
-          }
-          if (
-            typeof maxAmount === "number" &&
-            maxAmount > 0 &&
-            maxAmount < 100000
-          ) {
-            cleanFilters.max_transaction_amount = maxAmount;
-          }
-          delete cleanFilters.transactionAmountRange;
-        }
-
-        // 전용면적 범위 매핑
-        if (Array.isArray(allowedFilters.exclusiveAreaRange)) {
-          const [minArea, maxArea] = allowedFilters.exclusiveAreaRange;
-          if (typeof minArea === "number" && minArea > 0) {
-            cleanFilters.min_exclusive_area = minArea;
-          }
-          if (typeof maxArea === "number" && maxArea > 0) {
-            cleanFilters.max_exclusive_area = maxArea;
-          }
-          delete cleanFilters.exclusiveAreaRange;
-        }
-
-        // 건축연도 범위 매핑
-        if (Array.isArray(allowedFilters.buildYearRange)) {
-          const [minYear, maxYear] = allowedFilters.buildYearRange;
-          if (typeof minYear === "number" && minYear > 1900) {
-            cleanFilters.min_construction_year = minYear;
-          }
-          if (typeof maxYear === "number" && maxYear > 1900) {
-            cleanFilters.max_construction_year = maxYear;
-          }
-          delete cleanFilters.buildYearRange;
-        }
-
-        // 날짜 범위 매핑
-        console.log("🔍 [sale buildListKey] dateRange 필터 확인:", {
-          dateRange: allowedFilters.dateRange,
-          isArray: Array.isArray(allowedFilters.dateRange),
-          type: typeof allowedFilters.dateRange,
-          allowedFilters,
+        const params = buildSaleFilterParams(allowedFilters as any, {
+          includeAliases: true,
+          stripDefaults: true,
+          maxIds: 500,
         });
-        if (Array.isArray(allowedFilters.dateRange)) {
-          const [startDate, endDate] = allowedFilters.dateRange;
-          console.log("✅ [sale buildListKey] dateRange 매핑 시도:", {
-            startDate,
-            endDate,
-          });
-          if (startDate) {
-            cleanFilters.contract_date_from = startDate;
-            console.log("✅ contract_date_from 설정:", startDate);
-          }
-          if (endDate) {
-            cleanFilters.contract_date_to = endDate;
-            console.log("✅ contract_date_to 설정:", endDate);
-          }
-          delete cleanFilters.dateRange;
-        } else {
-          console.log(
-            "⚠️ [sale buildListKey] dateRange가 배열이 아니거나 없음"
-          );
-        }
 
-        // 층확인 매핑
-        if (
-          allowedFilters.floorConfirmation &&
-          allowedFilters.floorConfirmation !== "all"
-        ) {
-          if (Array.isArray(allowedFilters.floorConfirmation)) {
-            cleanFilters.floor_confirmation =
-              allowedFilters.floorConfirmation.join(",");
-          } else {
-            cleanFilters.floor_confirmation = allowedFilters.floorConfirmation;
-          }
-          delete cleanFilters.floorConfirmation;
-        }
-
-        // 엘리베이터 매핑
-        if (
-          allowedFilters.elevatorAvailable !== undefined &&
-          allowedFilters.elevatorAvailable !== "all"
-        ) {
-          cleanFilters.elevator_available = allowedFilters.elevatorAvailable;
-          delete cleanFilters.elevatorAvailable;
-        }
-
-        // 주소 검색 매핑 (백엔드 옵션 A/B 모두 지원)
-        if (allowedFilters.searchQuery && allowedFilters.searchField) {
-          const sf = String(allowedFilters.searchField);
-          const q = allowedFilters.searchQuery as string;
-          if (sf === "address") {
-            // 도로명 주소 검색 (Option A)
-            (cleanFilters as any).address_search = q;
-            (cleanFilters as any).address_search_type = "road";
-          } else if (sf === "jibun_address") {
-            // 지번 주소 검색 (Option A)
-            (cleanFilters as any).address_search = q;
-            (cleanFilters as any).address_search_type = "jibun";
-            // Option B(병행)도 추가로 세팅 가능: 서버가 우선순위 처리
-            // (cleanFilters as any).jibun_address_search = q;
-          } else if (sf === "road_address") {
-            // 전용 도로명 파라미터 (Option B)
-            (cleanFilters as any).road_address_search = q;
-          }
-          delete cleanFilters.searchQuery;
-          delete cleanFilters.searchField;
-        }
-
-        console.log("🔵 [sale buildListKey] 최종 API 파라미터:", cleanFilters);
+        console.log("🔵 [sale buildListKey] 최종 API 파라미터:", params);
 
         return [
           "/api/v1/real-transactions/",
           {
-            ...cleanFilters,
+            ...params,
             page,
             size,
           },
         ] as const;
       },
       fetchList: async ({ filters, page, size }) => {
-        // 화이트리스트로 허용된 필터만 선택
         const allowedFilters = pickAllowed(filters as any, SALE_FILTERS);
-        const cleanFilters = { ...allowedFilters } as Record<string, unknown>;
-
-        // 선택 항목만 보기(ids) 서버 필터 연동
-        try {
-          const selOnly = (filters as any)?.showSelectedOnly === true;
-          const idsArr = Array.isArray((filters as any)?.selectedIds)
-            ? ((filters as any)?.selectedIds as any[])
-            : [];
-          if (selOnly && idsArr.length > 0) {
-            const capped = idsArr
-              .slice(0, 500)
-              .map((v) => String(v))
-              .filter((s) => s && s !== "undefined" && s !== "null");
-            if (capped.length > 0) (cleanFilters as any).ids = capped.join(",");
-          }
-        } catch {}
-
-        // 지역 필터를 real_transactions 백엔드 필드명으로 매핑
-        if (allowedFilters.province) {
-          cleanFilters.sido = allowedFilters.province;
-          delete cleanFilters.province;
-        }
-        if (allowedFilters.cityDistrict) {
-          cleanFilters.sigungu = allowedFilters.cityDistrict;
-          delete cleanFilters.cityDistrict;
-        }
-        if (allowedFilters.town) {
-          cleanFilters.admin_dong_name = allowedFilters.town;
-          delete cleanFilters.town;
-        }
-
-        // 정렬 파라미터를 서버 ordering 형식으로 변환 (auction_ed 패턴)
-        if (allowedFilters.sortBy && allowedFilters.sortOrder) {
-          const serverKey = camelToSnake(allowedFilters.sortBy as string);
-          if (serverKey) {
-            const order = allowedFilters.sortOrder as string;
-            const ordering = `${order === "desc" ? "-" : ""}${serverKey}`;
-            cleanFilters.ordering = ordering;
-            delete cleanFilters.sortBy;
-            delete cleanFilters.sortOrder;
-          }
-        }
-
-        // 거래금액 범위 매핑
-        if (Array.isArray(allowedFilters.transactionAmountRange)) {
-          const [minAmount, maxAmount] = allowedFilters.transactionAmountRange;
-          if (typeof minAmount === "number" && minAmount > 0) {
-            cleanFilters.min_transaction_amount = minAmount;
-          }
-          if (
-            typeof maxAmount === "number" &&
-            maxAmount > 0 &&
-            maxAmount < 100000
-          ) {
-            cleanFilters.max_transaction_amount = maxAmount;
-          }
-          delete cleanFilters.transactionAmountRange;
-        }
-
-        // 평단가 범위 매핑
-        if (Array.isArray(allowedFilters.pricePerPyeongRange)) {
-          const [minPrice, maxPrice] = allowedFilters.pricePerPyeongRange;
-          if (typeof minPrice === "number" && minPrice > 0) {
-            cleanFilters.min_price_per_pyeong = minPrice;
-          }
-          if (typeof maxPrice === "number" && maxPrice > 0) {
-            cleanFilters.max_price_per_pyeong = maxPrice;
-          }
-          delete cleanFilters.pricePerPyeongRange;
-        }
-
-        // 전용면적 범위 매핑
-        if (Array.isArray(allowedFilters.exclusiveAreaRange)) {
-          const [minArea, maxArea] = allowedFilters.exclusiveAreaRange;
-          if (typeof minArea === "number" && minArea > 0) {
-            cleanFilters.min_exclusive_area = minArea;
-          }
-          if (typeof maxArea === "number" && maxArea > 0) {
-            cleanFilters.max_exclusive_area = maxArea;
-          }
-          delete cleanFilters.exclusiveAreaRange;
-        }
-
-        // 대지권면적 범위 매핑
-        if (Array.isArray(allowedFilters.landRightsAreaRange)) {
-          const [minArea, maxArea] = allowedFilters.landRightsAreaRange;
-          if (typeof minArea === "number" && minArea > 0) {
-            cleanFilters.min_land_rights_area = minArea;
-          }
-          if (typeof maxArea === "number" && maxArea > 0) {
-            cleanFilters.max_land_rights_area = maxArea;
-          }
-          delete cleanFilters.landRightsAreaRange;
-        }
-
-        // 건축연도 범위 매핑
-        if (Array.isArray(allowedFilters.buildYearRange)) {
-          const [minYear, maxYear] = allowedFilters.buildYearRange;
-          if (typeof minYear === "number" && minYear > 1900) {
-            cleanFilters.min_construction_year = minYear;
-          }
-          if (typeof maxYear === "number" && maxYear > 1900) {
-            cleanFilters.max_construction_year = maxYear;
-          }
-          delete cleanFilters.buildYearRange;
-        }
-
-        // 날짜 범위 매핑
-        console.log("🔍 [sale fetchList] dateRange 필터 확인:", {
-          dateRange: allowedFilters.dateRange,
-          isArray: Array.isArray(allowedFilters.dateRange),
-          type: typeof allowedFilters.dateRange,
-          allowedFilters,
+        const params = buildSaleFilterParams(allowedFilters as any, {
+          includeAliases: true,
+          stripDefaults: true,
+          maxIds: 500,
         });
-        if (Array.isArray(allowedFilters.dateRange)) {
-          const [startDate, endDate] = allowedFilters.dateRange;
-          console.log("✅ [sale fetchList] dateRange 매핑 시도:", {
-            startDate,
-            endDate,
-          });
-          if (startDate) {
-            cleanFilters.contract_date_from = startDate;
-            console.log("✅ contract_date_from 설정:", startDate);
-          }
-          if (endDate) {
-            cleanFilters.contract_date_to = endDate;
-            console.log("✅ contract_date_to 설정:", endDate);
-          }
-          delete cleanFilters.dateRange;
-        } else {
-          console.log("⚠️ [sale fetchList] dateRange가 배열이 아니거나 없음");
-        }
-
-        // 층확인 매핑
-        if (
-          allowedFilters.floorConfirmation &&
-          allowedFilters.floorConfirmation !== "all"
-        ) {
-          if (Array.isArray(allowedFilters.floorConfirmation)) {
-            cleanFilters.floor_confirmation =
-              allowedFilters.floorConfirmation.join(",");
-          } else {
-            cleanFilters.floor_confirmation = allowedFilters.floorConfirmation;
-          }
-          delete cleanFilters.floorConfirmation;
-        }
-
-        // 엘리베이터 매핑
-        if (
-          allowedFilters.elevatorAvailable !== undefined &&
-          allowedFilters.elevatorAvailable !== "all"
-        ) {
-          cleanFilters.elevator_available = allowedFilters.elevatorAvailable;
-          delete cleanFilters.elevatorAvailable;
-        }
-
-        // 주소 검색 매핑 (백엔드 옵션 A/B 모두 지원)
-        if (allowedFilters.searchQuery && allowedFilters.searchField) {
-          const sf = String(allowedFilters.searchField);
-          const q = allowedFilters.searchQuery as string;
-          if (sf === "address") {
-            (cleanFilters as any).address_search = q;
-            (cleanFilters as any).address_search_type = "road";
-          } else if (sf === "jibun_address") {
-            (cleanFilters as any).address_search = q;
-            (cleanFilters as any).address_search_type = "jibun";
-            // (cleanFilters as any).jibun_address_search = q; // 필요 시 병행
-          } else if (sf === "road_address") {
-            (cleanFilters as any).road_address_search = q;
-          }
-          delete cleanFilters.searchQuery;
-          delete cleanFilters.searchField;
-        }
-
-        console.log("🔵 [sale fetchList] 최종 API 파라미터:", cleanFilters);
 
         const result = await realTransactionApi.getTransactions({
-          ...(cleanFilters as any),
+          ...(params as any),
           page,
           size,
-        });
-
-        console.log("🟢 [sale fetchList] 백엔드 응답:", {
-          total: (result as any)?.count,
-          itemsCount: Array.isArray((result as any)?.results)
-            ? (result as any)?.results.length
-            : undefined,
-          hasContractDateFilter: !!(
-            cleanFilters.contract_date_from || cleanFilters.contract_date_to
-          ),
         });
 
         return result;
@@ -1232,7 +901,7 @@ export const datasetConfigs: Record<DatasetId, DatasetConfig> = {
             floorConfirmation: r?.floor_confirmation,
             elevatorAvailable: r?.elevator_available,
 
-            // J. 계산(파생) 필드
+            // 계산된 필드
             exclusiveAreaPyeong: toNumber(r?.exclusive_area_pyeong),
             pricePerSqm: toNumber(r?.price_per_sqm),
 
@@ -1841,7 +1510,6 @@ export const datasetConfigs: Record<DatasetId, DatasetConfig> = {
             elevatorCount: toNumber(r?.elevator_count),
             floorConfirmation: r?.floor_confirmation,
             elevatorAvailable: r?.elevator_available,
-            adminDong: r?.admin_dong,
 
             // 계산된 필드
             exclusiveAreaPyeong: toNumber(r?.exclusive_area_pyeong),

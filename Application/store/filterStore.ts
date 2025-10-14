@@ -23,10 +23,14 @@ interface FilterState {
   areaRange: [number, number]; // 하위호환용 (deprecated)
   buildingAreaRange: [number, number]; // 건축면적 범위 (평)
   landAreaRange: [number, number]; // 토지면적 범위 (평)
+  // ✅ 표준 키(목록/지도 공통) - 실거래가(매매)
+  exclusiveAreaRange?: [number, number];
+  landRightsAreaRange?: [number, number];
   buildYear: [number, number];
   floor: string; // 기존 층수 필터 (하위호환)
   floorConfirmation: string | string[]; // 멀티선택 지원
   hasElevator: string | string[]; // 멀티선택 지원 ("Y"/"N" 또는 한글)
+  elevatorAvailable?: string | boolean; // 표준 키(Y/N/all)
   hasParking?: boolean; // ❌ 백엔드 데이터 없음 (optional로 변경)
   auctionStatus: string;
   // 🆕 현재상태/특수조건(문자열 any-match)/불리언 특수조건
@@ -142,10 +146,14 @@ const initialState: FilterState = {
   areaRange: [0, 200], // 하위호환용 (deprecated)
   buildingAreaRange: [0, 100], // 건축면적 범위 (평) - 일반적인 빌라 크기
   landAreaRange: [0, 200], // 토지면적 범위 (평) - 일반적인 토지 크기
+  // 표준 키 기본값
+  exclusiveAreaRange: [0, 300],
+  landRightsAreaRange: [0, 600],
   buildYear: [1980, 2024],
   floor: "all", // 기존 층수 필터 (하위호환)
   floorConfirmation: "all",
   hasElevator: "all",
+  elevatorAvailable: "all",
   hasParking: undefined, // optional
   auctionStatus: "all", // 기본값을 "all"로 설정
   currentStatus: "all",
@@ -184,10 +192,35 @@ export const useFilterStore = create<FilterState & FilterActions>((set) => ({
   ...initialState,
 
   // 특정 필터 값을 설정하는 액션
-  setFilter: (key, value) => set({ [key]: value }),
+  setFilter: (key, value) =>
+    set((state: any) => {
+      const next: any = { [key]: value };
+      // 🧩 브리지: hasElevator → elevatorAvailable(Y/N/all)
+      if (key === "hasElevator") {
+        const raw = String(value).trim().toUpperCase();
+        const ySet = new Set(["Y", "TRUE", "O", "있음"]);
+        const nSet = new Set(["N", "FALSE", "X", "없음"]);
+        if (ySet.has(raw)) next.elevatorAvailable = "Y";
+        else if (nSet.has(raw)) next.elevatorAvailable = "N";
+        else next.elevatorAvailable = "all";
+      }
+      return next;
+    }),
 
   // 범위(Range) 필터 값을 설정하는 액션
-  setRangeFilter: (key, value) => set({ [key]: value }),
+  setRangeFilter: (key, value) =>
+    set((state: any) => {
+      const next: any = { [key]: value };
+      // 🧩 브리지: areaRange/buildingAreaRange → exclusiveAreaRange
+      if (key === "areaRange" || key === "buildingAreaRange") {
+        next.exclusiveAreaRange = value;
+      }
+      // 🧩 브리지: landAreaRange → landRightsAreaRange
+      if (key === "landAreaRange") {
+        next.landRightsAreaRange = value;
+      }
+      return next;
+    }),
 
   // 페이지/사이즈 변경 액션
   setPage: (page) => set({ page }),
