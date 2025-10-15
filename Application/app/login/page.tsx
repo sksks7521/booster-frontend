@@ -1,5 +1,6 @@
 "use client";
 
+import { Suspense } from "react";
 import type React from "react";
 
 import { useState } from "react";
@@ -13,7 +14,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Eye, EyeOff, Mail, Lock, ArrowLeft, AlertCircle } from "lucide-react";
 
-export default function LoginPage() {
+function LoginContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirect = searchParams.get("redirect");
@@ -300,5 +301,13 @@ export default function LoginPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen" />}> 
+      <LoginContent />
+    </Suspense>
   );
 }
