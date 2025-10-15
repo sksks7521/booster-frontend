@@ -329,6 +329,8 @@
   - `RentSearchResults.tsx`에 디바운스+트레일링, `mapTotal`/경고 표시
   - 콘솔 태그: `[rent] nearest(server) request/response`, `[rent] KNN check`
   - 지도 요약 UI를 매매와 동일 위치/스타일(“지도 total: T”)로 통일
+  - 영역 모드 호환: `/real-transactions/area` 호출 시 `dataset=rent` 명시(프런트 임시 대응)
+  - 정렬 보강: `getRowSortTs`가 `contract_date | contractDate | extra.contractDate` 모두 인식하도록 수정
 - 어댑터/좌표/엘리베이터
   - `toBool`로 `elevator_available` 정규화(Y/N)
   - `extractLatLng` 보강: lon/x/lat_y 등 혼용 + 한국 범위 기반 스왑 가드
@@ -339,6 +341,7 @@
   - 연 임대수익률 필터 제거(요청 반영)
 - 백엔드 요청(지도 정합성)
   - `/map?dataset=rent`에 `rent_type`, `contract_date_from/to`, 전환금 표준/별칭/호환키 반영 요청, echo.filters 노출 요청
+  - `/real-transactions/area?dataset=rent` 수용 또는 `/real-rents/area` 신규 제공 요청(전월세 스키마 응답, 총계/정렬 일관성)
 
 ### 콘솔 디버그 태그(개발)
 

@@ -50,6 +50,7 @@ export function buildRentAreaParams(opts: BuildRentAreaParamsOptions) {
     center_lat: center?.lat,
     center_lng: center?.lng,
     radius_m: clampRadius(radiusM),
+    dataset: "rent",
   };
 
   if (page != null) q.page = page;

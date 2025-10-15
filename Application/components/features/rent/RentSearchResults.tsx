@@ -562,8 +562,10 @@ export default function RentSearchResults({
     // 지도 전역 소스는 서버 응답(serverMapItems)으로 단일화
     globalSource: serverMapItems,
     maxMarkersCap,
-    getRowSortTs: (r: any) =>
-      r?.contract_date ? Date.parse(r.contract_date) : 0,
+    getRowSortTs: (r: any) => {
+      const s = r?.contract_date || r?.contractDate || r?.extra?.contractDate;
+      return s ? Date.parse(s) : 0;
+    },
   });
 
   const finalPagedItems = useServerArea
