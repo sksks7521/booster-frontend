@@ -42,6 +42,8 @@ interface FilterState {
   auctionDateFrom?: string; // YYYY-MM-DD (optional)
   auctionDateTo?: string; // YYYY-MM-DD (optional)
   auctionMonth?: string; // YYYY-MM (하위호환)
+  // 🆕 매각년도 빠른선택: 다중 연도 지원
+  saleYears?: number[];
 
   // 🔄 서버 사이드 정렬
   sortBy?: string; // 정렬 컬럼명 (building_area_pyeong, minimum_bid_price 등)
@@ -164,6 +166,7 @@ const initialState: FilterState = {
   auctionDateFrom: undefined,
   auctionDateTo: undefined,
   auctionMonth: undefined,
+  saleYears: [],
 
   // 편의 필터
   under100: false,

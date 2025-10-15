@@ -135,7 +135,9 @@ export default function AuctionEdFilter({
   const isSaleDateActive = Boolean(
     (filters as any).auctionDateFrom ||
       (filters as any).auctionDateTo ||
-      (filters as any).saleYear
+      (filters as any).saleYear ||
+      (Array.isArray((filters as any).saleYears) &&
+        (filters as any).saleYears.length > 0)
   );
   const isPriceActive = Array.isArray((filters as any).priceRange)
     ? !(
@@ -293,7 +295,7 @@ export default function AuctionEdFilter({
                 />
               </div>
             </div>
-            {/* 매각년도 빠른 필터 */}
+            {/* 매각년도 빠른 필터 (다중 선택) */}
             <div className="pt-2">
               <Label
                 className={`text-xs ${
@@ -303,29 +305,39 @@ export default function AuctionEdFilter({
                 매각년도(빠른 선택)
               </Label>
               <div className="mt-2 flex flex-wrap gap-2">
-                {[2020, 2021, 2022, 2023, 2024, 2025].map((y) => (
-                  <Button
-                    key={y}
-                    variant={
-                      (filters as any).saleYear === y ? "default" : "outline"
-                    }
-                    size="sm"
-                    className="h-7 px-2 text-xs"
-                    onClick={() => {
-                      // 토글: 같은 연도 클릭 시 해제
-                      if ((filters as any).saleYear === y) {
+                {[2020, 2021, 2022, 2023, 2024, 2025].map((y) => {
+                  const selected: number[] = Array.isArray(
+                    (filters as any).saleYears
+                  )
+                    ? ((filters as any).saleYears as number[])
+                    : [];
+                  const isActive = selected.includes(y);
+                  return (
+                    <Button
+                      key={y}
+                      variant={isActive ? "default" : "outline"}
+                      size="sm"
+                      className="h-7 px-2 text-xs"
+                      onClick={() => {
+                        const prev: number[] = Array.isArray(
+                          (filters as any).saleYears
+                        )
+                          ? ((filters as any).saleYears as number[])
+                          : [];
+                        const next = isActive
+                          ? prev.filter((v) => v !== y)
+                          : [...prev, y];
+                        setFilter("saleYears" as any, next);
+                        // 다중 연도 사용 시 단일 saleYear/개별 날짜는 비움
                         setFilter("saleYear" as any, undefined);
-                      } else {
-                        setFilter("saleYear" as any, y);
-                        // 연도 버튼을 쓰면 개별 시작/종료일은 비움
                         setFilter("auctionDateFrom" as any, undefined);
                         setFilter("auctionDateTo" as any, undefined);
-                      }
-                    }}
-                  >
-                    {y}년
-                  </Button>
-                ))}
+                      }}
+                    >
+                      {y}년
+                    </Button>
+                  );
+                })}
               </div>
             </div>
           </div>

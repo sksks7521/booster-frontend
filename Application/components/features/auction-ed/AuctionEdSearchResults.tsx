@@ -815,8 +815,12 @@ export default function AuctionEdSearchResults({
     });
 
   const areaTotal = Number(serverAreaState.total || 0);
-  const effectiveTotal =
-    useServerArea && areaTotal > 0 ? areaTotal : nearestTotal;
+  // 총 개수 계산: 영역 모드면 areaTotal, 아니면 서버 total(serverTotal) → KNN total 순으로 폴백
+  const effectiveTotal = useServerArea
+    ? areaTotal
+    : Number(serverTotal || 0) > 0
+    ? Number(serverTotal)
+    : Number(nearestTotal || 0);
   const tableItemsAll = useServerArea
     ? serverAreaState.items
     : processedItemsSorted; // 목록은 상한 없이 전체
@@ -888,7 +892,11 @@ export default function AuctionEdSearchResults({
 
   // auction_ed 데이터셋 설정 가져오기
   const datasetConfig = datasetConfigs["auction_ed"];
-  const schemaColumns = datasetConfig?.table?.columns;
+  // 우편번호, PNU, 위도, 경도 컬럼 숨김
+  const schemaColumns = (datasetConfig?.table?.columns || []).filter(
+    (c: any) =>
+      !["postalCode", "pnu", "latitude", "longitude"].includes(String(c?.key))
+  );
 
   // 서버에서 제공하는 정렬 가능 컬럼 목록은 위 useSortableColumns 호출로 수신
 
@@ -1214,6 +1222,15 @@ export default function AuctionEdSearchResults({
                             });
                           }
                         }
+                        // 엘리베이터 여부 가독성 포맷
+                        if (key === "elevatorAvailable") {
+                          const v =
+                            row?.elevatorAvailable ??
+                            row?.extra?.elevatorAvailable;
+                          if (v === true) return "있음";
+                          if (v === false) return "없음";
+                          return "-";
+                        }
                         const direct = row?.[key];
                         if (direct !== undefined) return direct;
                         const extra = row?.extra?.[key];
@@ -1465,6 +1482,7 @@ export default function AuctionEdSearchResults({
                               Math.random()
                           )
                         }
+                        isSorting={isSorting}
                         schemaColumns={schemaColumns}
                         getValueForKey={(row: any, key: string) => {
                           // area 컬럼 전역 플래그 기반 포맷
@@ -1488,9 +1506,24 @@ export default function AuctionEdSearchResults({
                               });
                             }
                           }
+                          // 엘리베이터 여부 가독성 포맷
+                          if (key === "elevatorAvailable") {
+                            const v =
+                              row?.elevatorAvailable ??
+                              row?.extra?.elevatorAvailable;
+                            if (v === true) return "있음";
+                            if (v === false) return "없음";
+                            return "-";
+                          }
                           const direct = row?.[key];
                           if (direct !== undefined) return direct;
-                          return row?.extra?.[key];
+                          const extra = row?.extra?.[key];
+                          if (extra !== undefined) return extra;
+                          // 안전망: snake_case 폴백 (어댑터 누락 시)
+                          const snake = String(key)
+                            .replace(/([A-Z])/g, "_$1")
+                            .toLowerCase();
+                          return row?.[snake] ?? row?.extra?.[snake];
                         }}
                         sortBy={sortBy as any}
                         sortOrder={sortOrder as any}
@@ -1560,6 +1593,12 @@ export default function AuctionEdSearchResults({
                         page={page}
                         pageSize={size}
                         onPageChange={(p) => setPage(p)}
+                        columnOrderStorageKey={"table:order:auction_ed"}
+                        defaultColumnOrder={
+                          Array.isArray(schemaColumns)
+                            ? schemaColumns.map((c: any) => c.key)
+                            : undefined
+                        }
                       />
                     }
 

@@ -324,3 +324,51 @@ export function useRealTransactionsAdminDong(sido?: string, sigungu?: string) {
     refresh: mutate,
   };
 }
+
+// ========================================
+// 과거경매결과(auction_ed) 전용 지역 목록 API
+// ========================================
+
+export interface AuctionEdRegion {
+  name: string;
+  count?: number;
+}
+
+/**
+ * 경매 시도 목록 조회
+ * GET /api/v1/auction-completed/regions/sido
+ */
+export function useAuctionEdSido() {
+  const { data, error, isLoading, mutate } = useSWR<AuctionEdRegion[]>(
+    "/api/v1/auction-completed/regions/sido",
+    fetcher,
+    {
+      revalidateOnFocus: false,
+      revalidateOnReconnect: false,
+      dedupingInterval: 30 * 60 * 1000,
+    }
+  );
+  return { sidos: data || [], isLoading, error, refresh: mutate };
+}
+
+/**
+ * 경매 시군구 목록 조회
+ * GET /api/v1/auction-completed/regions/sigungu?sido={sido}
+ * 반환 예: "경기도 고양시 일산서구"
+ */
+export function useAuctionEdSigungu(sido?: string) {
+  const { data, error, isLoading, mutate } = useSWR<AuctionEdRegion[]>(
+    sido
+      ? `/api/v1/auction-completed/regions/sigungu?sido=${encodeURIComponent(
+          sido
+        )}`
+      : null,
+    fetcher,
+    {
+      revalidateOnFocus: false,
+      revalidateOnReconnect: false,
+      dedupingInterval: 30 * 60 * 1000,
+    }
+  );
+  return { sigungus: data || [], isLoading, error, refresh: mutate };
+}

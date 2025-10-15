@@ -91,8 +91,22 @@ export function buildAreaQueryParams(opts: BuildAreaQueryParamsOptions) {
     if (maxY) q.build_year_max = maxY;
   }
 
-  // sale year/date
-  if ((filters as any)?.saleYear) {
+  // sale year/date (단일/다중)
+  if (
+    Array.isArray((filters as any)?.saleYears) &&
+    (filters as any).saleYears.length > 0
+  ) {
+    const years = ((filters as any).saleYears as any[])
+      .map((y) => clampYear(y))
+      .filter((n): n is number => Number.isFinite(n as any));
+    if (years.length > 0) {
+      const minY = Math.min(...years);
+      const maxY = Math.max(...years);
+      q.date_from = `${minY}-01-01`;
+      q.date_to = `${maxY}-12-31`;
+      q.sale_years = years.join(",");
+    }
+  } else if ((filters as any)?.saleYear) {
     const y = String((filters as any).saleYear);
     q.date_from = `${y}-01-01`;
     q.date_to = `${y}-12-31`;

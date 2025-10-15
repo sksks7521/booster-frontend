@@ -119,8 +119,19 @@ export function buildAuctionFilterParams(
     if (y2) q.build_year_max = y2;
   }
 
-  // sale year/date
-  if (isValid(f.saleYear)) {
+  // sale year/date (단일 연도 또는 다중 연도)
+  if (Array.isArray(f.saleYears) && f.saleYears.length > 0) {
+    const years = f.saleYears
+      .map((y: any) => clampYear(y))
+      .filter((n: any) => Number.isFinite(n)) as number[];
+    if (years.length > 0) {
+      const minY = Math.min(...years);
+      const maxY = Math.max(...years);
+      q.date_from = `${minY}-01-01`;
+      q.date_to = `${maxY}-12-31`;
+      q.sale_years = years.join(","); // 백엔드가 지원하면 OR 필터로 활용
+    }
+  } else if (isValid(f.saleYear)) {
     const y = String(f.saleYear).trim();
     q.date_from = `${y}-01-01`;
     q.date_to = `${y}-12-31`;

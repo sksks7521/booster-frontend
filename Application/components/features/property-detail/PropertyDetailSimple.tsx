@@ -94,8 +94,12 @@ function InfoRow({
 
 export default function PropertyDetailSimple({
   vm,
+  hideReportButton,
+  hideOpenMapButton,
 }: {
   vm?: PropertyDetailData | null;
+  hideReportButton?: boolean;
+  hideOpenMapButton?: boolean;
 }) {
   const router = useRouter();
   // 관심 토글 이벤트 디스패치
@@ -143,6 +147,8 @@ export default function PropertyDetailSimple({
       );
     } catch {}
   }, [vm?.id, vm?.roadAddress, vm?.locationAddress, router]);
+
+  // (임시) 상세 내 필터 적용 UI 제거: 통일성 있는 정보 표시만 유지
   return (
     <>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -199,6 +205,8 @@ export default function PropertyDetailSimple({
             />
           </Card>
 
+          {/* 필터 적용 UI 제거됨 */}
+
           <Card title="물건 분석">
             <InfoRow
               label="공시가격(만원)"
@@ -206,7 +214,13 @@ export default function PropertyDetailSimple({
             />
             <InfoRow
               label="1억 이하 여부"
-              value={vm?.under100Million ? "O" : "X"}
+              value={
+                vm?.under100Million === true
+                  ? "O"
+                  : vm?.under100Million === false
+                  ? "X"
+                  : "-"
+              }
             />
             <InfoRow
               label="최저가/공시가격"
@@ -216,14 +230,28 @@ export default function PropertyDetailSimple({
               label="층수"
               value={(() => {
                 const v: any = vm?.floors as any;
-                const n = Number(v);
-                return Number.isFinite(n) ? String(Math.trunc(n)) : v ?? "-";
+                if (v && String(v).trim()) {
+                  const n = Number(v);
+                  return Number.isFinite(n) ? String(Math.trunc(n)) : String(v);
+                }
+                const g = vm?.groundFloors;
+                const b = vm?.undergroundFloors;
+                if (Number.isFinite(g) || Number.isFinite(b)) {
+                  return `지상 ${g ?? 0}층 / 지하 ${b ?? 0}층`;
+                }
+                return "-";
               })()}
             />
-            <InfoRow label="층확인" value={vm?.floorConfirm ?? "-"} />
+            <InfoRow label="층확인" value={vm?.floorConfirm?.trim() || "-"} />
             <InfoRow
               label="Elevator여부"
-              value={vm?.hasElevator === true ? "있음" : "없음"}
+              value={
+                vm?.hasElevator === null
+                  ? "-"
+                  : vm?.hasElevator
+                  ? "있음"
+                  : "없음"
+              }
             />
           </Card>
         </div>
@@ -234,7 +262,12 @@ export default function PropertyDetailSimple({
             <InfoRow label="동명" value={vm?.dongName ?? "-"} />
             <InfoRow
               label="건축연도"
-              value={vm?.constructionYear ? `${vm.constructionYear}년` : "-"}
+              value={
+                typeof vm?.constructionYear === "number" &&
+                vm?.constructionYear > 0
+                  ? `${vm.constructionYear}년`
+                  : "-"
+              }
             />
             <InfoRow label="주용도" value={vm?.mainPurpose ?? "-"} />
             <InfoRow label="기타용도" value={vm?.otherPurpose ?? "-"} />
@@ -358,36 +391,38 @@ export default function PropertyDetailSimple({
             );
           })()}
           <div className="space-y-2">
-            <button
-              className="w-full rounded border px-3 py-2 text-sm hover:bg-gray-50"
-              onClick={() => {
-                const lat = vm?.latitude;
-                const lng = vm?.longitude;
-                const inLat =
-                  typeof lat === "number" && lat >= 33 && lat <= 39.5;
-                const inLng =
-                  typeof lng === "number" && lng >= 124 && lng <= 132.5;
-                if (inLat && inLng) {
-                  window.dispatchEvent(
-                    new CustomEvent("property:openOnMap", {
-                      detail: { id: String(vm?.id ?? ""), lat, lng },
-                    })
-                  );
+            {hideOpenMapButton !== true && (
+              <button
+                className="w-full rounded border px-3 py-2 text-sm hover:bg-gray-50"
+                onClick={() => {
+                  const lat = vm?.latitude;
+                  const lng = vm?.longitude;
+                  const inLat =
+                    typeof lat === "number" && lat >= 33 && lat <= 39.5;
+                  const inLng =
+                    typeof lng === "number" && lng >= 124 && lng <= 132.5;
+                  if (inLat && inLng) {
+                    window.dispatchEvent(
+                      new CustomEvent("property:openOnMap", {
+                        detail: { id: String(vm?.id ?? ""), lat, lng },
+                      })
+                    );
+                  }
+                }}
+                disabled={
+                  !(
+                    typeof vm?.latitude === "number" &&
+                    vm.latitude >= 33 &&
+                    vm.latitude <= 39.5 &&
+                    typeof vm?.longitude === "number" &&
+                    vm.longitude >= 124 &&
+                    vm.longitude <= 132.5
+                  )
                 }
-              }}
-              disabled={
-                !(
-                  typeof vm?.latitude === "number" &&
-                  vm.latitude >= 33 &&
-                  vm.latitude <= 39.5 &&
-                  typeof vm?.longitude === "number" &&
-                  vm.longitude >= 124 &&
-                  vm.longitude <= 132.5
-                )
-              }
-            >
-              지도에서 보기
-            </button>
+              >
+                지도에서 보기
+              </button>
+            )}
             <div className="flex gap-2">
               <button
                 className="flex-1 rounded bg-black text-white px-3 py-2 text-sm"
@@ -397,13 +432,15 @@ export default function PropertyDetailSimple({
               >
                 관심 물건으로 추가
               </button>
-              <button
-                className="flex-1 rounded border px-3 py-2 text-sm hover:bg-gray-50"
-                onClick={openReport}
-                aria-label="분석 보고서"
-              >
-                분석 보고서 생성
-              </button>
+              {hideReportButton !== true && (
+                <button
+                  className="flex-1 rounded border px-3 py-2 text-sm hover:bg-gray-50"
+                  onClick={openReport}
+                  aria-label="분석 보고서"
+                >
+                  분석 보고서 생성
+                </button>
+              )}
             </div>
           </div>
         </Card>

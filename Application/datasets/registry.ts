@@ -665,13 +665,18 @@ export const datasetConfigs: Record<DatasetId, DatasetConfig> = {
 
         const id = pickFirst(r?.id, r?.doc_id, r?.uuid, r?.case_number);
 
-        // 보조 변환기: 엘리베이터 O/X/Y/N → boolean
-        const toBool = (v: any): boolean | undefined => {
+        // 보조 변환기: 엘리베이터 여부 정규화(문자/숫자/국문 케이스 포함)
+        const toElevatorBool = (v: any): boolean | undefined => {
+          if (typeof v === "boolean") return v;
           const s = String(v ?? "")
             .trim()
             .toUpperCase();
-          if (["Y", "O", "TRUE", "1"].includes(s)) return true;
-          if (["N", "X", "FALSE", "0"].includes(s)) return false;
+          if (
+            ["Y", "O", "TRUE", "1", "YES", "있음", "가능", "TRUE"].includes(s)
+          )
+            return true;
+          if (["N", "X", "FALSE", "0", "NO", "없음", "불가"].includes(s))
+            return false;
           return undefined;
         };
 
@@ -748,7 +753,9 @@ export const datasetConfigs: Record<DatasetId, DatasetConfig> = {
             // 층수/편의시설
             floorInfo: r?.floor_info,
             floorConfirmation: r?.floor_confirmation,
-            elevatorAvailable: toBool(r?.elevator_available),
+            elevatorAvailable: toElevatorBool(
+              r?.elevator_available ?? r?.has_elevator ?? r?.elevator
+            ),
             elevatorCount: toNumber(r?.elevator_count),
             householdCount: toNumber(r?.household_count),
 

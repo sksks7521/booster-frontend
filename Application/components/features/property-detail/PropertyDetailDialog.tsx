@@ -18,12 +18,16 @@ interface Props {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   rowItem: Item | null;
+  hideReportButton?: boolean;
+  hideOpenMapButton?: boolean;
 }
 
 export default function PropertyDetailDialog({
   open,
   onOpenChange,
   rowItem,
+  hideReportButton,
+  hideOpenMapButton,
 }: Props) {
   const detailId = (rowItem as any)?.id as number | undefined;
   const { vm, isLoading, isError, reload, raw } = usePropertyDetail(detailId);
@@ -48,7 +52,11 @@ export default function PropertyDetailDialog({
         {/* 본문 */}
         {!isLoading && !isError && (
           <>
-            <PropertyDetailSimple vm={vm ?? undefined} />
+            <PropertyDetailSimple
+              vm={vm ?? undefined}
+              hideReportButton={hideReportButton}
+              hideOpenMapButton={hideOpenMapButton ?? true}
+            />
             <DetailDebugPanel raw={raw ?? rowItem} />
           </>
         )}

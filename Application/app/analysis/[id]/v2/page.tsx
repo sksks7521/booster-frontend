@@ -10,6 +10,11 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MapPin, ArrowLeft, Layers, List, Map, BarChart3 } from "lucide-react";
+import {
+  formatCurrencyManwon,
+  formatPercent1,
+  formatDateYmd,
+} from "@/components/features/property-detail/utils/formatters";
 import { useItemDetail } from "@/hooks/useItemDetail";
 import { LoadingState, ErrorState } from "@/components/ui/data-state";
 import { mapApiErrorToMessage } from "@/lib/errors";
@@ -45,8 +50,12 @@ import {
   useRealTransactionsSido,
   useRealTransactionsSigungu,
   useRealTransactionsAdminDong,
+  useAuctionEdSido,
+  useAuctionEdSigungu,
 } from "@/hooks/useLocations";
 import { Label } from "@/components/ui/label";
+import PropertyDetailDialog from "@/components/features/property-detail/PropertyDetailDialog";
+import type { Item } from "@/lib/api";
 
 export default function PropertyDetailV2Page() {
   const params = useParams();
@@ -123,6 +132,8 @@ export default function PropertyDetailV2Page() {
   const [detailsCollapsed, setDetailsCollapsed] = useState(false);
   const [isFilterCollapsed, setIsFilterCollapsed] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [detailRowItem, setDetailRowItem] = useState<Item | null>(null);
 
   // 🆕 서버 영역필터 전환 조건 계산(auction_ed 전용)
   const flags = useFeatureFlags();
@@ -173,10 +184,14 @@ export default function PropertyDetailV2Page() {
   const town = useFilterStore((s: any) => s.town);
   const setFilter = useFilterStore((s: any) => s.setFilter);
 
-  // 실거래가 전용 지역 목록 API
-  const { sidos } = useRealTransactionsSido();
-  const { sigungus } = useRealTransactionsSigungu(
+  // 데이터셋 별 지역 목록 API (sale/rent: 실거래가, auction_ed: 경매)
+  const { sidos: saleRentSidos } = useRealTransactionsSido();
+  const { sidos: auctionEdSidos } = useAuctionEdSido();
+  const { sigungus: saleRentSigungus } = useRealTransactionsSigungu(
     useRealTxApi ? selectedProvince : undefined
+  );
+  const { sigungus: auctionEdSigungus } = useAuctionEdSigungu(
+    !useRealTxApi ? selectedProvince : undefined
   );
   const { adminDongs } = useRealTransactionsAdminDong(
     useRealTxApi ? selectedProvince : undefined,
@@ -186,8 +201,8 @@ export default function PropertyDetailV2Page() {
   // 지역 선택 로직 - 시도 변경 시
   useEffect(() => {
     if (useRealTxApi) {
-      // 실거래가 API 기반: 시군구 전체명 그대로 표시 (예: "경기도 고양시 덕양구")
-      const names = sigungus.map((s) => s.name);
+      // 실거래가 API 기반: 시군구 전체명 그대로 표시
+      const names = saleRentSigungus.map((s: any) => s.name);
       if (
         names.length > 0 &&
         (availableCities.length !== names.length ||
@@ -201,6 +216,23 @@ export default function PropertyDetailV2Page() {
         if (availableDistricts.length > 0) setAvailableDistricts([]);
       }
       return;
+    }
+    // 경매(auction_ed) API 기반: 시군구 전체명 그대로 표시
+    {
+      const names = auctionEdSigungus.map((s: any) => s.name);
+      if (
+        names.length > 0 &&
+        (availableCities.length !== names.length ||
+          names.some((v, i) => v !== availableCities[i]))
+      ) {
+        setAvailableCities(names);
+      }
+      if (selectedCity && !names.includes(selectedCity)) {
+        setSelectedCity("");
+        setSelectedDistrict("");
+        if (availableDistricts.length > 0) setAvailableDistricts([]);
+      }
+      if (names.length > 0) return;
     }
 
     // 시군구 원본 목록을 '시' 단위로 접어서(예: "경기도 고양시 덕양구" → "경기도 고양시") 중복 제거
@@ -244,7 +276,8 @@ export default function PropertyDetailV2Page() {
     selectedProvince,
     selectedCity,
     useRealTxApi,
-    sigungus,
+    saleRentSigungus,
+    auctionEdSigungus,
     availableCities,
     availableDistricts,
   ]);
@@ -316,7 +349,9 @@ export default function PropertyDetailV2Page() {
   useEffect(() => {
     try {
       const cityList = useRealTxApi
-        ? sigungus.map((s) => s.name)
+        ? saleRentSigungus.map((s: any) => s.name)
+        : auctionEdSigungus.length > 0
+        ? auctionEdSigungus.map((s: any) => s.name)
         : availableCities;
 
       if (pendingCityRef.current && cityList.includes(pendingCityRef.current)) {
@@ -326,7 +361,7 @@ export default function PropertyDetailV2Page() {
       // 초기 동기화가 끝났으면 부트스트랩 종료
       if (bootRef.current) bootRef.current = false;
     } catch {}
-  }, [availableCities, useRealTxApi, sigungus]);
+  }, [availableCities, useRealTxApi, saleRentSigungus, auctionEdSigungus]);
 
   useEffect(() => {
     try {
@@ -1078,268 +1113,453 @@ export default function PropertyDetailV2Page() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="container mx-auto px-4 py-8 space-y-8">
-        {/* 상단 네비게이션 */}
-        <div className="flex items-center justify-between">
-          <Button
-            variant="ghost"
-            onClick={goBack}
-            className="flex items-center"
-          >
-            <ArrowLeft className="w-4 h-4 mr-2" /> 목록으로 돌아가기
-          </Button>
-        </div>
+    <>
+      <div className="min-h-screen bg-gray-50">
+        <div className="container mx-auto px-4 py-8 space-y-8">
+          {/* 상단 네비게이션 */}
+          <div className="flex items-center justify-between">
+            <Button
+              variant="ghost"
+              onClick={goBack}
+              className="flex items-center"
+            >
+              <ArrowLeft className="w-4 h-4 mr-2" /> 목록으로 돌아가기
+            </Button>
+          </div>
 
-        {/* 상단 요약 섹션 (auction_ing 기반 요약) */}
-        <Card>
-          <CardHeader>
-            <div className="flex items-start justify-between">
-              <div>
-                <CardTitle className="text-2xl font-bold mb-2">
-                  {property?.title ?? property?.address ?? "상세 정보"}
-                </CardTitle>
-                <div className="flex items-center text-gray-600 mb-2">
-                  <MapPin className="w-4 h-4 mr-1" />
-                  {property?.address ?? "-"}
+          {/* 상단 요약 섹션 (auction_ing 기반 요약) */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-start justify-between">
+                <div>
+                  <CardTitle className="text-2xl font-bold mb-2">
+                    {vm?.title ??
+                      property?.title ??
+                      property?.address ??
+                      "상세 정보"}
+                  </CardTitle>
+                  <div className="flex items-center text-gray-600 mb-2">
+                    <MapPin className="w-4 h-4 mr-1" />
+                    {vm?.roadAddress ?? property?.address ?? "-"}
+                  </div>
+                  <div className="flex items-center gap-3 text-sm text-gray-500">
+                    <span>
+                      {typeof property?.area === "number"
+                        ? `${property?.area}㎡`
+                        : "-"}
+                    </span>
+                    <span>
+                      {property?.buildYear
+                        ? `${property?.buildYear}년 건축`
+                        : "-"}
+                    </span>
+                    <span>{vm?.floorConfirm ?? property?.floor ?? "-"}</span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-3 text-sm text-gray-500">
-                  <span>
-                    {typeof property?.area === "number"
-                      ? `${property?.area}㎡`
-                      : "-"}
-                  </span>
-                  <span>
-                    {property?.buildYear
-                      ? `${property?.buildYear}년 건축`
-                      : "-"}
-                  </span>
-                  <span>{property?.floor ?? "-"}</span>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <Badge variant="secondary">현재상태</Badge>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="text-center">
-                <div className="text-xs text-gray-500 mb-1">경매 시작가</div>
-                <div className="text-xl font-semibold text-blue-600">
-                  {formatNumber(property?.price)}만원
-                </div>
-              </div>
-              <div className="text-center">
-                <div className="text-xs text-gray-500 mb-1">감정가</div>
-                <div className="text-xl font-semibold text-green-600">
-                  {formatNumber((property as any)?.estimatedValue)}만원
-                </div>
-              </div>
-              <div className="text-center">
-                <div className="text-xs text-gray-500 mb-1">예상 ROI</div>
-                <div className="text-xl font-semibold text-purple-600">
-                  {(property as any)?.investmentAnalysis?.expectedRoi ?? "-"}%
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      const idNum = Number(itemId);
+                      if (Number.isFinite(idNum)) {
+                        setDetailRowItem({ id: idNum } as Item);
+                        setDetailOpen(true);
+                      }
+                    }}
+                  >
+                    상세보기
+                  </Button>
+                  <Badge variant="secondary">
+                    {vm?.currentStatus ?? "현재상태"}
+                  </Badge>
                 </div>
               </div>
-              <div className="text-center">
-                <div className="text-xs text-gray-500 mb-1">편의시설</div>
-                <div className="text-sm text-gray-700">
-                  {(property as any)?.hasParking ? "주차" : ""}
-                  {(property as any)?.hasElevator
-                    ? (property as any)?.hasParking
-                      ? " / 엘리베이터"
-                      : "엘리베이터"
-                    : ""}
-                  {!(property as any)?.hasParking &&
-                  !(property as any)?.hasElevator
+            </CardHeader>
+            <CardContent>
+              {(() => {
+                const under100 =
+                  vm?.under100Million === true
+                    ? "O"
+                    : vm?.under100Million === false
+                    ? "X"
+                    : "-";
+                const elevator =
+                  vm?.hasElevator === null
                     ? "-"
-                    : ""}
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+                    : vm?.hasElevator
+                    ? "있음"
+                    : "없음";
+                const floors = (() => {
+                  const v: any = (vm as any)?.floors;
+                  if (v && String(v).trim()) {
+                    const n = Number(v);
+                    return Number.isFinite(n)
+                      ? String(Math.trunc(n))
+                      : String(v);
+                  }
+                  const g = vm?.groundFloors;
+                  const b = vm?.undergroundFloors;
+                  if (Number.isFinite(g) || Number.isFinite(b)) {
+                    return `지상 ${g ?? 0}층 / 지하 ${b ?? 0}층`;
+                  }
+                  return "-";
+                })();
 
-        {/* 상세 정보 섹션: auction_ing 컬럼 기반(기존 컴포넌트 재사용) */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">상세 정보</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {isDetailLoading && (
-              <div className="py-6 text-sm text-gray-500">
-                상세 정보를 불러오는 중…
-              </div>
-            )}
-            {isDetailError && (
-              <div className="py-6">
-                <ErrorState
-                  title="상세 정보 로딩 실패"
-                  onRetry={reloadDetail}
-                  retryText="다시 시도"
-                />
-              </div>
-            )}
-            {!isDetailLoading && !isDetailError && (
-              <PropertyDetailSimple vm={vm ?? undefined} />
-            )}
-          </CardContent>
-        </Card>
+                return (
+                  <div className="space-y-4">
+                    {/* 1행: 사건번호 / 매각기일 / 현재상태 / 건축연도 */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <div className="text-center">
+                        <div className="text-xs text-gray-500 mb-1">
+                          사건번호
+                        </div>
+                        <div className="text-base md:text-lg font-semibold text-gray-900">
+                          {vm?.caseNumber ?? "-"}
+                        </div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-xs text-gray-500 mb-1">
+                          매각기일
+                        </div>
+                        <div className="text-base md:text-lg font-semibold text-gray-900">
+                          {formatDateYmd(vm?.saleDate)}
+                        </div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-xs text-gray-500 mb-1">
+                          현재상태
+                        </div>
+                        <div className="text-base md:text-lg font-semibold text-gray-900">
+                          {vm?.currentStatus ?? "-"}
+                        </div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-xs text-gray-500 mb-1">
+                          건축연도
+                        </div>
+                        <div className="text-base md:text-lg font-semibold text-gray-900">
+                          {typeof vm?.constructionYear === "number" &&
+                          vm.constructionYear > 0
+                            ? `${vm.constructionYear}년`
+                            : "-"}
+                        </div>
+                      </div>
+                    </div>
 
-        {/* 데이터셋 대탭 헤더는 생략하고 아래 레이아웃에 배치 */}
+                    {/* 2행: 감정가 / 최저가 / 최저/감정 비율 / 공시가격 */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <div className="text-center">
+                        <div className="text-xs text-gray-500 mb-1">감정가</div>
+                        <div className="text-base md:text-lg font-semibold text-gray-900">
+                          {formatCurrencyManwon(vm?.appraisalValue)}
+                        </div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-xs text-gray-500 mb-1">최저가</div>
+                        <div className="text-base md:text-lg font-semibold text-gray-900">
+                          {formatCurrencyManwon(vm?.minimumPrice)}
+                        </div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-xs text-gray-500 mb-1">
+                          최저/감정 비율
+                        </div>
+                        <div className="text-base md:text-lg font-semibold text-gray-900">
+                          {formatPercent1(vm?.priceRatio)}
+                        </div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-xs text-gray-500 mb-1">
+                          공시가격
+                        </div>
+                        <div className="text-base md:text-lg font-semibold text-gray-900">
+                          {formatCurrencyManwon(vm?.publicPrice)}
+                        </div>
+                      </div>
+                    </div>
 
-        {/* 데이터셋 선택 탭 (상단) */}
-        <Tabs value={activeDataset} onValueChange={handleChangeDataset}>
-          <TabsList className="bg-muted text-muted-foreground h-9 items-center justify-center rounded-lg p-[3px] grid w-full grid-cols-4">
-            <TabsTrigger value="auction_ed">과거경매결과</TabsTrigger>
-            <TabsTrigger value="sale">실거래가(매매)</TabsTrigger>
-            <TabsTrigger value="rent">실거래가(전월세)</TabsTrigger>
-            <TabsTrigger value="listings">매물</TabsTrigger>
-          </TabsList>
+                    {/* 3행: 건물평형 / 토지평형 / 최저/공시 비율 / 1억 이하 */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <div className="text-center">
+                        <div className="text-xs text-gray-500 mb-1">
+                          건물평형
+                        </div>
+                        <div className="text-base md:text-lg font-semibold text-gray-900">
+                          {typeof vm?.buildingArea === "number"
+                            ? `${vm.buildingArea}평`
+                            : "-"}
+                        </div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-xs text-gray-500 mb-1">
+                          토지평형
+                        </div>
+                        <div className="text-base md:text-lg font-semibold text-gray-900">
+                          {typeof vm?.landArea === "number"
+                            ? `${vm.landArea}평`
+                            : "-"}
+                        </div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-xs text-gray-500 mb-1">
+                          최저/공시 비율
+                        </div>
+                        <div className="text-base md:text-lg font-semibold text-gray-900">
+                          {formatPercent1(vm?.publicPriceRatio)}
+                        </div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-xs text-gray-500 mb-1">
+                          1억 이하
+                        </div>
+                        <div className="text-base md:text-lg font-semibold text-gray-900">
+                          {under100}
+                        </div>
+                      </div>
+                    </div>
 
-          {/* 지역 선택 UI (모든 데이터셋 공통) */}
-          <Card className="mb-4">
-            <CardContent className="pt-4">
-              <div className="flex items-center gap-2 mb-3">
-                <MapPin className="w-4 h-4 text-blue-600" />
-                <Label className="text-sm font-medium">
-                  지역 선택 (모든 데이터셋 공통 적용)
-                </Label>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {/* 시도명 */}
-                <div>
-                  <Label className="text-xs text-gray-600 mb-1 block">
-                    시도
-                  </Label>
-                  <Select
-                    value={selectedProvince || "all"}
-                    onValueChange={(value) => {
-                      const actualValue = value === "all" ? "" : value;
-                      if (actualValue === selectedProvince) return; // 동일값 가드
-                      setSelectedProvince(actualValue);
-                      if (selectedCity) setSelectedCity("");
-                      if (selectedDistrict) setSelectedDistrict("");
-                    }}
-                  >
-                    <SelectTrigger className="h-9">
-                      <SelectValue placeholder="시도 선택" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">전체</SelectItem>
-                      {(useRealTxApi
-                        ? sidos.map((s) => s.name)
-                        : provinces
-                      ).map((province) => (
-                        <SelectItem key={province} value={province}>
-                          {province}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* 시군구 */}
-                <div>
-                  <Label className="text-xs text-gray-600 mb-1 block">
-                    시군구
-                  </Label>
-                  <Select
-                    value={selectedCity || "all"}
-                    onValueChange={(value) => {
-                      const actualValue = value === "all" ? "" : value;
-                      if (actualValue === selectedCity) return; // 동일값 가드
-                      setSelectedCity(actualValue);
-                      if (selectedDistrict) setSelectedDistrict("");
-                    }}
-                    disabled={!selectedProvince}
-                  >
-                    <SelectTrigger className="h-9">
-                      <SelectValue placeholder="시군구 선택" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">선택</SelectItem>
-                      {(useRealTxApi
-                        ? sigungus.map((s) => s.name)
-                        : availableCities
-                      ).map((city) => (
-                        <SelectItem key={city} value={city}>
-                          {city}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* 읍면동 */}
-                <div>
-                  <Label className="text-xs text-gray-600 mb-1 block">
-                    읍면동
-                  </Label>
-                  <Select
-                    value={selectedDistrict || "all"}
-                    onValueChange={(value) => {
-                      const actualValue = value === "all" ? "" : value;
-                      if (actualValue === selectedDistrict) return; // 동일값 가드
-                      setSelectedDistrict(actualValue);
-                    }}
-                    disabled={!useRealTxApi || !selectedCity}
-                  >
-                    <SelectTrigger className="h-9">
-                      <SelectValue placeholder="읍면동 선택" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">선택</SelectItem>
-                      {(useRealTxApi
-                        ? adminDongs.map((d) => d.name)
-                        : availableDistricts
-                      ).map((district) => (
-                        <SelectItem key={district} value={district}>
-                          {district}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
+                    {/* 4행: 층수 / 층확인 / 엘리베이터 / 특수권리 */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <div className="text-center">
+                        <div className="text-xs text-gray-500 mb-1">층수</div>
+                        <div className="text-base md:text-lg font-semibold text-gray-900">
+                          {floors}
+                        </div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-xs text-gray-500 mb-1">층확인</div>
+                        <div className="text-base md:text-lg font-semibold text-gray-900">
+                          {vm?.floorConfirm ?? "-"}
+                        </div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-xs text-gray-500 mb-1">
+                          엘리베이터
+                        </div>
+                        <div className="text-base md:text-lg font-semibold text-gray-900">
+                          {elevator}
+                        </div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-xs text-gray-500 mb-1">
+                          특수권리
+                        </div>
+                        <div
+                          className="text-base md:text-lg font-semibold text-gray-900 line-clamp-2"
+                          title={vm?.specialRights ?? "-"}
+                        >
+                          {vm?.specialRights ?? "-"}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
             </CardContent>
           </Card>
 
-          {/* 안내 배너: 지역 미선택 시 (sale 제외) */}
-          {activeDataset !== "sale" && !(selectedProvince && selectedCity) && (
-            <div className="mb-4 rounded-md border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
-              지역을 먼저 선택하세요. 시도와 시군구를 선택하면 결과가
-              표시됩니다.
-            </div>
-          )}
+          {/* 상세 정보 섹션은 팝업으로 대체됨 */}
 
-          {/* 선택된 필터 바 */}
-          <SelectedFilterBar
-            detailsCollapsed={detailsCollapsed}
-            onToggleDetailsCollapse={() =>
-              setDetailsCollapsed(!detailsCollapsed)
-            }
-            namespace={activeDataset}
-          />
+          {/* 데이터셋 대탭 헤더는 생략하고 아래 레이아웃에 배치 */}
 
-          {/* 분석 레이아웃: 좌측(목록/지도/통합) + 우측(필터) */}
-          <div
-            className={
-              "flex flex-col lg:flex-row items-start " +
-              (detailsCollapsed ? "gap-0" : "gap-8")
-            }
-          >
-            {/* 좌측 뷰 영역 */}
-            <div className="flex-1 min-w-0 w-full space-y-4">
-              <Card>
-                <CardContent>
-                  {(["auction_ed", "sale", "rent", "listings"] as const).map(
-                    (ds) => (
-                      <TabsContent key={ds} value={ds} className="mt-4">
-                        {ds === "auction_ed" ? (
-                          selectedProvince && selectedCity ? (
-                            <AuctionEdSearchResults
+          {/* 데이터셋 선택 탭 (상단) */}
+          <Tabs value={activeDataset} onValueChange={handleChangeDataset}>
+            <TabsList className="bg-muted text-muted-foreground h-9 items-center justify-center rounded-lg p-[3px] grid w-full grid-cols-4">
+              <TabsTrigger value="auction_ed">과거경매결과</TabsTrigger>
+              <TabsTrigger value="sale">실거래가(매매)</TabsTrigger>
+              <TabsTrigger value="rent">실거래가(전월세)</TabsTrigger>
+              <TabsTrigger value="listings">매물</TabsTrigger>
+            </TabsList>
+
+            {/* 지역 선택 UI (모든 데이터셋 공통) */}
+            <Card className="mb-4">
+              <CardContent className="pt-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <MapPin className="w-4 h-4 text-blue-600" />
+                  <Label className="text-sm font-medium">
+                    지역 선택 (모든 데이터셋 공통 적용)
+                  </Label>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {/* 시도명 */}
+                  <div>
+                    <Label className="text-xs text-gray-600 mb-1 block">
+                      시도
+                    </Label>
+                    <Select
+                      value={selectedProvince || "all"}
+                      onValueChange={(value) => {
+                        const actualValue = value === "all" ? "" : value;
+                        if (actualValue === selectedProvince) return; // 동일값 가드
+                        setSelectedProvince(actualValue);
+                        if (selectedCity) setSelectedCity("");
+                        if (selectedDistrict) setSelectedDistrict("");
+                      }}
+                    >
+                      <SelectTrigger className="h-9">
+                        <SelectValue placeholder="시도 선택" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">전체</SelectItem>
+                        {(useRealTxApi
+                          ? saleRentSidos.map((s) => s.name)
+                          : auctionEdSidos.length > 0
+                          ? auctionEdSidos.map((s) => s.name)
+                          : provinces
+                        ).map((province) => (
+                          <SelectItem key={province} value={province}>
+                            {province}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* 시군구 */}
+                  <div>
+                    <Label className="text-xs text-gray-600 mb-1 block">
+                      시군구
+                    </Label>
+                    <Select
+                      value={selectedCity || "all"}
+                      onValueChange={(value) => {
+                        const actualValue = value === "all" ? "" : value;
+                        if (actualValue === selectedCity) return; // 동일값 가드
+                        setSelectedCity(actualValue);
+                        if (selectedDistrict) setSelectedDistrict("");
+                      }}
+                      disabled={!selectedProvince}
+                    >
+                      <SelectTrigger className="h-9">
+                        <SelectValue placeholder="시군구 선택" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">선택</SelectItem>
+                        {(useRealTxApi
+                          ? saleRentSigungus.map((s) => s.name)
+                          : auctionEdSigungus.length > 0
+                          ? auctionEdSigungus.map((s) => s.name)
+                          : availableCities
+                        ).map((city) => (
+                          <SelectItem key={city} value={city}>
+                            {city}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* 읍면동 */}
+                  <div>
+                    <Label className="text-xs text-gray-600 mb-1 block">
+                      읍면동
+                    </Label>
+                    <Select
+                      value={selectedDistrict || "all"}
+                      onValueChange={(value) => {
+                        const actualValue = value === "all" ? "" : value;
+                        if (actualValue === selectedDistrict) return; // 동일값 가드
+                        setSelectedDistrict(actualValue);
+                      }}
+                      disabled={!useRealTxApi || !selectedCity}
+                    >
+                      <SelectTrigger className="h-9">
+                        <SelectValue placeholder="읍면동 선택" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">선택</SelectItem>
+                        {(useRealTxApi
+                          ? adminDongs.map((d) => d.name)
+                          : availableDistricts
+                        ).map((district) => (
+                          <SelectItem key={district} value={district}>
+                            {district}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* 안내 배너: 지역 미선택 시 (sale 제외) */}
+            {activeDataset !== "sale" &&
+              !(selectedProvince && selectedCity) && (
+                <div className="mb-4 rounded-md border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+                  지역을 먼저 선택하세요. 시도와 시군구를 선택하면 결과가
+                  표시됩니다.
+                </div>
+              )}
+
+            {/* 선택된 필터 바 */}
+            <SelectedFilterBar
+              detailsCollapsed={detailsCollapsed}
+              onToggleDetailsCollapse={() =>
+                setDetailsCollapsed(!detailsCollapsed)
+              }
+              namespace={activeDataset}
+            />
+
+            {/* 분석 레이아웃: 좌측(목록/지도/통합) + 우측(필터) */}
+            <div
+              className={
+                "flex flex-col lg:flex-row items-start " +
+                (detailsCollapsed ? "gap-0" : "gap-8")
+              }
+            >
+              {/* 좌측 뷰 영역 */}
+              <div className="flex-1 min-w-0 w-full space-y-4">
+                <Card>
+                  <CardContent>
+                    {(["auction_ed", "sale", "rent", "listings"] as const).map(
+                      (ds) => (
+                        <TabsContent key={ds} value={ds} className="mt-4">
+                          {ds === "auction_ed" ? (
+                            selectedProvince && selectedCity ? (
+                              <AuctionEdSearchResults
+                                activeView={
+                                  activeView === "list"
+                                    ? "table"
+                                    : activeView === "integrated"
+                                    ? "both"
+                                    : (activeView as "table" | "map" | "both")
+                                }
+                                serverAreaEnabled={useServerArea}
+                                onViewChange={(view) => {
+                                  console.log("🔍 [onViewChange] 뷰 변경:", {
+                                    view,
+                                    currentActiveView: activeView,
+                                    activeDataset,
+                                  });
+                                  const mappedView =
+                                    view === "both"
+                                      ? "integrated"
+                                      : view === "table"
+                                      ? "list"
+                                      : view;
+                                  console.log("🔍 [onViewChange] 매핑된 뷰:", {
+                                    mappedView,
+                                  });
+                                  handleChangeView(mappedView as ViewType);
+                                  if (selectedRowKeys.length > 0)
+                                    setSelectedRowKeys([]);
+                                }}
+                              />
+                            ) : (
+                              <ViewState
+                                isLoading={false}
+                                error={undefined}
+                                total={0}
+                                onRetry={() => {}}
+                              >
+                                <div className="py-8 text-center text-gray-500">
+                                  표시할 데이터가 없습니다.
+                                </div>
+                              </ViewState>
+                            )
+                          ) : ds === "sale" ? (
+                            <SaleSearchResults
                               activeView={
                                 activeView === "list"
                                   ? "table"
@@ -1347,163 +1567,130 @@ export default function PropertyDetailV2Page() {
                                   ? "both"
                                   : (activeView as "table" | "map" | "both")
                               }
-                              serverAreaEnabled={useServerArea}
                               onViewChange={(view) => {
-                                console.log("🔍 [onViewChange] 뷰 변경:", {
-                                  view,
-                                  currentActiveView: activeView,
-                                  activeDataset,
-                                });
                                 const mappedView =
                                   view === "both"
                                     ? "integrated"
                                     : view === "table"
                                     ? "list"
                                     : view;
-                                console.log("🔍 [onViewChange] 매핑된 뷰:", {
-                                  mappedView,
-                                });
+                                handleChangeView(mappedView as ViewType);
+                                if (selectedRowKeys.length > 0)
+                                  setSelectedRowKeys([]);
+                              }}
+                            />
+                          ) : ds === "rent" ? (
+                            <RentSearchResults
+                              activeView={
+                                activeView === "list"
+                                  ? "table"
+                                  : activeView === "integrated"
+                                  ? "both"
+                                  : (activeView as "table" | "map" | "both")
+                              }
+                              onViewChange={(view) => {
+                                const mappedView =
+                                  view === "both"
+                                    ? "integrated"
+                                    : view === "table"
+                                    ? "list"
+                                    : view;
                                 handleChangeView(mappedView as ViewType);
                                 if (selectedRowKeys.length > 0)
                                   setSelectedRowKeys([]);
                               }}
                             />
                           ) : (
-                            <ViewState
-                              isLoading={false}
-                              error={undefined}
-                              total={0}
-                              onRetry={() => {}}
-                            >
-                              <div className="py-8 text-center text-gray-500">
-                                표시할 데이터가 없습니다.
-                              </div>
-                            </ViewState>
-                          )
-                        ) : ds === "sale" ? (
-                          <SaleSearchResults
-                            activeView={
-                              activeView === "list"
-                                ? "table"
-                                : activeView === "integrated"
-                                ? "both"
-                                : (activeView as "table" | "map" | "both")
-                            }
-                            onViewChange={(view) => {
-                              const mappedView =
-                                view === "both"
-                                  ? "integrated"
-                                  : view === "table"
-                                  ? "list"
-                                  : view;
-                              handleChangeView(mappedView as ViewType);
-                              if (selectedRowKeys.length > 0)
-                                setSelectedRowKeys([]);
-                            }}
-                          />
-                        ) : ds === "rent" ? (
-                          <RentSearchResults
-                            activeView={
-                              activeView === "list"
-                                ? "table"
-                                : activeView === "integrated"
-                                ? "both"
-                                : (activeView as "table" | "map" | "both")
-                            }
-                            onViewChange={(view) => {
-                              const mappedView =
-                                view === "both"
-                                  ? "integrated"
-                                  : view === "table"
-                                  ? "list"
-                                  : view;
-                              handleChangeView(mappedView as ViewType);
-                              if (selectedRowKeys.length > 0)
-                                setSelectedRowKeys([]);
-                            }}
-                          />
-                        ) : (
-                          // listings 데이터셋의 경우 기본 UI 표시
-                          <div className="py-8 text-center text-gray-500">
-                            해당 데이터셋은 지원되지 않습니다.
-                          </div>
-                        )}
-                      </TabsContent>
-                    )
-                  )}
-                </CardContent>
-              </Card>
-            </div>
+                            // listings 데이터셋의 경우 기본 UI 표시
+                            <div className="py-8 text-center text-gray-500">
+                              해당 데이터셋은 지원되지 않습니다.
+                            </div>
+                          )}
+                        </TabsContent>
+                      )
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
 
-            {/* 우측 필터 영역 (불필요한 래퍼 제거) */}
-            <div
-              className={
-                detailsCollapsed
-                  ? "hidden"
-                  : "shrink-0 w-full lg:w-[384px] max-w-[384px]"
-              }
-            >
-              {activeDataset === "auction_ed" ? (
-                <AuctionEdFilter
-                  isCollapsed={detailsCollapsed}
-                  onToggleCollapse={() =>
-                    setDetailsCollapsed(!detailsCollapsed)
-                  }
-                  searchQuery={searchQuery}
-                  setSearchQuery={setSearchQuery}
-                  handleSearch={handleSearch}
-                  showDetailsOnly={true}
-                  namespace={activeDataset}
-                />
-              ) : activeDataset === "sale" ? (
-                <SaleFilter
-                  isCollapsed={detailsCollapsed}
-                  onToggleCollapse={() =>
-                    setDetailsCollapsed(!detailsCollapsed)
-                  }
-                  searchQuery={searchQuery}
-                  setSearchQuery={setSearchQuery}
-                  handleSearch={handleSearch}
-                  showDetailsOnly={false}
-                  namespace={activeDataset}
-                />
-              ) : activeDataset === "rent" ? (
-                <RentFilter
-                  isCollapsed={detailsCollapsed}
-                  onToggleCollapse={() =>
-                    setDetailsCollapsed(!detailsCollapsed)
-                  }
-                  searchQuery={searchQuery}
-                  setSearchQuery={setSearchQuery}
-                  handleSearch={handleSearch}
-                  showDetailsOnly={true}
-                  namespace={activeDataset}
-                />
-              ) : (
-                <FilterControl
-                  isCollapsed={detailsCollapsed}
-                  onToggleCollapse={() =>
-                    setDetailsCollapsed(!detailsCollapsed)
-                  }
-                  searchQuery={searchQuery}
-                  setSearchQuery={setSearchQuery}
-                  handleSearch={handleSearch}
-                  showDetailsOnly={true}
-                  preset={
-                    datasetConfigs[activeDataset as keyof typeof datasetConfigs]
-                      ?.filters?.ui
-                  }
-                  defaults={
-                    datasetConfigs[activeDataset as keyof typeof datasetConfigs]
-                      ?.filters?.defaults
-                  }
-                  namespace={activeDataset}
-                />
-              )}
+              {/* 우측 필터 영역 (불필요한 래퍼 제거) */}
+              <div
+                className={
+                  detailsCollapsed
+                    ? "hidden"
+                    : "shrink-0 w-full lg:w-[384px] max-w-[384px]"
+                }
+              >
+                {activeDataset === "auction_ed" ? (
+                  <AuctionEdFilter
+                    isCollapsed={detailsCollapsed}
+                    onToggleCollapse={() =>
+                      setDetailsCollapsed(!detailsCollapsed)
+                    }
+                    searchQuery={searchQuery}
+                    setSearchQuery={setSearchQuery}
+                    handleSearch={handleSearch}
+                    showDetailsOnly={true}
+                    namespace={activeDataset}
+                  />
+                ) : activeDataset === "sale" ? (
+                  <SaleFilter
+                    isCollapsed={detailsCollapsed}
+                    onToggleCollapse={() =>
+                      setDetailsCollapsed(!detailsCollapsed)
+                    }
+                    searchQuery={searchQuery}
+                    setSearchQuery={setSearchQuery}
+                    handleSearch={handleSearch}
+                    showDetailsOnly={false}
+                    namespace={activeDataset}
+                  />
+                ) : activeDataset === "rent" ? (
+                  <RentFilter
+                    isCollapsed={detailsCollapsed}
+                    onToggleCollapse={() =>
+                      setDetailsCollapsed(!detailsCollapsed)
+                    }
+                    searchQuery={searchQuery}
+                    setSearchQuery={setSearchQuery}
+                    handleSearch={handleSearch}
+                    showDetailsOnly={true}
+                    namespace={activeDataset}
+                  />
+                ) : (
+                  <FilterControl
+                    isCollapsed={detailsCollapsed}
+                    onToggleCollapse={() =>
+                      setDetailsCollapsed(!detailsCollapsed)
+                    }
+                    searchQuery={searchQuery}
+                    setSearchQuery={setSearchQuery}
+                    handleSearch={handleSearch}
+                    showDetailsOnly={true}
+                    preset={
+                      datasetConfigs[
+                        activeDataset as keyof typeof datasetConfigs
+                      ]?.filters?.ui
+                    }
+                    defaults={
+                      datasetConfigs[
+                        activeDataset as keyof typeof datasetConfigs
+                      ]?.filters?.defaults
+                    }
+                    namespace={activeDataset}
+                  />
+                )}
+              </div>
             </div>
-          </div>
-        </Tabs>
+          </Tabs>
+        </div>
       </div>
-    </div>
+      <PropertyDetailDialog
+        open={detailOpen}
+        onOpenChange={setDetailOpen}
+        rowItem={detailRowItem}
+        hideReportButton={true}
+      />
+    </>
   );
 }
