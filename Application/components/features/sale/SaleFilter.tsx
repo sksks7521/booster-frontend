@@ -188,6 +188,17 @@ export default function SaleFilter({
 
   const isDateRangeActive = Boolean(startDate || endDate);
 
+  // 추가: 섹션 활성화 상태(제목 파란색 처리)
+  const isFloorConfirmationActive = Array.isArray(
+    (filters as any).floorConfirmation
+  )
+    ? (filters as any).floorConfirmation.length > 0
+    : false;
+  const isElevatorActive =
+    (filters as any).elevatorAvailable === true ||
+    (filters as any).elevatorAvailable === false;
+  const isAddressSearchActive = Boolean((filters as any).searchQuery);
+
   // 검색 핸들러
   const setPageStore = useFilterStore((s) => s.setPage);
 
@@ -1053,10 +1064,18 @@ export default function SaleFilter({
 
               {/* 층확인 */}
               <div className="space-y-3">
-                <Label className="text-sm font-medium">층확인</Label>
+                <Label
+                  className={`text-sm font-medium ${
+                    isFloorConfirmationActive
+                      ? "text-blue-700 font-semibold"
+                      : ""
+                  }`}
+                >
+                  층확인
+                </Label>
                 <div className="flex flex-wrap gap-2">
                   <button
-                    onClick={() => setFilter("floorConfirmation", [])}
+                    onClick={() => setFilter("floorConfirmation", "all")}
                     className={`px-3 py-1.5 text-xs rounded-md border transition-colors ${
                       !(filters as any).floorConfirmation?.length
                         ? "bg-blue-500 text-white border-blue-500"
@@ -1071,25 +1090,37 @@ export default function SaleFilter({
                     { value: "normal_floor", label: "일반층" },
                     { value: "top_floor", label: "탑층" },
                   ].map((option) => {
-                    const isActive = (
-                      filters as any
-                    ).floorConfirmation?.includes(option.value);
+                    const raw = (filters as any).floorConfirmation;
+                    const arr = Array.isArray(raw)
+                      ? (raw as string[])
+                      : raw && raw !== "all"
+                      ? String(raw)
+                          .split(",")
+                          .map((s) => s.trim())
+                          .filter(Boolean)
+                      : [];
+                    const isActive = arr.includes(option.value);
                     return (
                       <button
                         key={option.value}
                         onClick={() => {
-                          const current =
-                            (filters as any).floorConfirmation || [];
+                          const prev = arr;
                           if (isActive) {
+                            const next = prev.filter(
+                              (v: string) => v !== option.value
+                            );
                             setFilter(
                               "floorConfirmation",
-                              current.filter((v: string) => v !== option.value)
+                              next.length ? next : "all"
                             );
                           } else {
-                            setFilter("floorConfirmation", [
-                              ...current,
-                              option.value,
-                            ]);
+                            const next = Array.from(
+                              new Set([...(prev as string[]), option.value])
+                            );
+                            setFilter(
+                              "floorConfirmation",
+                              next.length ? next : "all"
+                            );
                           }
                         }}
                         className={`px-3 py-1.5 text-xs rounded-md border transition-colors ${
@@ -1107,7 +1138,13 @@ export default function SaleFilter({
 
               {/* 엘리베이터 */}
               <div className="space-y-3">
-                <Label className="text-sm font-medium">엘리베이터</Label>
+                <Label
+                  className={`text-sm font-medium ${
+                    isElevatorActive ? "text-blue-700 font-semibold" : ""
+                  }`}
+                >
+                  엘리베이터
+                </Label>
                 <div className="flex flex-wrap gap-2">
                   <button
                     onClick={() => setFilter("elevatorAvailable", undefined)}
@@ -1146,7 +1183,13 @@ export default function SaleFilter({
 
               {/* 주소 검색 (하단으로 이동) */}
               <div className="space-y-4">
-                <Label className="text-sm font-medium">주소 검색</Label>
+                <Label
+                  className={`text-sm font-medium ${
+                    isAddressSearchActive ? "text-blue-700 font-semibold" : ""
+                  }`}
+                >
+                  주소 검색
+                </Label>
 
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">

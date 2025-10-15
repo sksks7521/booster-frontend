@@ -645,7 +645,79 @@ export const auctionApi = {
     apiClient.getAuctionCompletedDetail(itemId),
   getMarketAnalysis: (params?: Record<string, any>) =>
     apiClient.getAuctionMarketAnalysis(params),
+  // 🆕 경매결과 지도용 가까운 순 LIMIT API (서버 KNN)
+  getNearestAuctionMap: async (params: {
+    ref_lat: number;
+    ref_lng: number;
+    limit?: number;
+    bounds?: { south: number; west: number; north: number; east: number };
+    filters?: Record<string, any>;
+    timeoutMs?: number;
+  }): Promise<RentNearestResponse> => {
+    const q: Record<string, any> = {
+      // 경매는 별도 엔드포인트를 사용하므로 dataset 키는 불필요. 단, 서버가 요구 시 추가 협의
+      sort: "distance_asc",
+      // 서버 호환: center_lat/center_lng 표준 + ref_lat/ref_lng 병행 전송
+      center_lat: params.ref_lat,
+      center_lng: params.ref_lng,
+      ref_lat: params.ref_lat,
+      ref_lng: params.ref_lng,
+    };
+    if (typeof params.limit === "number") q.limit = params.limit;
+    if (params.bounds) {
+      q.south = params.bounds.south;
+      q.west = params.bounds.west;
+      q.north = params.bounds.north;
+      q.east = params.bounds.east;
+    }
+    if (params.filters && typeof params.filters === "object") {
+      Object.entries(params.filters).forEach(([k, v]) => {
+        if (v !== undefined && v !== null && v !== "") q[k] = v as any;
+      });
+    }
+    const query = new URLSearchParams(q).toString();
+    const endpoint = `/api/v1/auction-completed/map?${query}`;
+    const controller = new AbortController();
+    const to = setTimeout(
+      () => controller.abort(),
+      Math.max(5000, Number(params.timeoutMs ?? 10000))
+    );
+    try {
+      const res = await fetch(`${API_BASE_URL}${endpoint}`, {
+        method: "GET",
+        headers: { "Content-Type": "application/json" },
+        signal: controller.signal,
+      });
+      clearTimeout(to);
+      if (!res.ok) {
+        let details: any = undefined;
+        try {
+          details = await res.json();
+        } catch {
+          try {
+            details = await res.text();
+          } catch {}
+        }
+        throw createApiError({
+          message:
+            (details && (details.detail || details.message)) ||
+            `HTTP error ${res.status}`,
+          status: res.status,
+          url: `${API_BASE_URL}${endpoint}`,
+          method: "GET",
+          details,
+        });
+      }
+      return (await res.json()) as RentNearestResponse;
+    } catch (e) {
+      clearTimeout(to);
+      throw e;
+    }
+  },
 };
+
+// 실거래가(매매) 전용 API
+// 기존 realTransactionApi 객체가 아래에 정의되어 있어, 확장을 그 객체 안에 추가합니다.
 
 export const realTransactionApi = {
   getTransactions: (params?: Record<string, any>) =>
@@ -675,7 +747,75 @@ export const realTransactionApi = {
 
     return response.json();
   },
+  // 🆕 매매 지도용 가까운 순 LIMIT API (서버 KNN)
+  getNearestSaleMap: async (params: {
+    ref_lat: number;
+    ref_lng: number;
+    limit?: number;
+    bounds?: { south: number; west: number; north: number; east: number };
+    filters?: Record<string, any>;
+    timeoutMs?: number;
+  }): Promise<RentNearestResponse> => {
+    const q: Record<string, any> = {
+      dataset: "sale",
+      sort: "distance_asc",
+      ref_lat: params.ref_lat,
+      ref_lng: params.ref_lng,
+    };
+    if (typeof params.limit === "number") q.limit = params.limit;
+    if (params.bounds) {
+      q.south = params.bounds.south;
+      q.west = params.bounds.west;
+      q.north = params.bounds.north;
+      q.east = params.bounds.east;
+    }
+    if (params.filters && typeof params.filters === "object") {
+      Object.entries(params.filters).forEach(([k, v]) => {
+        if (v !== undefined && v !== null && v !== "") q[k] = v as any;
+      });
+    }
+    const query = new URLSearchParams(q).toString();
+    const endpoint = `/api/v1/real-transactions/map?${query}`;
+    const controller = new AbortController();
+    const to = setTimeout(
+      () => controller.abort(),
+      Math.max(5000, Number(params.timeoutMs ?? 10000))
+    );
+    try {
+      const res = await fetch(`${API_BASE_URL}${endpoint}`, {
+        method: "GET",
+        headers: { "Content-Type": "application/json" },
+        signal: controller.signal,
+      });
+      clearTimeout(to);
+      if (!res.ok) {
+        let details: any = undefined;
+        try {
+          details = await res.json();
+        } catch {
+          try {
+            details = await res.text();
+          } catch {}
+        }
+        throw createApiError({
+          message:
+            (details && (details.detail || details.message)) ||
+            `HTTP error ${res.status}`,
+          status: res.status,
+          url: `${API_BASE_URL}${endpoint}`,
+          method: "GET",
+          details,
+        });
+      }
+      return (await res.json()) as RentNearestResponse;
+    } catch (e) {
+      clearTimeout(to);
+      throw e;
+    }
+  },
 };
+
+import { RentNearestResponse } from "@/types/datasets";
 
 export const realRentApi = {
   getRents: (params?: Record<string, any>) => apiClient.getRealRents(params),
@@ -683,6 +823,126 @@ export const realRentApi = {
   getColumns: (): Promise<any> => apiClient.getRealRentsColumns(),
   getRentalYield: (params?: Record<string, any>) =>
     apiClient.getRentalYield(params),
+  // 🆕 전월세 영역(반경) API: /api/v1/real-transactions/area
+  // buildRentAreaParams 로 생성한 파라미터를 그대로 전달합니다.
+  getRentsArea: async (
+    params?: Record<string, any>
+  ): Promise<{
+    items?: any[];
+    results?: any[];
+    total?: number;
+    total_items?: number;
+    page?: number;
+    size?: number;
+    ordering?: string;
+  }> => {
+    const finalParams: Record<string, any> = { ...(params ?? {}) };
+    const query = new URLSearchParams(
+      Object.entries(finalParams)
+        .filter(([, v]) => v !== undefined && v !== null && v !== "")
+        .map(([k, v]) => [k, String(v)])
+    ).toString();
+    const endpoint = `/api/v1/real-transactions/area?${query}`;
+    const controller = new AbortController();
+    const to = setTimeout(() => controller.abort(), 10000);
+    try {
+      const res = await fetch(`${API_BASE_URL}${endpoint}`, {
+        method: "GET",
+        headers: { "Content-Type": "application/json" },
+        signal: controller.signal,
+      });
+      clearTimeout(to);
+      if (!res.ok) {
+        let details: any = undefined;
+        try {
+          details = await res.json();
+        } catch {
+          try {
+            details = await res.text();
+          } catch {}
+        }
+        throw createApiError({
+          message:
+            (details && (details.detail || details.message)) ||
+            `HTTP error ${res.status}`,
+          status: res.status,
+          url: `${API_BASE_URL}${endpoint}`,
+          method: "GET",
+          details,
+        });
+      }
+      return (await res.json()) as any;
+    } catch (e) {
+      clearTimeout(to);
+      throw e;
+    }
+  },
+  // 🆕 전월세 지도용 가까운 순 LIMIT API (서버 KNN)
+  getNearestRentMap: async (params: {
+    ref_lat: number;
+    ref_lng: number;
+    limit?: number;
+    bounds?: { south: number; west: number; north: number; east: number };
+    filters?: Record<string, any>;
+    timeoutMs?: number;
+  }): Promise<RentNearestResponse> => {
+    const q: Record<string, any> = {
+      dataset: "rent",
+      sort: "distance_asc",
+      ref_lat: params.ref_lat,
+      ref_lng: params.ref_lng,
+    };
+    if (typeof params.limit === "number") q.limit = params.limit;
+    if (params.bounds) {
+      q.south = params.bounds.south;
+      q.west = params.bounds.west;
+      q.north = params.bounds.north;
+      q.east = params.bounds.east;
+    }
+    if (params.filters && typeof params.filters === "object") {
+      Object.entries(params.filters).forEach(([k, v]) => {
+        if (v !== undefined && v !== null && v !== "") q[k] = v as any;
+      });
+    }
+    const query = new URLSearchParams(q).toString();
+    const endpoint = `/api/v1/real-transactions/map?${query}`;
+    const controller = new AbortController();
+    const to = setTimeout(
+      () => controller.abort(),
+      Math.max(5000, Number(params.timeoutMs ?? 10000))
+    );
+    try {
+      const res = await fetch(`${API_BASE_URL}${endpoint}`, {
+        method: "GET",
+        headers: { "Content-Type": "application/json" },
+        signal: controller.signal,
+      });
+      clearTimeout(to);
+      if (!res.ok) {
+        let details: any = undefined;
+        try {
+          details = await res.json();
+        } catch {
+          try {
+            details = await res.text();
+          } catch {}
+        }
+        throw createApiError({
+          message:
+            (details && (details.detail || details.message)) ||
+            `HTTP error ${res.status}`,
+          status: res.status,
+          url: `${API_BASE_URL}${endpoint}`,
+          method: "GET",
+          details,
+        });
+      }
+      return (await res.json()) as RentNearestResponse;
+    } catch (e) {
+      clearTimeout(to);
+      throw e;
+    }
+  },
   // 주소별 전월세 조회 (실거래가 팝업과 유사한 UX)
   getRentsByAddress: async (address: string): Promise<any> => {
     const response = await fetch(

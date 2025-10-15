@@ -150,15 +150,7 @@ export default function FilterControl({
       (setFilterBase as any)(key, value);
     }
   };
-  const setRangeFilter = (
-    key:
-      | "priceRange"
-      | "areaRange"
-      | "buildingAreaRange"
-      | "landAreaRange"
-      | "buildYear",
-    value: [number, number]
-  ) => {
+  const setRangeFilter = (key: any, value: [number, number]) => {
     if (namespace && typeof setNsRangeFilter === "function") {
       (setNsRangeFilter as any)(namespace, key, value);
     } else {
@@ -1176,11 +1168,14 @@ export default function FilterControl({
                   <div className="space-y-6">
                     <div className="px-4 py-3 bg-gray-50 rounded-lg">
                       <Slider
-                        value={filters.buildingAreaRange}
+                        value={
+                          filters.exclusiveAreaRange ||
+                          filters.buildingAreaRange
+                        }
                         onValueChange={(value: number[]) =>
-                          setRangeFilter("buildingAreaRange", [
+                          setRangeFilter("exclusiveAreaRange", [
                             value[0] || 0,
-                            value[1] || 100,
+                            value[1] || 300,
                           ])
                         }
                         min={0}
@@ -1192,11 +1187,19 @@ export default function FilterControl({
                     </div>
                     <div className="flex items-center justify-between text-sm font-medium text-gray-700">
                       <span className="px-2 py-1 rounded-md text-xs border">
-                        {filters.buildingAreaRange[0]}평
+                        {
+                          (filters.exclusiveAreaRange ||
+                            filters.buildingAreaRange)[0]
+                        }
+                        평
                       </span>
                       <span className="text-gray-400">~</span>
                       <span className="px-2 py-1 rounded-md text-xs border">
-                        {filters.buildingAreaRange[1]}평
+                        {
+                          (filters.exclusiveAreaRange ||
+                            filters.buildingAreaRange)[1]
+                        }
+                        평
                       </span>
                     </div>
                   </div>
@@ -1208,12 +1211,16 @@ export default function FilterControl({
                       </Label>
                       <Input
                         type="number"
-                        value={filters.buildingAreaRange[0]}
+                        value={
+                          (filters.exclusiveAreaRange ||
+                            filters.buildingAreaRange)[0]
+                        }
                         onChange={(e) => {
                           const value = Number.parseInt(e.target.value) || 0;
-                          setRangeFilter("buildingAreaRange", [
+                          setRangeFilter("exclusiveAreaRange", [
                             value,
-                            filters.buildingAreaRange[1],
+                            (filters.exclusiveAreaRange ||
+                              filters.buildingAreaRange)[1],
                           ]);
                         }}
                         disabled={!isLocationSelected}
@@ -1227,17 +1234,21 @@ export default function FilterControl({
                       </Label>
                       <Input
                         type="number"
-                        value={filters.buildingAreaRange[1]}
+                        value={
+                          (filters.exclusiveAreaRange ||
+                            filters.buildingAreaRange)[1]
+                        }
                         onChange={(e) => {
-                          const value = Number.parseInt(e.target.value) || 100;
-                          setRangeFilter("buildingAreaRange", [
-                            filters.buildingAreaRange[0],
+                          const value = Number.parseInt(e.target.value) || 300;
+                          setRangeFilter("exclusiveAreaRange", [
+                            (filters.exclusiveAreaRange ||
+                              filters.buildingAreaRange)[0],
                             value,
                           ]);
                         }}
                         disabled={!isLocationSelected}
                         className="h-9 text-sm"
-                        placeholder="100"
+                        placeholder="300"
                       />
                     </div>
                   </div>
@@ -1265,17 +1276,21 @@ export default function FilterControl({
                     <div className="px-4 py-3 bg-gray-50 rounded-lg">
                       <Slider
                         value={[
-                          filters.landAreaRange?.[0] || 0,
-                          filters.landAreaRange?.[1] || 200,
+                          filters.landRightsAreaRange?.[0] ??
+                            filters.landAreaRange?.[0] ??
+                            0,
+                          filters.landRightsAreaRange?.[1] ??
+                            filters.landAreaRange?.[1] ??
+                            600,
                         ]}
                         onValueChange={(value: number[]) =>
-                          setRangeFilter("landAreaRange", [
+                          setRangeFilter("landRightsAreaRange", [
                             value[0] || 0,
-                            value[1] || 200,
+                            value[1] || 600,
                           ])
                         }
                         min={0}
-                        max={300}
+                        max={600}
                         step={5}
                         disabled={!isLocationSelected}
                         className="w-full h-3"
@@ -1283,11 +1298,17 @@ export default function FilterControl({
                     </div>
                     <div className="flex items-center justify-between text-sm font-medium text-gray-700">
                       <span className="px-2 py-1 rounded-md text-xs border">
-                        {filters.landAreaRange?.[0] || 0}평
+                        {filters.landRightsAreaRange?.[0] ??
+                          filters.landAreaRange?.[0] ??
+                          0}
+                        평
                       </span>
                       <span className="text-gray-400">~</span>
                       <span className="px-2 py-1 rounded-md text-xs border">
-                        {filters.landAreaRange?.[1] || 200}평
+                        {filters.landRightsAreaRange?.[1] ??
+                          filters.landAreaRange?.[1] ??
+                          600}
+                        평
                       </span>
                     </div>
                   </div>
@@ -1299,12 +1320,18 @@ export default function FilterControl({
                       </Label>
                       <Input
                         type="number"
-                        value={filters.landAreaRange?.[0] || 0}
+                        value={
+                          filters.landRightsAreaRange?.[0] ??
+                          filters.landAreaRange?.[0] ??
+                          0
+                        }
                         onChange={(e) => {
                           const value = Number.parseInt(e.target.value) || 0;
-                          setRangeFilter("landAreaRange", [
+                          setRangeFilter("landRightsAreaRange", [
                             value,
-                            filters.landAreaRange?.[1] || 200,
+                            filters.landRightsAreaRange?.[1] ??
+                              filters.landAreaRange?.[1] ??
+                              600,
                           ]);
                         }}
                         disabled={!isLocationSelected}
@@ -1318,17 +1345,23 @@ export default function FilterControl({
                       </Label>
                       <Input
                         type="number"
-                        value={filters.landAreaRange?.[1] || 200}
+                        value={
+                          filters.landRightsAreaRange?.[1] ??
+                          filters.landAreaRange?.[1] ??
+                          600
+                        }
                         onChange={(e) => {
-                          const value = Number.parseInt(e.target.value) || 200;
-                          setRangeFilter("landAreaRange", [
-                            filters.landAreaRange?.[0] || 0,
+                          const value = Number.parseInt(e.target.value) || 600;
+                          setRangeFilter("landRightsAreaRange", [
+                            filters.landRightsAreaRange?.[0] ??
+                              filters.landAreaRange?.[0] ??
+                              0,
                             value,
                           ]);
                         }}
                         disabled={!isLocationSelected}
                         className="h-9 text-sm"
-                        placeholder="200"
+                        placeholder="600"
                       />
                     </div>
                   </div>
@@ -1664,8 +1697,9 @@ export default function FilterControl({
                       }}
                       disabled={!isLocationSelected}
                       className={`px-2 py-1 text-xs rounded-md border transition-colors ${
-                        !Array.isArray((filters as any).specialRights) || 
-                        ((filters as any).specialRights as string[]).length === 0
+                        !Array.isArray((filters as any).specialRights) ||
+                        ((filters as any).specialRights as string[]).length ===
+                          0
                           ? "bg-purple-500 text-white border-purple-500"
                           : "bg-white text-gray-700 border-gray-300 hover:border-purple-300 hover:bg-purple-50"
                       } ${
@@ -1676,50 +1710,48 @@ export default function FilterControl({
                     >
                       전체
                     </button>
-                    {specialRights && specialRights.length > 0 ? (
-                      specialRights.map((right) => {
-                        const current = (filters as any).specialRights as
-                          | string[]
-                          | undefined;
-                        const isActive = Array.isArray(current)
-                          ? current.includes(right)
-                          : false;
-                        return (
-                          <button
-                            key={right}
-                            onClick={() => {
-                              const prev = (filters as any).specialRights as
-                                | string[]
-                                | undefined;
-                              const next = Array.isArray(prev)
-                                ? isActive
-                                  ? prev.filter((v) => v !== right)
-                                  : [...prev, right]
-                                : [right];
-                              setFilter("specialRights" as any, next as any);
-                            }}
-                            disabled={!isLocationSelected}
-                            className={`px-2 py-1 text-xs rounded-md border transition-colors ${
-                              isActive
-                                ? "bg-purple-500 text-white border-purple-500"
-                                : "bg-white text-gray-700 border-gray-300 hover:border-purple-300 hover:bg-purple-50"
-                            } ${
-                              !isLocationSelected
-                                ? "opacity-50 cursor-not-allowed"
-                                : ""
-                            }`}
-                          >
-                            {right}
-                          </button>
-                        );
-                      })
-                    ) : (
-                      !isLoadingSpecialRights && (
-                        <span className="text-xs text-gray-500">
-                          특수권리 없음
-                        </span>
-                      )
-                    )}
+                    {specialRights && specialRights.length > 0
+                      ? specialRights.map((right) => {
+                          const current = (filters as any).specialRights as
+                            | string[]
+                            | undefined;
+                          const isActive = Array.isArray(current)
+                            ? current.includes(right)
+                            : false;
+                          return (
+                            <button
+                              key={right}
+                              onClick={() => {
+                                const prev = (filters as any).specialRights as
+                                  | string[]
+                                  | undefined;
+                                const next = Array.isArray(prev)
+                                  ? isActive
+                                    ? prev.filter((v) => v !== right)
+                                    : [...prev, right]
+                                  : [right];
+                                setFilter("specialRights" as any, next as any);
+                              }}
+                              disabled={!isLocationSelected}
+                              className={`px-2 py-1 text-xs rounded-md border transition-colors ${
+                                isActive
+                                  ? "bg-purple-500 text-white border-purple-500"
+                                  : "bg-white text-gray-700 border-gray-300 hover:border-purple-300 hover:bg-purple-50"
+                              } ${
+                                !isLocationSelected
+                                  ? "opacity-50 cursor-not-allowed"
+                                  : ""
+                              }`}
+                            >
+                              {right}
+                            </button>
+                          );
+                        })
+                      : !isLoadingSpecialRights && (
+                          <span className="text-xs text-gray-500">
+                            특수권리 없음
+                          </span>
+                        )}
                   </div>
                 )}
               </div>

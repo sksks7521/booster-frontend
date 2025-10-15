@@ -1,0 +1,11 @@
+Application/components/features/rent/RentFilter.tsx
+Application/components/features/rent/RentSearchResults.tsx
+Application/components/features/sale/SaleSearchResults.tsx
+Application/datasets/registry.ts
+"Communication/Backend/receive/Completed/251011_Backend_to_Frontend_real-rents_filters_\355\231\225\354\236\245_\353\213\265\354\213\240.md"
+"Communication/Backend/send/Completed/251011_Backend_to_Frontend_real-rents_ids_\354\247\200\354\233\220_\353\213\265\354\213\240.md"
+"Communication/Backend/send/Request/251011_Frontend_to_Backend_real-rents_filters_\355\231\225\354\236\245\354\232\224\354\262\255.md"
+"Communication/Backend/send/Request/251011_Frontend_to_Backend_real-rents_ids_\354\247\200\354\233\220\354\232\224\354\262\255.md"
+"Communication/Backend/send/Request/251011_Frontend_to_Backend_real-rents_ordering_\354\247\200\354\233\220\354\232\224\354\262\255.md"
+Doc/RealTransactions/RENT_PLAN.md
+Log/251011.md

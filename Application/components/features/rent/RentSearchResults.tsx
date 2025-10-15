@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import type { Key } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -14,6 +14,10 @@ const ItemTableVirtual = dynamic(
   { ssr: false }
 );
 import MapView from "@/components/features/map-view";
+import { realRentApi } from "@/lib/api";
+import { buildRentMapFilters } from "@/components/features/rent/mapPayload";
+import { buildRentAreaParams } from "@/components/features/rent/areaQuery";
+import { haversineDistanceM } from "@/lib/geo/distance";
 
 import { useFilterStore } from "@/store/filterStore";
 import { useSortableColumns } from "@/hooks/useSortableColumns";
@@ -81,18 +85,21 @@ export default function RentSearchResults({
   const setSortConfig = useFilterStore((s: any) => s.setSortConfig);
   const page = useFilterStore((s) => s.page);
   const size = useFilterStore((s) => s.size);
+  // 전역 정렬 상태 (영역 API 파라미터에도 사용)
+  const sortBy = useFilterStore((s: any) => s.sortBy);
+  const sortOrder = useFilterStore((s: any) => s.sortOrder);
 
   // 지역 조건 체크
   const hasProvince = !!(allFilters as any)?.province;
   const hasCity = !!(allFilters as any)?.cityDistrict;
   const regionReady = hasProvince && hasCity;
 
-  // 기본 정렬 초기화 (최초 1회만)
-  useEffect(() => {
-    if (regionReady && !(allFilters as any)?.sortBy) {
-      setSortConfig("contractDate", "desc");
-    }
-  }, [regionReady, setSortConfig]);
+  // 기본 정렬 초기화 제거: 초기 화면에서는 정렬 미설정(사용자 선택 시에만 설정)
+  // useEffect(() => {
+  //   if (regionReady && !(allFilters as any)?.sortBy) {
+  //     setSortConfig("contractDate", "desc");
+  //   }
+  // }, [regionReady, setSortConfig]);
 
   // 🆕 원 필터 상태 먼저 가져오기 (분기 조건 판단용)
   const nsState = useFilterStore((s: any) => s.ns);
@@ -103,9 +110,25 @@ export default function RentSearchResults({
     Number.isFinite(circleCenter.lat) &&
     Number.isFinite(circleCenter.lng) &&
     !(Number(circleCenter.lat) === 0 && Number(circleCenter.lng) === 0);
-  const centerForFilter = centerValid
-    ? { lat: Number(circleCenter.lat), lng: Number(circleCenter.lng) }
-    : null;
+  // 서버 KNN 기준점: circleCenter 우선, 없으면 refMarkerCenter 폴백
+  const centerForFilter = (function () {
+    if (centerValid)
+      return { lat: Number(circleCenter!.lat), lng: Number(circleCenter!.lng) };
+    const ref = (nsState?.rent?.refMarkerCenter as any) || null;
+    if (
+      ref &&
+      Number.isFinite(ref.lat) &&
+      Number.isFinite(ref.lng) &&
+      !(Number(ref.lat) === 0 && Number(ref.lng) === 0)
+    )
+      return { lat: Number(ref.lat), lng: Number(ref.lng) };
+    return null;
+  })();
+
+  // 원 그리기 상태 (네임스페이스 기반) - 영역 API 의존 값은 선 선언
+  const setNsFilter = useFilterStore((s: any) => s.setNsFilter);
+  const circleEnabled = Boolean(nsState?.rent?.circleEnabled);
+  const circleRadiusM = nsState?.rent?.circleRadiusM ?? 1000;
 
   // 🆕 페이지별 데이터 (서버 정렬+페이지네이션)
   const pageHook = useDataset("rent", mergedFilters, page, size, regionReady);
@@ -116,8 +139,20 @@ export default function RentSearchResults({
   const refetch = pageHook.mutate;
   const rawItems = pageHook.items;
   const serverTotal = pageHook.total;
-  const items = rawItems || [];
-  const totalCount = serverTotal;
+  // 선택 항목만 보기(클라이언트 필터) 적용: 백엔드 ids 미지원 대비
+  const showSelectedOnly = useFilterStore((s: any) => s.showSelectedOnly);
+  const selectedIdsForFilter = useFilterStore(
+    (s: any) => s.selectedIds || []
+  ) as string[];
+  const itemsBase = rawItems || [];
+  const items = showSelectedOnly
+    ? Array.isArray(selectedIdsForFilter) && selectedIdsForFilter.length > 0
+      ? itemsBase.filter((it: any) =>
+          (selectedIdsForFilter as string[]).includes(String(it?.id))
+        )
+      : []
+    : itemsBase;
+  const totalCount = showSelectedOnly ? items.length : serverTotal;
 
   // 📊 전체 데이터 개수 조회 (필터 없이)
   const { total: totalAllData } = useDataset("rent", {}, 1, 1, true);
@@ -186,6 +221,331 @@ export default function RentSearchResults({
   );
   const mapRawItems = mapPageHook.items;
 
+  // 플래그/최근접 서버 모드 상태
+  const { areaDisplay, nearestLimitRentIsServer } = useFeatureFlags();
+  // 🆕 디버그 게이트(개발/환경변수)
+  const debugEnabled =
+    String(process.env.NEXT_PUBLIC_DETAIL_DEBUG || "") === "1" ||
+    process.env.NODE_ENV === "development";
+  const [nearestItems, setNearestItems] = useState<any[] | null>(null);
+  const [nearestError, setNearestError] = useState<string | null>(null);
+  const [nearestWarning, setNearestWarning] = useState<string | null>(null);
+
+  // 영역 안만 보기 활성 시 서버 영역 API 사용 여부
+  const useServerArea = Boolean(applyCircleFilter && centerForFilter);
+
+  // 서버 영역 리스트/지도 상태
+  const [serverAreaState, setServerAreaState] = useState<{
+    items: any[];
+    total: number;
+    isLoading: boolean;
+    error?: any;
+  }>({ items: [], total: 0, isLoading: false });
+  const [serverAreaMapState, setServerAreaMapState] = useState<{
+    items: any[];
+    isLoading: boolean;
+    error?: any;
+  }>({ items: [], isLoading: false });
+
+  // 서버 영역 리스트 데이터(fetch: page/size)
+  useEffect(() => {
+    let ignore = false;
+    (async () => {
+      if (!useServerArea) {
+        if (!ignore)
+          setServerAreaState({ items: [], total: 0, isLoading: false });
+        return;
+      }
+      try {
+        if (!centerForFilter) {
+          if (!ignore)
+            setServerAreaState({ items: [], total: 0, isLoading: false });
+          return;
+        }
+        setServerAreaState({ items: [], total: 0, isLoading: true });
+        // 🆕 백엔드 /area ordering 제약 대응: 항상 거리 오름차순으로 요청하고,
+        // 목록 정렬은 클라이언트에서 처리
+        const q = buildRentAreaParams({
+          filters: mergedFilters,
+          center: centerForFilter,
+          radiusM: Number(circleRadiusM) || 1000,
+          page,
+          size,
+          sortBy: "distance",
+          sortOrder: "asc",
+        });
+        try {
+          if (debugEnabled) {
+            console.groupCollapsed(
+              "%c[rent] area(list) request",
+              "color:#7b5; font-weight:bold;",
+              {
+                center: centerForFilter,
+                radiusM: Number(circleRadiusM) || 1000,
+                page,
+                size,
+                ordering: (q as any)?.ordering,
+              }
+            );
+            console.time("[rent] area(list) fetch");
+          }
+        } catch {}
+        try {
+          if (debugEnabled) {
+            console.groupCollapsed(
+              "%c[rent] area(server) request",
+              "color:#7b5; font-weight:bold;",
+              {
+                center: centerForFilter,
+                radiusM: Number(circleRadiusM) || 1000,
+                page: 1,
+                size: q?.size,
+                ordering_hint: "distance_asc",
+                limitHint: Number(maxMarkersCap),
+              }
+            );
+            console.time("[rent] area(server) fetch");
+          }
+        } catch {}
+        const res = await realRentApi.getRentsArea(q as any);
+        if (ignore) return;
+        const raw = ((res as any)?.items ??
+          (res as any)?.results ??
+          []) as any[];
+        const adapted = Array.isArray(raw)
+          ? raw.map((r: any) =>
+              (datasetConfigs as any)?.["rent"]?.adapter?.toItemLike
+                ? (datasetConfigs as any)["rent"].adapter.toItemLike(r)
+                : r
+            )
+          : [];
+        const totalVal = Number(
+          (res as any)?.total ??
+            (res as any)?.total_items ??
+            adapted.length ??
+            0
+        );
+        setServerAreaState({
+          items: adapted,
+          total: totalVal,
+          isLoading: false,
+        });
+        try {
+          if (debugEnabled) {
+            console.timeEnd("[rent] area(list) fetch");
+            (window as any).__rentAreaList = {
+              ts: Date.now(),
+              params: {
+                center: centerForFilter,
+                radiusM: Number(circleRadiusM) || 1000,
+                page,
+                size,
+              },
+              total: totalVal,
+              itemsLength: adapted.length,
+            };
+            console.info("[rent] area(list) response", {
+              total: totalVal,
+              itemsLength: adapted.length,
+            });
+            console.groupEnd();
+          }
+        } catch {}
+        try {
+          if (debugEnabled) {
+            console.timeEnd("[rent] area(server) fetch");
+            const sample2 = ((serverAreaMapState.items as any[]) || [])
+              .slice(0, 5)
+              .map((it: any) => {
+                const lat = Number(it?.lat ?? it?.latitude ?? (it as any)?.y);
+                const lng = Number(it?.lng ?? it?.longitude ?? (it as any)?.x);
+                const d =
+                  Number.isFinite(lat) && Number.isFinite(lng)
+                    ? Math.round(
+                        haversineDistanceM(
+                          {
+                            lat: centerForFilter!.lat,
+                            lng: centerForFilter!.lng,
+                          },
+                          { lat, lng }
+                        )
+                      )
+                    : null;
+                return { id: it?.id, lat, lng, d };
+              });
+            const distances2 = sample2
+              .map((s: any) => s.d)
+              .filter((d: any) => d != null) as number[];
+            const isNonDecreasing2 = distances2.every(
+              (d: any, i: number, a: number[]) =>
+                i === 0 ? true : d! >= (a[i - 1] ?? d!)
+            );
+            (window as any).__rentArea = {
+              ts: Date.now(),
+              params: {
+                center: centerForFilter,
+                radiusM: Number(circleRadiusM) || 1000,
+                page: 1,
+                size: q?.size,
+                limitHint: Number(maxMarkersCap),
+              },
+              total: (res as any)?.total ?? (res as any)?.total_items,
+              ordering: (res as any)?.ordering,
+              itemsLength: adapted.length,
+            };
+            console.info("[rent] area(server) response", {
+              itemsLength: adapted.length,
+              total: (res as any)?.total ?? (res as any)?.total_items,
+              ordering: (res as any)?.ordering,
+            });
+            console.info("[rent] area(server) KNN check", {
+              top5: sample2,
+              distances: distances2,
+              isNonDecreasing: isNonDecreasing2,
+              minDistance: distances2.length ? Math.min(...distances2) : null,
+              maxDistance: distances2.length ? Math.max(...distances2) : null,
+            });
+            console.groupEnd();
+          }
+        } catch {}
+      } catch (e) {
+        if (ignore) return;
+        setServerAreaState({ items: [], total: 0, isLoading: false, error: e });
+      }
+    })();
+    return () => {
+      ignore = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    useServerArea,
+    centerForFilter?.lat,
+    centerForFilter?.lng,
+    circleRadiusM,
+    page,
+    size,
+    sortBy,
+    sortOrder,
+    JSON.stringify({
+      province: mergedFilters?.province,
+      city: mergedFilters?.cityDistrict,
+      town: mergedFilters?.town,
+    }),
+  ]);
+
+  // 서버 영역 지도 대용량(fetch: page=1, size=α*cap, distance asc 힌트)
+  useEffect(() => {
+    let ignore = false;
+    (async () => {
+      if (!useServerArea) {
+        if (!ignore) setServerAreaMapState({ items: [], isLoading: false });
+        return;
+      }
+      try {
+        if (!centerForFilter) {
+          if (!ignore) setServerAreaMapState({ items: [], isLoading: false });
+          return;
+        }
+        setServerAreaMapState({ items: [], isLoading: true });
+        const ALPHA = 3;
+        const alphaCapped = Math.min(
+          3000,
+          BACKEND_MAX_PAGE_SIZE,
+          MAP_GUARD.maxMarkers,
+          Math.max(1, Number(maxMarkersCap) * ALPHA)
+        );
+        const q = buildRentAreaParams({
+          filters: mergedFilters,
+          center: centerForFilter,
+          radiusM: Number(circleRadiusM) || 1000,
+          page: 1,
+          size: alphaCapped,
+          // 🆕 /area는 거리정렬 우선 요청
+          sortBy: "distance",
+          sortOrder: "asc",
+          limitHint: Number(maxMarkersCap),
+        });
+        const res = await realRentApi.getRentsArea(q as any);
+        if (ignore) return;
+        const raw = ((res as any)?.items ??
+          (res as any)?.results ??
+          []) as any[];
+        const adapted = Array.isArray(raw)
+          ? raw.map((r: any) =>
+              (datasetConfigs as any)?.["rent"]?.adapter?.toItemLike
+                ? (datasetConfigs as any)["rent"].adapter.toItemLike(r)
+                : r
+            )
+          : [];
+        // 클라이언트 KNN 정렬 및 표시상한 절단
+        const center = centerForFilter;
+        const sortedLimited = adapted
+          .map((it: any) => {
+            const lat = Number((it?.lat ?? it?.latitude) as any);
+            const lng = Number((it?.lng ?? it?.longitude) as any);
+            const d =
+              Number.isFinite(lat) && Number.isFinite(lng)
+                ? haversineDistanceM(
+                    { lat: center!.lat, lng: center!.lng },
+                    { lat, lng }
+                  )
+                : Number.POSITIVE_INFINITY;
+            return { it, d };
+          })
+          .sort((a, b) => a.d - b.d)
+          .slice(0, Number(maxMarkersCap))
+          .map((x) => x.it);
+        // 경고 배지 구성
+        try {
+          const areaTotal = Number(
+            (res as any)?.total ??
+              (res as any)?.total_items ??
+              adapted.length ??
+              0
+          );
+          if (Number.isFinite(areaTotal) && areaTotal > Number(maxMarkersCap)) {
+            const limitUsed = Number(maxMarkersCap);
+            const txt = `필터 결과가 ${areaTotal.toLocaleString()}건입니다. 가까운 순 상위 ${limitUsed.toLocaleString()}건만 표시합니다.`;
+            setNearestWarning(txt);
+          } else {
+            setNearestWarning(null);
+          }
+        } catch {}
+        setServerAreaMapState({ items: sortedLimited, isLoading: false });
+      } catch (e) {
+        if (ignore) return;
+        setServerAreaMapState({ items: [], isLoading: false, error: e });
+      }
+    })();
+    return () => {
+      ignore = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    useServerArea,
+    centerForFilter?.lat,
+    centerForFilter?.lng,
+    circleRadiusM,
+    maxMarkersCap,
+    sortBy,
+    sortOrder,
+    JSON.stringify({
+      province: mergedFilters?.province,
+      city: mergedFilters?.cityDistrict,
+      town: mergedFilters?.town,
+    }),
+  ]);
+
+  // 서버 지도 소스 결합: 영역 우선 → KNN → 페이지 데이터
+  const areaItems = ((serverAreaMapState.items as any[]) || []) as any[];
+  const knnItems = ((nearestItems as any[]) || []) as any[];
+  const serverMapItems =
+    useServerArea && areaItems.length > 0
+      ? areaItems
+      : nearestLimitRentIsServer && knnItems.length > 0
+      ? knnItems
+      : mapRawItems;
+
   // 원 영역 필터 파이프라인
   const {
     processedItemsSorted,
@@ -199,13 +559,20 @@ export default function RentSearchResults({
     page,
     size,
     items,
-    globalSource: mapRawItems,
+    // 지도 전역 소스는 서버 응답(serverMapItems)으로 단일화
+    globalSource: serverMapItems,
     maxMarkersCap,
-    getRowSortTs: (r: any) =>
-      r?.contract_date ? Date.parse(r.contract_date) : 0,
+    getRowSortTs: (r: any) => {
+      const s = r?.contract_date || r?.contractDate || r?.extra?.contractDate;
+      return s ? Date.parse(s) : 0;
+    },
   });
 
-  const finalPagedItems = applyCircle ? pagedItems : items;
+  const finalPagedItems = useServerArea
+    ? serverAreaState.items
+    : applyCircle
+    ? pagedItems
+    : items;
   const finalMapItems = filteredMapItems;
   const finalTotalCount = applyCircle
     ? processedItemsSorted.length
@@ -213,9 +580,6 @@ export default function RentSearchResults({
 
   // 테이블 기능을 위한 추가 상태들
   const { sortableColumns } = useSortableColumns("rent");
-  const sortBy = useFilterStore((s: any) => s.sortBy);
-  const sortOrder = useFilterStore((s: any) => s.sortOrder);
-  const { areaDisplay } = useFeatureFlags();
   const useVirtual = false;
 
   // 체크박스 선택 → 지도 연동
@@ -226,11 +590,6 @@ export default function RentSearchResults({
   const setPendingMapTarget = useFilterStore(
     (s: any) => s.setPendingMapTarget ?? NOOP
   );
-
-  // 원 그리기 상태 (네임스페이스 기반)
-  const setNsFilter = useFilterStore((s: any) => s.setNsFilter);
-  const circleEnabled = Boolean(nsState?.rent?.circleEnabled);
-  const circleRadiusM = nsState?.rent?.circleRadiusM ?? 1000;
 
   const handleCircleToggle = () => {
     if (typeof setNsFilter === "function") {
@@ -287,14 +646,19 @@ export default function RentSearchResults({
 
   // 정렬 핸들러: 서버 허용 키만
   const handleSort = (column?: string, direction?: "asc" | "desc") => {
-    const key = column ?? "";
+    // 정렬 해제: column이 비어 들어오면 해제로 처리
+    if (!column) {
+      setSortConfig(undefined as any, undefined as any);
+      return;
+    }
+    // 정렬 설정: 허용 컬럼만 통과
+    const key = column;
     const order = direction ?? "asc";
     const snakeKey = key.replace(/([A-Z])/g, "_$1").toLowerCase();
     if (
-      !key ||
-      (Array.isArray(sortableColumns) &&
-        sortableColumns.length > 0 &&
-        !sortableColumns.includes(snakeKey))
+      Array.isArray(sortableColumns) &&
+      sortableColumns.length > 0 &&
+      !sortableColumns.includes(snakeKey)
     ) {
       return;
     }
@@ -315,6 +679,245 @@ export default function RentSearchResults({
     .split(",")
     .map((v) => parseInt(v.trim()))
     .filter((n) => Number.isFinite(n));
+
+  // 서버 전달용 필터 페이로드(빌더 적용)
+  const serverFilterPayload = (() => {
+    try {
+      // 🆕 fetch limit 분리: applyCircle ON이면 서버 limit=1000 고정, OFF면 cap 사용
+      const effectiveLimit = applyCircleFilter ? 1000 : Number(maxMarkersCap);
+      return buildRentMapFilters({
+        filters: mergedFilters,
+        center: centerForFilter,
+        limit: Number(effectiveLimit),
+        bounds,
+        sortBy: sortBy as any,
+        sortOrder: (sortOrder as any) || undefined,
+      });
+    } catch {
+      return mergedFilters;
+    }
+  })();
+
+  // 요청 키(필터/센터/경계/limit) 디바운스 → 입력 중간값 과호출 방지
+  // 🆕 applyCircle ON이면 requestKey에서 limit 제거(표시상한 변경 시 서버 재호출 방지)
+  const requestKey = JSON.stringify(
+    applyCircleFilter
+      ? {
+          f: serverFilterPayload,
+          lat: centerForFilter?.lat ?? null,
+          lng: centerForFilter?.lng ?? null,
+          b: bounds
+            ? {
+                s: bounds.south ?? null,
+                w: bounds.west ?? null,
+                n: bounds.north ?? null,
+                e: bounds.east ?? null,
+              }
+            : null,
+        }
+      : {
+          f: serverFilterPayload,
+          lat: centerForFilter?.lat ?? null,
+          lng: centerForFilter?.lng ?? null,
+          b: bounds
+            ? {
+                s: bounds.south ?? null,
+                w: bounds.west ?? null,
+                n: bounds.north ?? null,
+                e: bounds.east ?? null,
+              }
+            : null,
+          limit: Number(maxMarkersCap),
+        }
+  );
+  const [debouncedRequestKey, setDebouncedRequestKey] = useState<string | null>(
+    null
+  );
+  useEffect(() => {
+    const tid = setTimeout(() => setDebouncedRequestKey(requestKey), 200);
+    return () => clearTimeout(tid);
+  }, [requestKey]);
+
+  const [mapTotal, setMapTotal] = useState<number | null>(null);
+  // 🆕 표시/총계 계산: 영역 우선, 그 외는 KNN/전체 총계
+  const displayTotal = (() => {
+    const areaTotal = Number(serverAreaState?.total || 0);
+    if (useServerArea)
+      return areaTotal > 0 ? areaTotal : processedItemsSorted.length;
+    if (applyCircle) return processedItemsSorted.length;
+    if (nearestLimitRentIsServer && mapTotal != null) return Number(mapTotal);
+    return totalCount;
+  })();
+  const displayShown = Math.min(
+    finalMapItems?.length || 0,
+    Number(maxMarkersCap)
+  );
+
+  // 서버 KNN 모드: 지도용 데이터 최근접 상위 K만 요청 (디바운스+트레일링)
+  const inFlightRef = useRef(false);
+  const pendingKeyRef = useRef<string | null>(null);
+  const lastSentKeyRef = useRef<string | null>(null);
+  const [rerunTick, setRerunTick] = useState(0);
+
+  useEffect(() => {
+    const shouldUseServer = Boolean(nearestLimitRentIsServer);
+    const wantMapData = activeView !== "table" || applyCircleFilter;
+    if (!regionReady || !shouldUseServer || !wantMapData) {
+      setNearestItems(null);
+      setNearestError(null);
+      return;
+    }
+    if (!centerForFilter) {
+      setNearestItems(null);
+      setNearestError(null);
+      return;
+    }
+    if (!debouncedRequestKey) return;
+    pendingKeyRef.current = debouncedRequestKey;
+    if (inFlightRef.current) return;
+    inFlightRef.current = true;
+    let aborted = false;
+    (async () => {
+      try {
+        setNearestError(null);
+        const params = {
+          ref_lat: centerForFilter.lat,
+          ref_lng: centerForFilter.lng,
+          // 🆕 fetch limit 분리: applyCircle ON이면 1000, OFF면 cap
+          limit: Number(applyCircleFilter ? 1000 : Number(maxMarkersCap)),
+          bounds: bounds || undefined,
+          filters: serverFilterPayload,
+          timeoutMs: 10000,
+        } as const;
+        try {
+          console.groupCollapsed(
+            "%c[rent] nearest(server) request",
+            "color:#0aa; font-weight:bold;",
+            {
+              ref_lat: params.ref_lat,
+              ref_lng: params.ref_lng,
+              limit: params.limit,
+              hasBounds: Boolean(params.bounds),
+              requestKey: pendingKeyRef.current,
+            }
+          );
+          console.time("[rent] nearest(server) fetch");
+        } catch {}
+        const resp = await realRentApi.getNearestRentMap(params as any);
+        if (aborted) return;
+        try {
+          console.timeEnd("[rent] nearest(server) fetch");
+        } catch {}
+        const arr = Array.isArray(resp?.items) ? resp.items : [];
+        setMapTotal(
+          Number.isFinite(resp?.total) ? Number(resp?.total) : arr.length
+        );
+        if (resp?.warning) {
+          const limitUsed = Number(
+            (resp as any)?.echo?.limit ?? Number(maxMarkersCap)
+          );
+          const txt = `물건 위치로부터 가까운 상위 ${
+            Number.isFinite(limitUsed) && limitUsed > 0
+              ? limitUsed.toLocaleString()
+              : String(maxMarkersCap)
+          }건만 반환했습니다.`;
+          setNearestWarning(txt);
+          try {
+            console.warn("[rent] nearest warning:", resp.warning, txt);
+          } catch {}
+        } else {
+          setNearestWarning(null);
+        }
+        // 🆕 /map 응답 표준화: 어댑터 적용 후 저장
+        const adapter =
+          (datasetConfigs as any)?.["rent"]?.adapter?.toItemLike ||
+          ((x: any) => x);
+        const adaptedArr = (arr as any[]).map((x) => adapter(x));
+        setNearestItems(adaptedArr as any[]);
+        // KNN 간단 검증: 상위 5개 거리 비감소
+        try {
+          const ref = { lat: params.ref_lat, lng: params.ref_lng } as const;
+          const sample = (adaptedArr as any[]).slice(0, 5).map((it) => {
+            const lat = Number(it?.lat ?? it?.latitude ?? it?.y);
+            const lng = Number(it?.lng ?? it?.longitude ?? it?.x);
+            const d =
+              Number.isFinite(lat) && Number.isFinite(lng)
+                ? Math.round(haversineDistanceM(ref, { lat, lng }))
+                : null;
+            return { id: it?.id, lat, lng, d };
+          });
+          const distances = sample
+            .map((s) => s.d)
+            .filter((d) => d != null) as number[];
+          const isNonDecreasing = distances.every((d, i, a) =>
+            i === 0 ? true : d >= (a[i - 1] ?? d)
+          );
+          console.info("[rent] KNN check", {
+            top5: sample,
+            isNonDecreasing,
+            minD: Math.min(...(distances.length ? distances : [NaN])),
+            maxD: Math.max(...(distances.length ? distances : [NaN])),
+          });
+        } catch {}
+        try {
+          (window as any).__nearestRent = {
+            ts: Date.now(),
+            params: {
+              ref_lat: params.ref_lat,
+              ref_lng: params.ref_lng,
+              limit: params.limit,
+              bounds: params.bounds,
+            },
+            echo: resp?.echo,
+            warning: resp?.warning ?? null,
+            itemsLength: arr.length,
+          };
+          console.info("[rent] nearest(server) response", {
+            itemsLength: arr.length,
+            echo: resp?.echo,
+            total: resp?.total,
+            warning: resp?.warning ?? null,
+          });
+          console.groupEnd();
+        } catch {}
+      } catch (e: any) {
+        if (aborted) return;
+        setNearestItems(null);
+        const msg = String(e?.message || "nearest fetch failed");
+        setNearestError(msg);
+        try {
+          console.info("[rent] fallback to client Top-K:", msg);
+        } catch {}
+        try {
+          (window as any).__nearestRentError = {
+            ts: Date.now(),
+            message: msg,
+          };
+        } catch {}
+      } finally {
+        lastSentKeyRef.current =
+          pendingKeyRef.current || debouncedRequestKey || null;
+        inFlightRef.current = false;
+        if (
+          pendingKeyRef.current &&
+          lastSentKeyRef.current &&
+          pendingKeyRef.current !== lastSentKeyRef.current
+        ) {
+          setRerunTick((t) => t + 1);
+        }
+      }
+    })();
+    return () => {
+      aborted = true;
+    };
+  }, [
+    nearestLimitRentIsServer,
+    regionReady,
+    activeView !== "table",
+    applyCircleFilter,
+    debouncedRequestKey,
+    rerunTick,
+  ]);
 
   return (
     <div className="space-y-4 lg:space-y-6">
@@ -414,6 +1017,19 @@ export default function RentSearchResults({
               </TabsTrigger>
             </TabsList>
           </Tabs>
+
+          {/* 🆕 지도 요약: 표시 N / 총 T + 경고 */}
+          {activeView === "map" && (
+            <div className="flex items-center justify-between py-2 text-sm text-muted-foreground">
+              <span className="inline-flex items-center rounded border border-gray-200 bg-white px-2 py-1 text-[11px] text-gray-700">
+                표시 {displayShown.toLocaleString()} / 총{" "}
+                {Number(displayTotal || 0).toLocaleString()}
+              </span>
+              {nearestWarning && (
+                <div className="text-amber-600">{nearestWarning}</div>
+              )}
+            </div>
+          )}
 
           {/* 표시 상한 + 영역 안만 보기 (map, both에서 노출) */}
           {activeView !== "table" && (
@@ -786,6 +1402,7 @@ export default function RentSearchResults({
                   <MapView
                     items={finalMapItems}
                     namespace="rent"
+                    markerLimit={maxMarkersCap}
                     clusterToggleEnabled={true}
                     useClustering={true}
                     legendTitle="전월세전환금 범례(단위: 만원)"
@@ -817,6 +1434,7 @@ export default function RentSearchResults({
                       <MapView
                         items={finalMapItems}
                         namespace="rent"
+                        markerLimit={maxMarkersCap}
                         clusterToggleEnabled={true}
                         useClustering={true}
                         legendTitle="전월세전환금 범례(단위: 만원)"

@@ -35,6 +35,9 @@
 - 데이터셋/정렬
   - `datasetConfigs.rent.table.defaultSort = { key: "contractDate", order: "desc" }` 적용
   - `fetchList`에서 `sigungu` 자동 정규화(예: `경기도` + `고양시 덕양구` → `경기도 고양시 덕양구`)
+  - 테이블 정렬 토글 사이클 구현: 오름(asc) → 내림(desc) → 해제(none)
+    - `ItemTable` 3번째 클릭 시 `onSort(undefined, undefined)` 전송
+    - `RentSearchResults.tsx`/`SaleSearchResults.tsx`의 `handleSort`가 빈 컬럼 입력 시 `setSortConfig(undefined, undefined)` 호출하도록 수정
 - 컬럼/스키마
   - `columnsRent` 확정: "대지권면적(㎡)" 제외, "보증금갱신차이(만원) → 보증금갱신차이(%)" 순서 반영
   - 팝업 스키마 `components/map/popup/schemas/rent.ts` 추가, `pickFirst`로 snake/camel 혼합 키 안정화
@@ -49,6 +52,17 @@
   - 색상 기준: 전월세 전환금(5%) 분기 사용
 - 백엔드 커뮤니케이션
   - `/real-rents/by-address` 라우팅 충돌(422) 및 지역 AND 필터 정규화 요청 문서화·발송
+  - 실거래가(전월세) 목록 API 정렬(ordering) 미적용 확인 → 적용 요청서 발송
+    - 문서: `Communication/Backend/send/Request/251011_Frontend_to_Backend_real-rents_ordering_지원요청.md`
+  - 확장 필터/UI/서버 매핑
+    - 전환금/연수익률/평당보증금/평당월세 4종 컨트롤 추가 및 서버 `min/max_*` 매핑 활성화
+    - 계약일자 빠른 선택(최근 1/3/6개월/올해) 버튼 추가
+    - 층확인 칩 보정 및 서버 토큰 정규화(영→한), 빈/"all"/공백 미전송
+    - 상단 버튼(선택 항목만 보기/설정 초기화) 도입, 하단 중복 초기화 버튼 제거
+  - 선택 항목만 보기(ids)
+    - 프론트: `ids` CSV(≤500) 전송 로직 추가(폴백: 클라이언트 필터)
+    - 백엔드: 지원 완료(AND 결합, 정렬/페이징 호환) 답신 수신
+    - 문서: `Communication/Backend/send/Request/251011_Frontend_to_Backend_real-rents_ids_지원요청.md`, `Communication/Backend/send/Completed/251011_Backend_to_Frontend_real-rents_ids_지원_답신.md`
 
 ### 2. 차이(전월세 전용) 포인트
 
@@ -136,6 +150,7 @@
 - 허용 컬럼: `/columns`의 허용 목록만 활성
 - 기본 정렬: `contractDate desc`(제안)
 - 토글 사이클: asc → desc → none, isSorting 동안 재클릭 억제
+  - 구현 상태: 렌트/매매 모두 `handleSort` 정렬 해제 분기 반영(2025-10-11)
 - 구현 메모:
   - 훅: `useSortableColumns("rent")` 사용
   - 응답 포맷이 legacy(`sortable_columns`)일 경우 그대로 사용, new(`columns[].sortable`)면 true만 추출
@@ -160,6 +175,10 @@
 - 좌표 매핑: 다양한 키(lat/lng/lon/x/y/lat_y 등) 우선순위 + 범위 기반 스왑 가드
 - 초기: 첫 로드 1회 `fitBounds`, 이후 중심·레벨 유지, 0건이어도 리셋 금지
 - 마커 상한: 공통 상한치, 안내 배지
+- 서버 KNN(공통 정책): 초기 분석 좌표 기준 가까운 순 상위 K만 서버에서 반환(rent/sale 공통), 기본 server 모드
+- 경고 문구(공통): 서버 `warning` 수신 시
+  - "물건 위치로부터 가까운 상위 {limit}건만 반환했습니다."
+- 폴백(공통): 서버 장애/타임아웃 시 클라이언트 Top‑K로 근사 표시, 상단 파란 배지로 폴백 안내
 - 클러스터 토글: 공통 `MapView` 옵션 사용(`useClustering`, `clusterToggleEnabled`)
 - 범례/라벨: 전월세 기준 임계값(t1~t4)과 라벨 정책 확정 [결정필요]
   - 제안 A(보증금 기준): t1=2000, t2=5000, t3=10000, t4=20000(만원)
@@ -299,6 +318,60 @@
 
 - 네임스페이스 충돌 방지: 키에 `:rent` 접미어 유지
 - 서버 저장 전환 시 기존 localStorage와 마이그레이션 전략 필요
+
+### 진행 로그(2025-10-14)
+
+- 공통 빌더/정합성
+  - `buildRentFilterParams` 도입, `registry.ts`(rent 목록)·지도 경로에서 공용 사용
+  - 기본값 가드(stripDefaults) 활성, 표준+별칭 동시 전송, ids 게이트/상한(≤500)
+  - 목록 호환 별칭 추가: 보증금(`min_deposit_amount/max_deposit_amount`), 전환금(`min/max_jeonse_conversion_amount`)
+- 지도(KNN)/로깅/UX
+  - `RentSearchResults.tsx`에 디바운스+트레일링, `mapTotal`/경고 표시
+  - 콘솔 태그: `[rent] nearest(server) request/response`, `[rent] KNN check`
+  - 지도 요약 UI를 매매와 동일 위치/스타일(“지도 total: T”)로 통일
+  - 영역 모드 호환: `/real-transactions/area` 호출 시 `dataset=rent` 명시(프런트 임시 대응)
+  - 정렬 보강: `getRowSortTs`가 `contract_date | contractDate | extra.contractDate` 모두 인식하도록 수정
+- 어댑터/좌표/엘리베이터
+  - `toBool`로 `elevator_available` 정규화(Y/N)
+  - `extractLatLng` 보강: lon/x/lat_y 등 혼용 + 한국 범위 기반 스왑 가드
+- 층확인 토큰 모드
+  - `floorTokenMode`: 목록=list(KR 토큰), 지도=map(ENG 토큰) 적용
+- 기본값/필터 정리
+  - 전용면적 기본값을 스토어에서 `[0,300]`으로 통일(초기 활성/총계 불일치 해결)
+  - 연 임대수익률 필터 제거(요청 반영)
+- 백엔드 요청(지도 정합성)
+  - `/map?dataset=rent`에 `rent_type`, `contract_date_from/to`, 전환금 표준/별칭/호환키 반영 요청, echo.filters 노출 요청
+  - `/real-transactions/area?dataset=rent` 수용 또는 `/real-rents/area` 신규 제공 요청(전월세 스키마 응답, 총계/정렬 일관성)
+
+### 콘솔 디버그 태그(개발)
+
+- `[rent] nearest(server) request/response/warning`, `window.__nearestRent`
+- `[rent] KNN check` → `isNonDecreasing` true면 최근접 정렬 정상
+
+### 빠른 검증 체크리스트(요약)
+
+- 전용면적 초기/초기화 후 비활성(파란색 아님), 지역/상세 총계 일치
+- 전세/월세, 계약일자, 전환금: 목록/지도 함께 감소(지도는 서버 반영 필요 항목은 요청서 참조)
+- 층확인: 반지하/일반층 선택 시 목록 0건 아님(토큰 모드 KR 변환 적용)
+- ids: 선택만 보기 ON 시 ids(≤500) 전송, OFF 시 제거
+
+### 진행 로그(2025-10-16)
+
+- 파이프라인/표시
+  - applyCircle ON 시 소스 단일화: `/area` 우선, 실패 시 `/map` KNN 폴백
+  - fetch limit 분리: 요청키에서 cap 제거, 영역 ON 시 서버 limit=1000 고정(표시상한은 렌더에서만 적용)
+  - 지도/통합 탭 요약을 “표시 N / 총 T”로 통일(T=영역 총합 우선)
+  - `/map` 응답을 `datasetConfigs['rent'].adapter.toItemLike`로 표준화 후 전역 소스 주입
+  - /area(list/server) 요청·응답 그룹로그, time, echo, KNN 검증(top5) 로깅 추가(디버그 게이트)
+  - /area 리스트/지도 요청은 `ordering=distance` 고정(목록 정렬은 클라이언트에서 처리) — 422 회피
+- 필터/빌더/스토어
+  - `buildRentFilterParams`: floorTokenMode(en/eng/kr) 허용, 주소검색 필드 확장, `date_from/to` 별칭 병행, `rent_type=all` 미전송, `floor_type` 별칭 병행
+  - 엘리베이터 UI를 표준키(Y/N/all)로 정합(버튼 활성/선택된 필터 바 표기 수정)
+  - 초기 화면 기본 정렬 제거(사용자 클릭 전에는 정렬 없음)
+- 백엔드 협업 문서
+  - `251016_Frontend_to_Backend_real-transactions-area-422-REQUEST.md` — /area 422 재현과 파라미터 수용/echo 명시
+  - `251016_Frontend_to_Backend_real-rents-area-map-consistency-REQUEST.md` — /map·/area 필터/정렬/총계 일관성
+  - `251016_Frontend_to_Backend_real-rents-area-schema-REQUEST.md` — dataset=rent 수용 또는 `/real-rents/area` 도입, 전월세 스키마 표준화
 
 ### 13. SALE → RENT 매핑 요약(차이점 정리)
 

@@ -34,7 +34,8 @@ export function auctionSchema(item: any): {
 } {
   const usage = item?.usage ?? item?.extra?.usage ?? "";
   const caseNumber = item?.case_number ?? item?.extra?.caseNumber ?? "";
-  const title = `${usage} ${caseNumber}`.trim();
+  const rawTitle = `${usage} ${caseNumber}`.trim();
+  const title = rawTitle || String(item?.id ?? "");
   const subtitle =
     item?.general_location ??
     item?.extra?.generalLocation ??

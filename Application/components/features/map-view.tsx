@@ -84,6 +84,8 @@ interface MapViewProps {
   // true (기본값): circleCenter → refMarker → 지도중심 (경매 방식)
   // false: circleCenter만 사용, 폴백 없음 (실거래 방식)
   useRefMarkerFallback?: boolean;
+  // 표시 상한(사용자 UI에서 선택한 cap). 지정 시 내부 Top-K에 반영
+  markerLimit?: number;
 }
 
 function MapView({
@@ -135,6 +137,8 @@ function MapView({
   const [isFullscreen, setIsFullscreen] = useState(false);
   const focusMarkerRef = useRef<any>(null);
   const focusCircleRef = useRef<any>(null);
+  // 🆕 상세→지도 초기 마커(전월세: circleEnabled 여부와 무관하게 표기)
+  const initialCenterMarkerRef = useRef<any>(null);
   const markersRef = useRef<any[]>([]);
   const clustererRef = useRef<any>(null);
   const [clusterEnabled, setClusterEnabled] = useState<boolean>(
@@ -217,6 +221,9 @@ function MapView({
   // Kakao만 사용
   const kakaoKey = process.env.NEXT_PUBLIC_KAKAO_APP_KEY;
   const provider: "kakao" = "kakao";
+  const propsMarkerLimit = (arguments as any)[0]?.markerLimit as
+    | number
+    | undefined;
 
   // 지역 키가 바뀌었을 때 내부 마커/클러스터 정리 및 초기 fitBounds 1회 재허용
   useEffect(() => {
@@ -1314,14 +1321,61 @@ function MapView({
     } catch {}
 
     // 최대 N개만 표시(성능 보호) - 면적 상한과 분리된 표시 상한 사용
-    const MAX = MAP_GUARD.maxMarkers;
-    // 좌표 결측 제외 + 상한 적용
+    const MAX =
+      Number.isFinite(Number(propsMarkerLimit)) && Number(propsMarkerLimit) > 0
+        ? Math.floor(Number(propsMarkerLimit))
+        : MAP_GUARD.maxMarkers;
+    // 좌표 결측 제외 + 상한 적용 (렌트는 기준점 가까운 순 Top-K 지원)
     const filtered = items.filter(
       (it: any) =>
         (it?.latitude ?? it?.lat ?? it?.lat_y ?? it?.y) != null &&
         (it?.longitude ?? it?.lng ?? it?.lon ?? it?.x) != null
     );
-    const slice = filtered.slice(0, MAX);
+    // 기준점 산출: circleCenter → refMarker → 지도중심
+    const refCenter = (function () {
+      if (namespace === "rent") {
+        const c =
+          (circleCenter as any) || (refMarkerCenter as any) || centerCoord;
+        if (
+          c &&
+          Number.isFinite((c as any).lat) &&
+          Number.isFinite((c as any).lng) &&
+          !(Number((c as any).lat) === 0 && Number((c as any).lng) === 0)
+        )
+          return { lat: Number((c as any).lat), lng: Number((c as any).lng) };
+      }
+      return null;
+    })();
+
+    let slice: any[];
+    if (namespace === "rent" && refCenter) {
+      // 거리 근사로 Top-K: (Δlat^2 + Δlng^2) 기준
+      const dx = (lat: number, lng: number) => {
+        const dlat = lat - refCenter.lat;
+        const dlng = lng - refCenter.lng;
+        return dlat * dlat + dlng * dlng;
+      };
+      // K가 작으면 정렬, 크면 힙/퀵셀렉트 고려 가능. 우선 간단 정렬 적용
+      slice = filtered
+        .map((it: any) => {
+          const latRaw = it?.latitude ?? it?.lat ?? it?.lat_y ?? it?.y;
+          const lngRaw = it?.longitude ?? it?.lng ?? it?.lon ?? it?.x;
+          const lat =
+            typeof latRaw === "number" ? latRaw : parseFloat(String(latRaw));
+          const lng =
+            typeof lngRaw === "number" ? lngRaw : parseFloat(String(lngRaw));
+          const score =
+            Number.isFinite(lat) && Number.isFinite(lng)
+              ? dx(lat, lng)
+              : Number.POSITIVE_INFINITY;
+          return { it, score };
+        })
+        .sort((a, b) => a.score - b.score)
+        .slice(0, MAX)
+        .map((e) => e.it);
+    } else {
+      slice = filtered.slice(0, MAX);
+    }
     const toAdd: any[] = [];
     let missingCoords = items.length - filtered.length;
     slice.forEach((it: any, idx: number) => {
@@ -1687,7 +1741,8 @@ function MapView({
       if (!drawCircleCenterMarkerRef.current) {
         drawCircleCenterMarkerRef.current = new w.kakao.maps.Marker({
           position: centerLatLng,
-          draggable: true,
+          // 전월세/매매(namespace==='rent'|'sale')에서는 중심 마커 드래그 비활성화
+          draggable: !(namespace === "rent" || namespace === "sale"),
           zIndex: 6000,
         });
         drawCircleCenterMarkerRef.current.setMap(map);
@@ -1710,6 +1765,12 @@ function MapView({
       } else {
         try {
           drawCircleCenterMarkerRef.current.setPosition(centerLatLng);
+          if (
+            typeof drawCircleCenterMarkerRef.current.setDraggable === "function"
+          )
+            drawCircleCenterMarkerRef.current.setDraggable(
+              !(namespace === "rent" || namespace === "sale")
+            );
         } catch {}
       }
     } catch {}
@@ -1721,7 +1782,152 @@ function MapView({
     mapReady,
     provider,
     centerCoord,
+    namespace,
   ]);
+
+  // 🆕 전월세/매매/경매 초기화: circleCenter가 있으면 최초 1회 중심/레벨 설정(레벨 7)
+  useEffect(() => {
+    if (provider !== "kakao") return;
+    if (!mapReady || !kakaoMapRef.current) return;
+    if (
+      !(
+        namespace === "rent" ||
+        namespace === "sale" ||
+        namespace === "auction_ed"
+      )
+    )
+      return;
+    const center = circleCenter as any;
+    if (
+      !center ||
+      !Number.isFinite(center?.lat) ||
+      !Number.isFinite(center?.lng) ||
+      (Number(center?.lat) === 0 && Number(center?.lng) === 0)
+    )
+      return;
+    if (didInitialFitRef.current) return;
+    try {
+      const w = window as any;
+      const map = kakaoMapRef.current;
+      const latlng = new w.kakao.maps.LatLng(center.lat, center.lng);
+      if (typeof map.setCenter === "function") map.setCenter(latlng);
+      if (typeof map.setLevel === "function") map.setLevel(7);
+      lastCenterRef.current = { lat: center.lat, lng: center.lng };
+      setCenterCoord({ lat: center.lat, lng: center.lng });
+      didInitialFitRef.current = true;
+      pendingFitRef.current = false;
+    } catch {}
+  }, [mapReady, provider, namespace, circleCenter]);
+
+  // 🆕 전월세/매매/경매: 초기 마커 항상 표시(원 표시 여부와 무관), 드래그 불가 + 호버 툴팁
+  useEffect(() => {
+    if (provider !== "kakao") return;
+    if (!mapReady || !kakaoMapRef.current) return;
+    if (
+      !(
+        namespace === "rent" ||
+        namespace === "sale" ||
+        namespace === "auction_ed"
+      )
+    )
+      return;
+    const w = window as any;
+    const map = kakaoMapRef.current;
+    const center = circleCenter as any;
+    const valid =
+      center &&
+      Number.isFinite(center?.lat) &&
+      Number.isFinite(center?.lng) &&
+      !(Number(center?.lat) === 0 && Number(center?.lng) === 0);
+
+    // 표시/제거 분기
+    if (!valid) {
+      try {
+        if (initialCenterMarkerRef.current)
+          initialCenterMarkerRef.current.setMap(null);
+      } catch {}
+      initialCenterMarkerRef.current = null;
+      return;
+    }
+
+    const pos = new w.kakao.maps.LatLng(center.lat, center.lng);
+    try {
+      if (!initialCenterMarkerRef.current) {
+        // 구글 스타일 파란 핀 마커 (화이트 서클 + 하단 삼각형), 40px 표시(레티나 80px 소스)
+        const svg =
+          `<svg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 80 80'>` +
+          `<defs>` +
+          `<linearGradient id='pinGrad' x1='0' y1='0' x2='0' y2='1'>` +
+          `<stop offset='0%' stop-color='#4f86f7'/><stop offset='100%' stop-color='#2b6be8'/></linearGradient>` +
+          `<filter id='pinShadow' x='-50%' y='-50%' width='200%' height='200%'>` +
+          `<feDropShadow dx='0' dy='2' stdDeviation='2' flood-color='rgba(0,0,0,0.25)'/></filter>` +
+          `</defs>` +
+          `<path d='M40 8c-12.7 0-23 10.3-23 23 0 10.8 8.2 19.6 14.4 26.9 3.8 4.5 6.6 8.7 7.9 11.9a1.5 1.5 0 0 0 2.8 0c1.3-3.2 4.1-7.4 7.9-11.9C54.8 50.6 63 41.8 63 31 63 18.3 52.7 8 40 8z' fill='url(#pinGrad)' filter='url(#pinShadow)' stroke='#1e40af' stroke-width='1'/>` +
+          `<circle cx='40' cy='34' r='10' fill='#ffffff' />` +
+          `<path d='M40 30 l-5 7 h10 z' fill='#2b6be8' />` +
+          `</svg>`;
+        const url = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(
+          svg
+        )}`;
+        const size = new w.kakao.maps.Size(48, 48); // +20%
+        const offset = new w.kakao.maps.Point(24, 46);
+        const image = new w.kakao.maps.MarkerImage(url, size, { offset });
+        initialCenterMarkerRef.current = new w.kakao.maps.Marker({
+          position: pos,
+          image,
+          draggable: false,
+          zIndex: 6500,
+        });
+      } else {
+        try {
+          initialCenterMarkerRef.current.setPosition(pos);
+          if (typeof initialCenterMarkerRef.current.setDraggable === "function")
+            initialCenterMarkerRef.current.setDraggable(false);
+        } catch {}
+      }
+      // 원 표시 중에는 중심 핸들 마커가 별도로 존재하므로 초기 마커는 숨김
+      if (circleEnabled) {
+        initialCenterMarkerRef.current.setMap(null);
+      } else {
+        initialCenterMarkerRef.current.setMap(map);
+        // 호버 툴팁: 분석 대상 물건 위치 (마커 아래쪽에 세련된 스타일)
+        try {
+          const content = document.createElement("div");
+          content.style.padding = "6px 10px";
+          content.style.background = "rgba(2,6,23,0.92)"; // slate-950/92
+          content.style.color = "#e5e7eb"; // gray-200
+          content.style.fontSize = "11px";
+          content.style.borderRadius = "8px";
+          content.style.boxShadow = "0 8px 24px rgba(0,0,0,.18)";
+          content.style.border = "1px solid rgba(255,255,255,0.08)";
+          try {
+            (content.style as any).backdropFilter = "blur(4px)";
+          } catch {}
+          content.style.display = "inline-flex";
+          content.style.alignItems = "center";
+          content.style.gap = "6px";
+          content.textContent = "분석 물건";
+          const overlay = new w.kakao.maps.CustomOverlay({
+            position: pos,
+            yAnchor: -0.2, // 마커 아래쪽으로 살짝
+            zIndex: 8000,
+            content,
+          });
+          // mouseover/mouseout으로 표시/숨김
+          w.kakao.maps.event.addListener(
+            initialCenterMarkerRef.current,
+            "mouseover",
+            () => overlay.setMap(map)
+          );
+          w.kakao.maps.event.addListener(
+            initialCenterMarkerRef.current,
+            "mouseout",
+            () => overlay.setMap(null)
+          );
+        } catch {}
+      }
+    } catch {}
+  }, [mapReady, provider, namespace, circleCenter, circleEnabled]);
 
   // Kakao: 분석물건 마커 표시/드래그 제어
   useEffect(() => {

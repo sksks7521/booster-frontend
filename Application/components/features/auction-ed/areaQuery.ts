@@ -57,10 +57,14 @@ export function buildAreaQueryParams(opts: BuildAreaQueryParamsOptions) {
   if ((filters as any)?.town) q.eup_myeon_dong = (filters as any).town;
 
   // price (만원)
+  // 백엔드 요청: 기본값(0~500000)은 '미설정' 처리 → 파라미터 자체를 전송하지 않음
   if (Array.isArray((filters as any)?.priceRange)) {
     const [minP, maxP] = (filters as any).priceRange as [number, number];
-    if (Number.isFinite(minP) && minP > 0) q.price_min = Math.max(0, minP);
-    if (Number.isFinite(maxP) && maxP > 0) {
+    const DEFAULT_MIN = 0;
+    const DEFAULT_MAX = 500000;
+    if (Number.isFinite(minP) && minP > DEFAULT_MIN)
+      q.price_min = Math.max(0, minP);
+    if (Number.isFinite(maxP) && maxP > 0 && maxP < DEFAULT_MAX) {
       const MAX_PRICE_CAP = 100000; // 미만(<) 규칙 상한 보정
       q.price_max = Math.min(MAX_PRICE_CAP, maxP);
     }
@@ -117,6 +121,14 @@ export function buildAreaQueryParams(opts: BuildAreaQueryParamsOptions) {
   const sr = toCsv((filters as any)?.specialRights);
   if (sr) q.special_rights = sr;
 
+  // 특수권리 불리언 컬럼용 canonical 키 CSV 전달 (권장)
+  if (Array.isArray((filters as any)?.specialBooleanFlags)) {
+    const keys = ((filters as any).specialBooleanFlags as any[])
+      .map((s) => String(s).trim())
+      .filter((s) => s !== "");
+    if (keys.length > 0) q.special_conditions = keys.join(",");
+  }
+
   // search mapping
   if ((filters as any)?.searchQuery && (filters as any)?.searchField) {
     const sq = String((filters as any).searchQuery);
@@ -134,5 +146,39 @@ export function buildAreaQueryParams(opts: BuildAreaQueryParamsOptions) {
   q.page = page;
   q.size = Math.min(1000, Number.isFinite(size as any) ? (size as any) : 20);
 
+  return q;
+}
+
+/**
+ * buildAuctionAreaParams
+ * 공통 영역 파라미터 빌더(확장 진입점).
+ * 현재는 기존 buildAreaQueryParams를 위임 호출하여 기능 회귀를 방지합니다.
+ * 이후 표준/별칭/가드 추가 정합화가 필요할 경우 이 진입점을 확장합니다.
+ */
+export function buildAuctionAreaParams(
+  opts: BuildAreaQueryParamsOptions
+): Record<string, any> {
+  const { filters, center, radiusM, page, size, sortBy, sortOrder } = opts;
+  // 공통 빌더로 필터 정규화
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const {
+    buildAuctionFilterParams,
+  } = require("@/lib/filters/buildAuctionFilterParams");
+  const normalized = buildAuctionFilterParams(filters, {
+    includeAliases: true,
+    stripDefaults: true,
+    floorTokenMode: "kr",
+  });
+  // 영역 파라미터 병합
+  const q: Record<string, any> = {
+    ...normalized,
+    center_lat: center?.lat,
+    center_lng: center?.lng,
+    radius_m: clampRadius(radiusM),
+    page,
+    size: Math.min(1000, Number.isFinite(size as any) ? (size as any) : 20),
+  };
+  const key = camelToSnake(sortBy);
+  if (key && sortOrder) q.ordering = `${sortOrder === "desc" ? "-" : ""}${key}`;
   return q;
 }
