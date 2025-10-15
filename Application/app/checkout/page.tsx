@@ -1,5 +1,6 @@
 "use client";
 
+import { Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -24,7 +25,7 @@ const SIMPLE_PLANS: SimplePlanInfo[] = [
   { id: "pro", name: "Pro", priceMonthly: 79000 },
 ];
 
-export default function CheckoutPage() {
+function CheckoutContent() {
   const searchParams = useSearchParams();
   const { user } = useAuthUser();
 
@@ -96,5 +97,13 @@ export default function CheckoutPage() {
         </Card>
       </div>
     </div>
+  );
+}
+
+export default function CheckoutPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-gray-50" />}>
+      <CheckoutContent />
+    </Suspense>
   );
 }
