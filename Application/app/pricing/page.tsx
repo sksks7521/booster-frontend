@@ -11,7 +11,7 @@ export const metadata = {
     description: "스탠다드와 프로 플랜의 기능과 가격을 비교하세요.",
   },
 };
-"use client";
+("use client");
 
 import type React from "react";
 

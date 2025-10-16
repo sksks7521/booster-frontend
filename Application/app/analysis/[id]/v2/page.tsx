@@ -1,4 +1,5 @@
 "use client";
+export const metadata = { robots: { index: false, follow: false } };
 import MapView from "@/components/features/map-view";
 import { AuctionEdMap } from "@/components/features/auction-ed";
 

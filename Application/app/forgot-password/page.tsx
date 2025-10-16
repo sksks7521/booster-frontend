@@ -1,139 +1,153 @@
-"use client"
+"use client";
 
 export const metadata = {
   title: "비밀번호/아이디 찾기",
   description: "등록된 정보로 계정 복구를 진행하세요.",
   alternates: { canonical: "/forgot-password" },
   robots: { index: false, follow: false },
-}
+};
 
-import type React from "react"
+import type React from "react";
 
-import { useState } from "react"
-import Link from "next/link"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Mail, User, ArrowLeft, AlertCircle, CheckCircle, Send } from "lucide-react"
+import { useState } from "react";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Mail,
+  User,
+  ArrowLeft,
+  AlertCircle,
+  CheckCircle,
+  Send,
+} from "lucide-react";
 
 export default function ForgotPasswordPage() {
-  const [activeTab, setActiveTab] = useState("password")
-  const [isLoading, setIsLoading] = useState(false)
-  const [success, setSuccess] = useState("")
-  const [error, setError] = useState("")
+  const [activeTab, setActiveTab] = useState("password");
+  const [isLoading, setIsLoading] = useState(false);
+  const [success, setSuccess] = useState("");
+  const [error, setError] = useState("");
 
   // 비밀번호 찾기 상태
   const [passwordForm, setPasswordForm] = useState({
     email: "",
-  })
+  });
 
   // 아이디 찾기 상태
   const [idForm, setIdForm] = useState({
     name: "",
     email: "",
-  })
+  });
 
   const handlePasswordFormChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target
+    const { name, value } = e.target;
     setPasswordForm((prev) => ({
       ...prev,
       [name]: value,
-    }))
+    }));
     if (error || success) {
-      setError("")
-      setSuccess("")
+      setError("");
+      setSuccess("");
     }
-  }
+  };
 
   const handleIdFormChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target
+    const { name, value } = e.target;
     setIdForm((prev) => ({
       ...prev,
       [name]: value,
-    }))
+    }));
     if (error || success) {
-      setError("")
-      setSuccess("")
+      setError("");
+      setSuccess("");
     }
-  }
+  };
 
   const handlePasswordReset = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setIsLoading(true)
-    setError("")
-    setSuccess("")
+    e.preventDefault();
+    setIsLoading(true);
+    setError("");
+    setSuccess("");
 
     // 유효성 검사
     if (!passwordForm.email.trim()) {
-      setError("이메일을 입력해주세요.")
-      setIsLoading(false)
-      return
+      setError("이메일을 입력해주세요.");
+      setIsLoading(false);
+      return;
     }
 
     if (!passwordForm.email.includes("@")) {
-      setError("올바른 이메일 형식을 입력해주세요.")
-      setIsLoading(false)
-      return
+      setError("올바른 이메일 형식을 입력해주세요.");
+      setIsLoading(false);
+      return;
     }
 
     try {
       // 실제 구현에서는 API 호출
-      await new Promise((resolve) => setTimeout(resolve, 2000)) // 로딩 시뮬레이션
+      await new Promise((resolve) => setTimeout(resolve, 2000)); // 로딩 시뮬레이션
 
       // 임시 비밀번호 재설정 로직
       setSuccess(
-        `${passwordForm.email}로 비밀번호 재설정 링크를 발송했습니다. 이메일을 확인해주세요. (링크는 24시간 동안 유효합니다)`,
-      )
-      setPasswordForm({ email: "" })
+        `${passwordForm.email}로 비밀번호 재설정 링크를 발송했습니다. 이메일을 확인해주세요. (링크는 24시간 동안 유효합니다)`
+      );
+      setPasswordForm({ email: "" });
     } catch (err) {
-      setError("비밀번호 재설정 요청 중 오류가 발생했습니다. 다시 시도해주세요.")
+      setError(
+        "비밀번호 재설정 요청 중 오류가 발생했습니다. 다시 시도해주세요."
+      );
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   const handleIdFind = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setIsLoading(true)
-    setError("")
-    setSuccess("")
+    e.preventDefault();
+    setIsLoading(true);
+    setError("");
+    setSuccess("");
 
     // 유효성 검사
     if (!idForm.name.trim() || !idForm.email.trim()) {
-      setError("이름과 이메일을 모두 입력해주세요.")
-      setIsLoading(false)
-      return
+      setError("이름과 이메일을 모두 입력해주세요.");
+      setIsLoading(false);
+      return;
     }
 
     if (!idForm.email.includes("@")) {
-      setError("올바른 이메일 형식을 입력해주세요.")
-      setIsLoading(false)
-      return
+      setError("올바른 이메일 형식을 입력해주세요.");
+      setIsLoading(false);
+      return;
     }
 
     try {
       // 실제 구현에서는 API 호출
-      await new Promise((resolve) => setTimeout(resolve, 2000)) // 로딩 시뮬레이션
+      await new Promise((resolve) => setTimeout(resolve, 2000)); // 로딩 시뮬레이션
 
       // 임시 아이디 찾기 로직
-      const maskedEmail = idForm.email.replace(/(.{2})(.*)(@.*)/, "$1***$3")
-      setSuccess(`입력하신 정보와 일치하는 아이디는 ${maskedEmail} 입니다.`)
-      setIdForm({ name: "", email: "" })
+      const maskedEmail = idForm.email.replace(/(.{2})(.*)(@.*)/, "$1***$3");
+      setSuccess(`입력하신 정보와 일치하는 아이디는 ${maskedEmail} 입니다.`);
+      setIdForm({ name: "", email: "" });
     } catch (err) {
-      setError("아이디 찾기 요청 중 오류가 발생했습니다. 다시 시도해주세요.")
+      setError("아이디 찾기 요청 중 오류가 발생했습니다. 다시 시도해주세요.");
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         {/* 뒤로가기 버튼 */}
         <div className="mb-8">
-          <Button variant="ghost" size="sm" asChild className="text-gray-600 hover:text-gray-900">
+          <Button
+            variant="ghost"
+            size="sm"
+            asChild
+            className="text-gray-600 hover:text-gray-900"
+          >
             <Link href="/login">
               <ArrowLeft className="w-4 h-4 mr-2" />
               로그인으로 돌아가기
@@ -157,19 +171,27 @@ export default function ForgotPasswordPage() {
           {success && (
             <Alert className="mb-6 border-green-200 bg-green-50">
               <CheckCircle className="h-4 w-4 text-green-600" />
-              <AlertDescription className="text-green-800">{success}</AlertDescription>
+              <AlertDescription className="text-green-800">
+                {success}
+              </AlertDescription>
             </Alert>
           )}
 
           {error && (
             <Alert className="mb-6 border-red-200 bg-red-50">
               <AlertCircle className="h-4 w-4 text-red-600" />
-              <AlertDescription className="text-red-800">{error}</AlertDescription>
+              <AlertDescription className="text-red-800">
+                {error}
+              </AlertDescription>
             </Alert>
           )}
 
           {/* 탭 메뉴 */}
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <Tabs
+            value={activeTab}
+            onValueChange={setActiveTab}
+            className="w-full"
+          >
             <TabsList className="grid w-full grid-cols-2 mb-8">
               <TabsTrigger value="password" className="text-sm font-medium">
                 비밀번호 찾기
@@ -185,7 +207,9 @@ export default function ForgotPasswordPage() {
                 <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
                   <Mail className="w-8 h-8 text-blue-600" />
                 </div>
-                <h2 className="text-lg font-semibold text-gray-900 mb-2">비밀번호를 잊으셨나요?</h2>
+                <h2 className="text-lg font-semibold text-gray-900 mb-2">
+                  비밀번호를 잊으셨나요?
+                </h2>
                 <p className="text-sm text-gray-600">
                   가입하신 이메일 주소를 입력하시면
                   <br />
@@ -195,7 +219,10 @@ export default function ForgotPasswordPage() {
 
               <form onSubmit={handlePasswordReset} className="space-y-6">
                 <div className="space-y-2">
-                  <Label htmlFor="reset-email" className="text-sm font-medium text-gray-700">
+                  <Label
+                    htmlFor="reset-email"
+                    className="text-sm font-medium text-gray-700"
+                  >
                     이메일 주소
                   </Label>
                   <div className="relative">
@@ -234,7 +261,9 @@ export default function ForgotPasswordPage() {
 
               {/* 추가 안내 */}
               <div className="mt-6 p-4 bg-gray-50 rounded-lg">
-                <h3 className="text-sm font-medium text-gray-900 mb-2">이메일이 오지 않나요?</h3>
+                <h3 className="text-sm font-medium text-gray-900 mb-2">
+                  이메일이 오지 않나요?
+                </h3>
                 <ul className="text-xs text-gray-600 space-y-1">
                   <li>• 스팸 메일함을 확인해보세요</li>
                   <li>• 이메일 주소가 정확한지 확인해보세요</li>
@@ -249,7 +278,9 @@ export default function ForgotPasswordPage() {
                 <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
                   <User className="w-8 h-8 text-green-600" />
                 </div>
-                <h2 className="text-lg font-semibold text-gray-900 mb-2">아이디를 잊으셨나요?</h2>
+                <h2 className="text-lg font-semibold text-gray-900 mb-2">
+                  아이디를 잊으셨나요?
+                </h2>
                 <p className="text-sm text-gray-600">
                   가입 시 입력하신 이름과 이메일을 입력하시면
                   <br />
@@ -259,7 +290,10 @@ export default function ForgotPasswordPage() {
 
               <form onSubmit={handleIdFind} className="space-y-6">
                 <div className="space-y-2">
-                  <Label htmlFor="find-name" className="text-sm font-medium text-gray-700">
+                  <Label
+                    htmlFor="find-name"
+                    className="text-sm font-medium text-gray-700"
+                  >
                     이름
                   </Label>
                   <div className="relative">
@@ -278,7 +312,10 @@ export default function ForgotPasswordPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="find-email" className="text-sm font-medium text-gray-700">
+                  <Label
+                    htmlFor="find-email"
+                    className="text-sm font-medium text-gray-700"
+                  >
                     이메일 주소
                   </Label>
                   <div className="relative">
@@ -299,7 +336,9 @@ export default function ForgotPasswordPage() {
                 <Button
                   type="submit"
                   className="w-full h-12 bg-green-600 hover:bg-green-700 text-white font-medium text-base"
-                  disabled={isLoading || !idForm.name.trim() || !idForm.email.trim()}
+                  disabled={
+                    isLoading || !idForm.name.trim() || !idForm.email.trim()
+                  }
                 >
                   {isLoading ? (
                     <div className="flex items-center space-x-2">
@@ -317,10 +356,14 @@ export default function ForgotPasswordPage() {
 
               {/* 추가 안내 */}
               <div className="mt-6 p-4 bg-gray-50 rounded-lg">
-                <h3 className="text-sm font-medium text-gray-900 mb-2">아이디를 찾을 수 없나요?</h3>
+                <h3 className="text-sm font-medium text-gray-900 mb-2">
+                  아이디를 찾을 수 없나요?
+                </h3>
                 <ul className="text-xs text-gray-600 space-y-1">
                   <li>• 가입 시 입력한 정보와 정확히 일치해야 합니다</li>
-                  <li>• 소셜 로그인으로 가입하신 경우 해당 서비스를 이용해주세요</li>
+                  <li>
+                    • 소셜 로그인으로 가입하신 경우 해당 서비스를 이용해주세요
+                  </li>
                   <li>• 문제가 지속되면 고객센터로 문의해주세요</li>
                 </ul>
               </div>
@@ -338,14 +381,21 @@ export default function ForgotPasswordPage() {
           <div className="space-y-4">
             <div className="text-center">
               <p className="text-gray-600 mb-4">계정 정보가 기억나셨나요?</p>
-              <Button variant="outline" className="w-full h-12 border-gray-300 text-gray-700 bg-transparent" asChild>
+              <Button
+                variant="outline"
+                className="w-full h-12 border-gray-300 text-gray-700 bg-transparent"
+                asChild
+              >
                 <Link href="/login">로그인하기</Link>
               </Button>
             </div>
 
             <div className="text-center">
               <p className="text-gray-600 mb-4">아직 계정이 없으신가요?</p>
-              <Button className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white" asChild>
+              <Button
+                className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white"
+                asChild
+              >
                 <Link href="/signup">회원가입</Link>
               </Button>
             </div>
@@ -368,8 +418,12 @@ export default function ForgotPasswordPage() {
         {/* 고객센터 안내 */}
         <div className="mt-6 p-4 bg-white/60 rounded-lg border border-gray-200">
           <div className="text-center">
-            <h3 className="text-sm font-medium text-gray-900 mb-2">도움이 필요하신가요?</h3>
-            <p className="text-xs text-gray-600 mb-3">계정 복구에 어려움이 있으시면 고객센터로 문의해주세요.</p>
+            <h3 className="text-sm font-medium text-gray-900 mb-2">
+              도움이 필요하신가요?
+            </h3>
+            <p className="text-xs text-gray-600 mb-3">
+              계정 복구에 어려움이 있으시면 고객센터로 문의해주세요.
+            </p>
             <Button variant="outline" size="sm" asChild>
               <Link href="/support">고객센터 문의</Link>
             </Button>
@@ -377,5 +431,5 @@ export default function ForgotPasswordPage() {
         </div>
       </div>
     </div>
-  )
+  );
 }
