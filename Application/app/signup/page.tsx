@@ -1,5 +1,12 @@
 "use client";
 
+export const metadata = {
+  title: "회원가입",
+  description: "부동산부스터 계정을 생성하고 서비스를 시작하세요.",
+  alternates: { canonical: "/signup" },
+  robots: { index: false, follow: false },
+};
+
 import type React from "react";
 
 import { useState } from "react";

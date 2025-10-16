@@ -1,5 +1,11 @@
 "use client";
 
+export const metadata = {
+  title: "마이페이지",
+  robots: { index: false, follow: false },
+  alternates: { canonical: "/mypage" },
+};
+
 import type React from "react";
 
 import { useState, useEffect } from "react";

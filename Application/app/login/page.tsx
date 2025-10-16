@@ -1,5 +1,12 @@
 "use client";
 
+export const metadata = {
+  title: "로그인",
+  description: "부동산부스터 계정으로 로그인하세요.",
+  alternates: { canonical: "/login" },
+  robots: { index: false, follow: false },
+};
+
 import { Suspense } from "react";
 import type React from "react";
 
@@ -306,7 +313,7 @@ function LoginContent() {
 
 export default function LoginPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen" />}> 
+    <Suspense fallback={<div className="min-h-screen" />}>
       <LoginContent />
     </Suspense>
   );
