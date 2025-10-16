@@ -21,8 +21,8 @@ interface SimplePlanInfo {
 }
 
 const SIMPLE_PLANS: SimplePlanInfo[] = [
-  { id: "plus", name: "Plus", priceMonthly: 29000 },
-  { id: "pro", name: "Pro", priceMonthly: 79000 },
+  { id: "standard", name: "Standard", priceMonthly: 59,000 },
+  { id: "pro", name: "Pro", priceMonthly: 준비중 },
 ];
 
 function CheckoutContent() {

@@ -1,3 +1,16 @@
+export const metadata = {
+  title: "요금제",
+  description: "스탠다드/프로 요금제 비교와 혜택을 확인하세요.",
+  alternates: { canonical: "/pricing" },
+  openGraph: {
+    title: "요금제 | 부동산부스터",
+    description: "스탠다드와 프로 플랜의 기능과 가격을 비교하세요.",
+  },
+  twitter: {
+    title: "요금제 | 부동산부스터",
+    description: "스탠다드와 프로 플랜의 기능과 가격을 비교하세요.",
+  },
+};
 "use client";
 
 import type React from "react";
@@ -80,9 +93,9 @@ export default function PricingPage() {
       color: "border-gray-200",
     },
     {
-      id: "plus",
-      name: "Plus",
-      description: "개인 투자자를 위한 기본 플랜",
+      id: "standard",
+      name: "Standard",
+      description: "개인 투자자를 위한 스탠다드 플랜",
       price: {
         monthly: 29000,
         yearly: 290000,
