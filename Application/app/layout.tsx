@@ -3,6 +3,8 @@ import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
 import "./globals.css";
 import { Providers } from "./providers";
+import { Analytics } from "@vercel/analytics/react";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import AppShell from "@/components/layout/AppShell";
 
 const siteUrl =
@@ -70,6 +72,8 @@ html {
         <Providers>
           <AppShell>{children}</AppShell>
         </Providers>
+        <Analytics />
+        <SpeedInsights />
       </body>
     </html>
   );

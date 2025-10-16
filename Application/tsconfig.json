@@ -12,7 +12,13 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "jsx": "preserve",
-    "types": ["react", "react-dom", "node"],
+    "types": [
+      "react",
+      "react-dom",
+      "node",
+      "./types/vercel-analytics",
+      "./types/vercel-speed-insights"
+    ],
     "incremental": true,
     "plugins": [
       {
