@@ -17,5 +17,3 @@ export default function Head({ params }: Params) {
     </>
   );
 }
-
-

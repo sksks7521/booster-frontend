@@ -1,10 +1,4 @@
 "use client";
-
-export const metadata = {
-  title: "공지사항",
-  description: "서비스 공지와 업데이트 소식을 확인하세요.",
-  alternates: { canonical: "/notices" },
-};
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";

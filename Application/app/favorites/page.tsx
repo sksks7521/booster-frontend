@@ -1,11 +1,5 @@
 "use client";
 
-export const metadata = {
-  title: "관심 목록",
-  robots: { index: false, follow: false },
-  alternates: { canonical: "/favorites" },
-};
-
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";

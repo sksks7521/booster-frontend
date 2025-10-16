@@ -1,22 +1,4 @@
 "use client";
-
-export const metadata = {
-  title: "부동산부스터 – 데이터 기반 부동산 분석 플랫폼",
-  description:
-    "비정형 부동산을 데이터 기반으로 빠르고 정확하게 분석해 투자 의사결정을 돕습니다.",
-  alternates: { canonical: "/" },
-  openGraph: {
-    title: "부동산부스터",
-    description:
-      "데이터 기반 부동산 분석, 지도/차트/리포트로 인사이트를 한눈에.",
-  },
-  twitter: {
-    title: "부동산부스터",
-    description:
-      "데이터 기반 부동산 분석, 지도/차트/리포트로 인사이트를 한눈에.",
-    card: "summary_large_image",
-  },
-};
 import { useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";

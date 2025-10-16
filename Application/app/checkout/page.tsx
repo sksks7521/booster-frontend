@@ -14,7 +14,6 @@ import {
 } from "@/components/ui/card";
 import { useAuthUser } from "@/hooks/useAuthUser";
 
-
 interface SimplePlanInfo {
   id: string;
   name: string;

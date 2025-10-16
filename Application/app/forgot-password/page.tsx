@@ -1,12 +1,5 @@
 "use client";
 
-export const metadata = {
-  title: "비밀번호/아이디 찾기",
-  description: "등록된 정보로 계정 복구를 진행하세요.",
-  alternates: { canonical: "/forgot-password" },
-  robots: { index: false, follow: false },
-};
-
 import type React from "react";
 
 import { useState } from "react";
