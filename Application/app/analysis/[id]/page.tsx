@@ -1,17 +1,4 @@
 "use client";
-
-export async function generateMetadata({ params }: { params: { id: string } }) {
-  const id = params?.id;
-  const title = `분석 상세 · ${id}`;
-  const description = "데이터 기반 리포트와 비교 분석 결과를 확인하세요.";
-  return {
-    title,
-    description,
-    alternates: { canonical: `/analysis/${id}` },
-    openGraph: { title, description },
-    twitter: { title, description, card: "summary_large_image" },
-  } as const;
-}
 import { useEffect, useState } from "react";
 import useSWR from "swr";
 import { useParams, useRouter } from "next/navigation";
@@ -206,7 +193,7 @@ export default function PropertyDetailPage() {
   if (!property) {
     return (
       <div className="min-h-screen bg-gray-50">
-        <Header user={user} />
+        <Header />
         <div className="container mx-auto px-4 py-8">
           <EmptyState onRetry={refetch} retryText="다시 불러오기" />
           <div className="mt-4 text-center">

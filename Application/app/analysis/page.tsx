@@ -1,18 +1,4 @@
 "use client";
-
-export const metadata = {
-  title: "매물 분석",
-  description: "지역·조건별로 물건을 탐색하고 지도/표로 비교 분석하세요.",
-  alternates: { canonical: "/analysis" },
-  openGraph: {
-    title: "매물 분석 | 부동산부스터",
-    description: "지도/표/필터로 빠르게 투자 대상을 선별하세요.",
-  },
-  twitter: {
-    title: "매물 분석 | 부동산부스터",
-    description: "지도/표/필터로 빠르게 투자 대상을 선별하세요.",
-  },
-};
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";

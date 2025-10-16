@@ -14,12 +14,6 @@ import {
 } from "@/components/ui/card";
 import { useAuthUser } from "@/hooks/useAuthUser";
 
-export const metadata = {
-  title: "결제",
-  description: "선택한 플랜을 확인하고 결제 문의로 진행하세요.",
-  alternates: { canonical: "/checkout" },
-  robots: { index: false, follow: false },
-};
 
 interface SimplePlanInfo {
   id: string;

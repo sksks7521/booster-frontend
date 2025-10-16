@@ -1,11 +1,4 @@
 "use client";
-
-export const metadata = {
-  title: "수익률 계산기",
-  description: "매입가·임대·비용·대출 조건으로 투자 수익률을 계산하세요.",
-  alternates: { canonical: "/calculator" },
-  robots: { index: false, follow: false },
-};
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
