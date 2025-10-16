@@ -1,10 +1,4 @@
 "use client";
-
-export const metadata = {
-  title: "고객센터",
-  description: "문의 접수, FAQ, 내 문의내역을 확인하세요.",
-  alternates: { canonical: "/support" },
-};
 import type React from "react";
 
 import { useState } from "react";

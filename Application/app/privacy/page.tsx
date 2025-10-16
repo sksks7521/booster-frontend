@@ -1,10 +1,4 @@
 "use client";
-
-export const metadata = {
-  title: "개인정보처리방침",
-  description: "개인정보 보호 원칙과 처리 기준을 안내합니다.",
-  alternates: { canonical: "/privacy" },
-};
 import type React from "react";
 
 import { useState } from "react";

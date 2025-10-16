@@ -1,10 +1,4 @@
 "use client";
-
-export const metadata = {
-  title: "이용약관",
-  description: "부스터 서비스 이용에 관한 약관을 안내합니다.",
-  alternates: { canonical: "/terms" },
-};
 import { useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";

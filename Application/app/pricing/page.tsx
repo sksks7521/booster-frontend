@@ -1,17 +1,4 @@
-export const metadata = {
-  title: "요금제",
-  description: "스탠다드/프로 요금제 비교와 혜택을 확인하세요.",
-  alternates: { canonical: "/pricing" },
-  openGraph: {
-    title: "요금제 | 부동산부스터",
-    description: "스탠다드와 프로 플랜의 기능과 가격을 비교하세요.",
-  },
-  twitter: {
-    title: "요금제 | 부동산부스터",
-    description: "스탠다드와 프로 플랜의 기능과 가격을 비교하세요.",
-  },
-};
-("use client");
+"use client";
 
 import type React from "react";
 
