@@ -5,10 +5,39 @@ import "./globals.css";
 import { Providers } from "./providers";
 import AppShell from "@/components/layout/AppShell";
 
+const siteUrl =
+  process.env.NEXT_PUBLIC_SITE_URL ?? "https://booster-frontend.vercel.app";
+const isPreview =
+  process.env.NEXT_PUBLIC_ENV === "preview" ||
+  process.env.VERCEL_ENV === "preview";
+
 export const metadata: Metadata = {
-  title: "v0 App",
-  description: "Created with v0",
-  generator: "v0.dev",
+  title: {
+    default: "부동산부스터",
+    template: "%s | 부동산부스터",
+  },
+  description: "데이터 기반으로 부동산 분석을 더 빠르고 정확하게.",
+  metadataBase: new URL(siteUrl),
+  alternates: {
+    canonical: "/",
+  },
+  openGraph: {
+    type: "website",
+    url: siteUrl,
+    siteName: "부동산부스터",
+    title: "부동산부스터",
+    description: "데이터 기반 부동산 분석 플랫폼",
+    images: [{ url: "/og.png", width: 1200, height: 630 }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "부동산부스터",
+    description: "데이터 기반 부동산 분석 플랫폼",
+    images: ["/og.png"],
+  },
+  robots: isPreview
+    ? { index: false, follow: false }
+    : { index: true, follow: true },
 };
 
 export default function RootLayout({
